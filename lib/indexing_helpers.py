@@ -81,7 +81,6 @@ async def load_and_index_documents(
     return chunk_size, chunk_overlap
 
 
-
 async def load_and_index_web_page(
     url,
     vector_memory,
@@ -125,3 +124,13 @@ async def load_and_index_web_page(
         print(f"Error processing {url}: {e}")
 
     return chunk_size, chunk_overlap
+
+def read_txt_file(file_path: str) -> str:
+    """
+    Reads the content of a .txt file and returns it as a string.
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"Error reading file: {e}"

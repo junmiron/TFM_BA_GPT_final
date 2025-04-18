@@ -27,44 +27,63 @@ async def create_agent_interviewer(model_client, vector_memory, input_func=None)
 
     Returns:
         tuple: A tuple of user_proxy, assistant_agent representing the
-               created agents.
+        created agents.
     """
     user_proxy = UserProxyAgent(
-        name="user_proxy",
-        description="A human user",
-        input_func=input_func,
+            name="user",
+            description="A human user",
+            input_func=input,
+        )
+
+    planning_agent = AssistantAgent(
+        name="planning_agent",
+        description="An agent for planning tasks, this agent should be the first to engage when given a new task.",
+        model_client=model_client,
+        memory=[vector_memory],
+        system_message="""
+        You are a planning agent.
+        Your job is to break down complex tasks into smaller, manageable subtasks.
+        Your team members are:
+            Interviewer: ask the user questions to gather information
+            summarizer: summarize all the information provided and ask the user for feedback
+            user: the human user who will provide information and feedback
+
+        You only plan and delegate tasks - you do not execute them yourself.
+
+        When assigning tasks, use this format:
+        1. <agent> : <task>
+
+        After assigning tasks, wait for all agents to finish their tasks.
+        After all tasks are complete, summarize the findings and end with "TERMINATE".
+        """,
     )
 
     interviewer_agent = AssistantAgent(
-        name="interviewer",
-        model_client=model_client,
-        handoffs=["summarizer", "user"],
-        memory=[vector_memory],
-        system_message=(
-            "You are a professional interviewer."
-            "You will ask the user questions to gather information about:"
-            "the scope and requirements for a change request, a new feature"
-            "or a project."
-            "You will use the RAG memory to get help and context for questions"
-            "When the user say FINISH, you will end the interview and handoff the conversation"""
-            "to the summarizer."
-        ),
-        model_client_stream=True,  # Enable model client streaming.
-    )
+            name="interviewer",
+            description="An agent to ask questions to a human.",
+            model_client=model_client,
+            memory=[vector_memory],
+            system_message=(
+                "You are a Business Analyst."
+                "You will ask the user questions one by one to gather information about"
+                "the scope and requirements for a project."
+                "You will use the RAG memory to get help and context to ask questions"
+            ),
+            model_client_stream=True,  # Enable model client streaming.
+        )
 
     summarizer_agent = AssistantAgent(
-        name="summarizer",
-        model_client=model_client,
-        handoffs=["interviewer", "user"],
-        memory=[vector_memory],
-        system_message=(
-            "You are an expert on making summaries."
-            "You will summarize the conversation between the user and the interviewer."
-            "You will present the summary to the user."
-            "You will also ask the user if they want to add more information."
-            "If the user says yes, you will handoff the conversation to the interviewer."
-        ),
-        model_client_stream=True,  # Enable model client streaming.
-    )
+            name="summarizer",
+            description="An agent that summarizes the information provided.",
+            model_client=model_client,
+            system_message=(
+                "You are an expert on making summaries."
+                "Summarize the the information provided by the interviewer then"
+                "handoff the summary to the user and ask the user if he wants to add more information,"
+                "if the user says yes, you will handoff the conversation to the interviewer"
+                "and let him know the user have more information."
+            ),
+            model_client_stream=True,  # Enable model client streaming.
+        )
 
-    return user_proxy, interviewer_agent, summarizer_agent
+    return user_proxy, interviewer_agent, summarizer_agent, planning_agent
