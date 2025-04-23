@@ -1,0 +1,32 @@
+Tema
+Desarrollo de un asistente basado en inteligencia artificial capaz de realizar un cuestionario inicial a clientes
+internos o externos que soliciten un nuevo proyecto, una modificación o una mejora de procesos.
+Objetivos y Funcionalidad
+El asistente automatizará la primera iteración de la recopilación de requisitos mediante interacción en
+lenguaje natural, optimizando la generación de documentos de especificación funcional.
+Principales funcionalidades:
+• Capacidad para realizar preguntas en lenguaje natural a través de chat o audio.
+• Generación automática de un resumen de la conversación para validación con el cliente.
+• Creación de un documento inicial de especificación funcional (Functional Specification Document)
+que incluirá:
+o Requerimientos
+o Criterios de aceptación
+o Historias de usuario
+o Diagrama BPMN actual (AS-IS)
+o Diagrama BPMN propuesto (TO-BE)
+• Solicitud y gestión de feedback en formato escrito o de audio:
+o Interacción en tiempo real con los stakeholders presentes en la conversación.
+o Posibilidad de obtener retroalimentación asíncrona de otros stakeholders.
+o Control de autorización y límites en la solicitud de feedback por parte de administradores o
+usuarios clave.
+El objetivo principal del asistente no es reemplazar a los Business Analysts (BA), sino optimizar su trabajo
+automatizando la generación de las primeras iteraciones de la documentación. De esta manera, los BA
+podrán enfocarse en la validación y refinamiento de los documentos para su versión final.
+Implementación Técnica
+El desarrollo inicial del chatbot se centrará en una interfaz web sencilla para la interacción, utilizando Jupyter
+Notebook con Ollama como entorno de ejecución. Aunque la integración final contempla su uso en
+plataformas como Slack, Microsoft Teams y WhatsApp, la implementación para el TFM priorizará el desarrollo
+de la inteligencia artificial sobre otros aspectos del software.
+Enfoque de Recuperación y Generación de Información (RAG)
+Para entrenar y mejorar la precisión del modelo, se utilizarán documentos de especificación funcional de
+proyectos internos o disponibles en internet (pendiente de autorización).
