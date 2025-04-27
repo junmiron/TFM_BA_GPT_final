@@ -1,9 +1,12 @@
 ```mermaid
-graph TB
-    A[List potential clients] --> B[Find contact info]
-    B --> C[Send introductory email]
-    C --> D[Schedule follow-up call if response]
-    D --> E[Phone conversation]
-    E --> F[Forward interested client details to manager]
-    F --> G[Additional resources: templates, guidelines, databases]
+graph TD
+    A[Start] --> B[Create a list of potential clients]
+    B --> C[Locate potential clients' email addresses]
+    C --> D[Send an email to each potential client to explain product benefits]
+    D --> E{Did you receive a reply?}
+    E -->|Yes| F[Schedule a phone call]
+    E -->|No| G[End]
+    F --> H[Complete the phone conversation]
+    H --> I[Send any interested clients' information to the sales manager]
+    I --> G[End]
 ```
