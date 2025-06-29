@@ -125,6 +125,7 @@ async def load_and_index_web_page(
 
     return chunk_size, chunk_overlap
 
+
 def read_txt_file(file_path: str) -> str:
     """
     Reads the content of a .txt file and returns it as a string.
@@ -134,3 +135,34 @@ def read_txt_file(file_path: str) -> str:
             return f.read()
     except Exception as e:
         return f"Error reading file: {e}"
+
+
+def read_pdf_file(file_path: str) -> str:
+    """
+    Reads the content of a .pdf file and returns it as a string.
+    """
+    try:
+        loader = PyMuPDFLoader(file_path)
+        documents = loader.load()
+        return documents[0].page_content if documents else ""
+    except Exception as e:
+        return f"Error reading file: {e}"
+
+
+def write_mermaid_to_file(mermaid_code: str, filename: str) -> None:
+    """
+    Write Mermaid diagram code to a .mmd file.
+
+    Args:
+        mermaid_code (str): The Mermaid syntax/code to write.
+        filename (str): The name of the file to write to. Should end with '.mmd'.
+    """
+    if not filename.endswith('.mmd'):
+        raise ValueError("Filename must end with '.mmd'")
+
+    with open(filename, 'w', encoding='utf-8') as file:
+        file.write("```mermaid\n")
+        file.write(mermaid_code)
+        file.write("\n```")
+
+    print(f"Mermaid diagram written to {filename}")
