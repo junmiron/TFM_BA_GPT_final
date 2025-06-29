@@ -30,10 +30,10 @@ async def create_agent_interviewer(model_client, vector_memory, input_func=None)
         created agents.
     """
     user_proxy = UserProxyAgent(
-            name="user",
-            description="A human user",
-            input_func=input,
-        )
+        name="user",
+        description="A human user",
+        input_func=input,
+    )
 
     planning_agent = AssistantAgent(
         name="planning_agent",
