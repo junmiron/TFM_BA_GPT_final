@@ -1,5 +1,7 @@
 /data
 /venv
 /install
-*.yaml
-*.yml
+/src/model_config_azure.yaml
+/src/model_config_ollama.yaml
+/src/model_config_llmstudio.yaml
+/src/model_config_template.yaml
