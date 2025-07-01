@@ -33,30 +33,20 @@ async def create_chromadb_memory(
     """
 
     # --- EMBEDDING FUNCTION (Local SentenceTransformer) --- #
-    emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
+    embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+    model_name="paraphrase-multilingual-mpnet-base-v2"
     )
 
-    # --- CHROMADB SET UP --- #
-    # Step 2: Set up ChromaDB client with embedding function
-    chroma_client = chromadb.Client(Settings(
-        persist_directory=chroma_dir,
-        anonymized_telemetry=False
-    ))
-
-    # Step 3: Create or load the collection with embedding
-    chroma_client.get_or_create_collection(
-        name=collection_name,
-        embedding_function=emb_fn
-        )
-
-    # --- RAG-ENABLED AUTO-GEN SETUP WITH CHROMADB --- #
+# --- RAG-ENABLED AUTO-GEN SETUP WITH CHROMADB --- #
+# Using a specific Sentence Transformer model
     vector_memory = ChromaDBVectorMemory(
-        config=PersistentChromaDBVectorMemoryConfig(
-            collection_name=collection_name,
-            persistence_path=chroma_dir,
-            k=3,
-            score_threshold=0.4,
+    config=PersistentChromaDBVectorMemoryConfig(
+        collection_name=collection_name,
+        persistence_path=chroma_dir,
+        k=3,
+        score_threshold=0.4,
+        embedding_function=embedding_function
         )
     )
+
     return vector_memory

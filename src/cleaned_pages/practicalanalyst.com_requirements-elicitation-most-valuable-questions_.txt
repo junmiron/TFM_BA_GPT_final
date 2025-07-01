@@ -1,0 +1,526 @@
+Requirements Elicitation: Most Valuable Questions | Practical Analyst
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+									TRENDING:								
+
+
+
+Business Analyst Job Description
+
+
+What Does the Future Hold for the Business Analyst Role...
+
+
+Good Requirements Are More Than Just Accurate
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Resources
+
+Articles
+Quotes
+Books
+Blog
+Downloads
+
+
+About
+Contact
+Sitemap
+ 
+
+
+
+
+
+
+Select Page
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+Requirements Elicitation: Most Valuable Questions
+
+Posted by JB | May 28, 2009 | Requirements | 6  | 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+I actually have an ongoing collection of elicitation interview questions that I like to refer to as I prepare for stakeholder interviews. In this post, I’ll discuss why I think that is a good idea, and then share some of my favorite, “go-to” questions that are characteristic of those I might ask of a business owner or stakeholder representative during an initial interview.
+Keep an Inventory of “Great Questions”
+I am convinced that successful requirement elicitation interviews begin with preparation – including researching the problem domain and brainstorming potential questions*. One of the primary points of distinction between the expert analyst and the novice lies in the ability to recognize situations and apply the proper tools – in this case, questions – that suit the situation.
+As I’ve conducted interviews over time, I’ve come to recognize instances where a particular type of question or even specific phrasing of a question works well in eliciting the needed information. When I do, I take a minute to write them down and categorize them.  I find that having such a reference makes preparing for interviews quicker and easier. At the same time, I’ve found that having the list and going over it with some regularity helps me internalize the questions and the situations in which they work best – which enables that steady move from novice to expert.
+Mine has evolved from a simple list of questions into a repository of specific requirement templates and patterns, which, of course, is a topic for another post. Suffice it to say, I’m a big believer in “reuse” which, in my case, means writing it down now so I can benefit from it again later.
+With those things in mind, I’ve listed some questions below; some of my “most valuable” questions. These questions – or derivatives of them – should serve well for nearly any project, but I’d recommend just using them as a guide. If they’re not there already, put them in your “toolbox” of requirement elicitation questions and patterns for recall in the right situation and at the right time.
+1. What “points of pain” are we trying to alleviate with this project? Or, what are the points of pain that caused us consider the project?
+I use this or a similarly worded question to help discover the true business problem and to begin progress toward identifying the root cause. I find that asking about “points of pain” draws out more useful and specific information than just asking “what is the business problem?”, for example. That’s not to say I don’t refer to the business problem by name, but I may ask something more like “what specific business problems is this project aimed at resolving?”
+Possible Alternatives/Follow-ups:
+
+Who are the primary people/roles that are feeling this pain? (This could also accompany item #4)
+Why does this problem exist?
+What need will this project fill?
+
+2. What would happen if we don’t go through with this project? – or – What is the worst likely result(s) of not implementing the project?
+
+I like to use this question to get a feel for the priority and criticality of the project. It also helps me perform a quick sanity check of the business case to confirm that the “need” is based in reality and justifies the expenditure of scarce development resources.
+Possible Alternatives/Follow-ups:
+
+Which among the following will this project improve: Customer Satisfaction, Operational Effectiveness, Increase Revenue, Decrease Cost/Expense, Regulatory Compliance? If none of the above, what is the business reason for spending company resources on this project? (Obviously I wouldn’t phrase the question this way, but you get the idea of the type of content my follow-up may include.)
+
+3. How would you define success for the project? – or – What does success for this project look like to you?
+This is probably my favorite question, and I sometimes lead with it. It helps me understand the stakeholder’s vision for the project and helps with elicitation of business objectives. To follow-up, I like to begin to get an idea of how the objectives line up in terms of priority.
+Possible Alternatives/Follow-ups:
+
+How would you quantify success?
+What is the single most important thing that you want to make sure happens as a result of this project?
+Let’s create a checklist for success factors (or acceptance criteria) that we can review after the project is implemented to determine how successful the project was. … Now, let’s arrange the list in order of importance.
+
+4. Who is going to be the most excited to see this project launched? – or – Who is going to benefit most from the improvements implemented in the project?
+I like to use this type of questioning to identify key stakeholders, users, etc. Also works as a starting point for identifying actors and high-level use cases or user stories. I’ve found it to be more effective than the generic, “so, who is going to be impacted by the project?” line.
+Possible Alternatives/Follow-ups:
+
+Who else might I speak with to get additional perspective on how this process/function/etc. should work?
+How do you deal with the problem/situation now?
+
+5. Is there anything else you think I should know that we haven’t covered during this discussion?
+I always like to close an interview with this one. Regardless of how well I plan or how well I brainstorm possible questions, I’ll inevitably miss something. That’s just how it works. Asking if there is anything else almost always uncovers a couple of items of value.
+Honorable Mention
+If the above are my “starting five” elicitation questions, then the simple question, “why?” is always first off the bench. While it isn’t targeted to elicit any specific requirement information on its own, it is probably the most versatile follow-up question at a BA’s disposal. For every question above, you could reasonably follow up with some tactful form of the question “why?” to uncover additional information and requirements.
+“Why?” is a great vehicle for getting you from the vague to the specific; from the symptom to the cause; from wants to needs (read: The 5 Why’s).
+So, now that I’ve shared some of my “most valuable questions”, what are some of yours? Do you have certain questions or types of questions you like to ask in a certain situation?
+And if you think you could benefit from keeping a catalog of good questions similar to mine, I’d encourage you to do so. If you’d like some help getting started, I’d be glad to tell you what I use and how I structure mine. Just drop me a line via my contact link.
+As always, I’ll be interested in hearing from you!
+*As you do your preparatory research and consider the types of questions to ask, I’d refer you to one of my all-time favorite articles  on the topic by Esther Derby (@estherderby). In it, she describes in more detail some of the various form of questions and provides some guidance on when and how they might be used.
+8/19/09: Update – 
+Here’s a link to some more good elicitation questions from Joy Matthews @ Pierson Requirements Group.
+
+
+
+
+Share:
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+Rate: 
+
+
+
+
+
+
+ 
+
+
+
+
+PreviousAre "Project Teams" Really Teams? 
+
+NextGoogle Wave for Business Analysis 
+
+
+
+
+About The Author
+
+
+
+ 
+
+JB
+Jonathan Babcock is a management and IT consultant with expertise in business analysis, process optimization and solution delivery methodology. Practical Analyst is his outlet for sharing what he's learned, and for interacting with solution delivery professionals across the globe.
+
+
+
+
+
+
+
+
+
+
+
+Related Posts
+
+
+
+
+
+
+What’s in a Signature?
+June 23, 2009
+
+
+
+
+
+Good Requirements Are More Than Just Accurate
+December 18, 2007
+
+
+
+
+
+Give ’em Pictures!
+February 3, 2010
+
+
+
+
+
+Requirements Are the Keystone
+June 9, 2009
+
+
+
+
+
+6 Comments
+
+
+
+
+ 
+
+Self Esteem 
+					on January 17, 2010 at 12:18 AM				
+
+
+
+Thank you so much, Great information… You keep writing and I’ll keep reading.
+Reply 
+
+
+
+
+
+
+ 
+
+Nkele 
+					on June 17, 2010 at 12:49 PM				
+
+
+
+Hi Jonathan,
+Elicitation is my most challenging area as I do not have good questioning skills and I am poor at probing.  I am looking at decveloping the skill, sample questions like yours can set me on the right track.  Would you mind sharing your templates with me please.
+Many Thanks!
+Novice BA
+Nkele
+Reply 
+
+
+
+
+
+
+ 
+
+dougieb5000 
+					on May 1, 2012 at 7:21 AM				
+
+
+
+I have been an analyst for a little while now and I have to say this is a perfectly succinct starting point for requirements gathering! Well done
+Reply 
+
+
+
+
+
+
+ 
+
+Toni 
+					on June 13, 2014 at 1:52 PM				
+
+
+
+It’s always interesting to see how others approach requirements gathering. Thanks for the information.
+Reply 
+
+
+
+
+
+
+ 
+
+Angelo the BA 
+					on September 9, 2014 at 10:55 PM				
+
+
+
+The beginning stages of elicitation are the most difficult for me cause that’s when I’m really getting my feet wet, but I think after you go through a couple of cycles, especially when things get slowed down because of misses in the requirements, it helps you ask better questions in the future.
+I don’t have a list of go to questions as of yet (perhaps I should consider it), I typically choose a work-product that I know I’ll need/want to create (like a diagram, data model, etc) and use that to guide my initial questions. Its important to keep an open mind and change directions on a work-product type if its starting to not make sense or not get results in the arena your in.
+Reply 
+
+
+
+
+
+
+ 
+
+More 
+					on August 24, 2015 at 4:22 AM				
+
+
+
+what is meant by a use case during the elicitation of requirements.
+Reply 
+
+
+
+
+
+Trackbacks/Pingbacks
+
+Jonathan Babcock - New blog post: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o	
+doug goldberg - RT RT @jonbab1New blog post: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o Always thought provoking.	
+Rob - Pondering sharing reqs interview questions thx to @jonbab1: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o #baot	
+Gundega Lazdane - RT @jonbab1 Requirements Elicitation: “Most Valuable” Questions : Practical Analyst http://bit.ly/DkM0o (via @tweetmeme)	
+Escalation and Infinite Regression : Practical Analyst - […] and define the business problem (or point of pain) to be addressed. If done properly, this will include some…	
+Requirements Elicitation: Are You the Artist, or the Order-Taker? : Practical Analyst - […] serious thought to the types of questions you might ask before the interviews take place I’ve touched on that…	
+Four Key Knowledge Areas for Business Analysts : Practical Analyst - […] well do I understand the principles and techniques of requirements elicitation, analysis, specification, validation and management? How well do…	
+Patterns and the Evolving Business Analyst | Practical Analyst - […] dealings with the similar item? In the case of requirements, I might review specific requirements, questions I asked to…	
+
+
+
+Leave a reply Cancel replyYour email address will not be published. Required fields are marked *COMMENTName * 
+Email * 
+Website 
+ 
+
+Δ 
+
+
+
+ 
+
+Search for:
+
+
+
+  
+
+
+ 
+
+Recent Posts
+
+
+Tweets of the Week – 20180713
+
+
+The Real Value of Visuals in Solution Delivery – A Reprise
+
+
+Hippocrates on Clarity of Language
+
+
+The Book, The Movie, and the Business Document
+
+
+Interview with Ryland Leyton, author of “The Agile Business Analyst”
+
+
+John Dewey on Starting with a Problem to be Solved
+
+
+Business analyst, these are the reasons your project will succeed
+
+
+Four Critical Components of a Meeting Invitation
+
+
+Benjamin L. Kovitz on Requirements
+
+
+Business Analysts and Grammar Police
+
+
+Visionary Leadership and You
+
+
+Alistair Cockburn – Agile is an Attitude
+
+
+Business Analysis Success is . . .
+
+
+Harold Evans on Creating Understanding
+
+
+The “Obviousness” Danger that Kills Projects
+
+
+Jabian Journal and Visual Communication
+
+
+Distinguishing between Business Rules and Software Requirements
+
+
+Roughly Right, or Precisely Wrong?
+
+
+6 Guidelines for Building a Reputation with Your New Employer
+
+
+Why Stakeholders Don’t Tell You Everything
+
+
+ Categories
+
+Books & Literature
+
+Business Analysis
+
+Communication
+
+Link Share
+
+Management
+
+Methodology
+
+Miscellanea
+
+Module Library
+
+Performance
+
+Professional Development
+
+Professionalism
+
+Quotes
+
+Requirements
+
+Video
+
+Weekly Digest
+
+
+ 
+ 
+ 
+ 
+
+
+
+
+Designed by Elegant Themes | Powered by WordPress

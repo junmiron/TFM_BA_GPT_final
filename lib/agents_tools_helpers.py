@@ -5,6 +5,7 @@ uses a text splitter to divide documents into smaller chunks
 for efficient indexing.
 """
 import os
+import asyncio
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
     PyMuPDFLoader,
@@ -82,48 +83,69 @@ async def load_and_index_documents(
 
 
 async def load_and_index_web_page(
-    url,
+    urls,
     vector_memory,
     chunk_size=500,
     chunk_overlap=50
 ):
     """
-    Loads a web page from the specified URL, splits its content into chunks,
-    and indexes the chunks in the provided AutoGen vector memory.
-
-    Args:
-        url (str): The URL of the web page to load.
-        vector_memory: The vector memory object to index the web page into.
-        chunk_size (int): Number of characters in each chunk.
-        chunk_overlap (int): Number of overlapping characters between chunks.
+    Loads one or multiple web pages, extracts readable content using readability-lxml,
+    and indexes the clean text chunks in the AutoGen vector memory.
     """
-    # Instantiate the text splitter (same as for documents)
+    if isinstance(urls, str):
+        urls = [urls]
+
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap
     )
 
-    try:
-        # Use a web page loader from LangChain. If you prefer an alternate loader
-        # (e.g., UnstructuredURLLoader) you can change it here.
-        loader = WebBaseLoader(url)
-        docs = loader.load()
-        split_docs = text_splitter.split_documents(docs)
+    # Cleaner to remove scripts, style tags, etc.
+    cleaner = Cleaner()
+    cleaner.javascript = True
+    cleaner.style = True
+    cleaner.kill_tags = ['noscript', 'iframe', 'header', 'footer', 'nav', 'aside']
 
-        for i, chunk in enumerate(split_docs):
-            await vector_memory.add(
-                MemoryContent(
-                    content=chunk.page_content,
-                    mime_type=MemoryMimeType.TEXT,
-                    metadata={"source": url, "chunk_index": i}
-                )
-            )
+    async def process_url(url):
+        try:
+            loader = WebBaseLoader(url)
+            docs = loader.load()
 
-        print(f"Indexed {len(split_docs)} chunks from {url}.")
+            for doc in docs:
+                raw_html = doc.page_content
 
-    except Exception as e:
-        print(f"Error processing {url}: {e}")
+                # Use readability to extract main content
+                readable_doc = Document(raw_html)
+                readable_html = readable_doc.summary()
+
+                # Clean the HTML
+                cleaned_html = cleaner.clean_html(readable_html)
+
+                # Convert to plain text
+                parsed = lxml.html.fromstring(cleaned_html)
+                clean_text = parsed.text_content().strip()
+
+                # Now split and index the cleaned text
+                chunks = text_splitter.split_text(clean_text)
+
+                for i, chunk in enumerate(chunks):
+                    await vector_memory.add(
+                        MemoryContent(
+                            content=chunk,
+                            mime_type=MemoryMimeType.TEXT,
+                            metadata={"source": url, "chunk_index": i}
+                        )
+                    )
+
+                print(f"Indexed {len(chunks)} cleaned chunks from {url}.")
+
+        except Exception as e:
+            print(f"Error processing {url}: {e}")
+
+    tasks = [process_url(url) for url in urls]
+    await asyncio.gather(*tasks)
 
     return chunk_size, chunk_overlap
+
 
 
 def read_txt_file(file_path: str) -> str:
