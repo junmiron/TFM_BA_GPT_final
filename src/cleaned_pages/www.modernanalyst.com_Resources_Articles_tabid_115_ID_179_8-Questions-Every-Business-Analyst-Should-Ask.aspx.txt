@@ -341,7 +341,7 @@ Recent Posts
 
 
 
-            166455 Views
+            166474 Views
         
 
             2 Comments
@@ -400,7 +400,7 @@ Like this article: 12345
 
 
 
-            166455 Views
+            166474 Views
             
 
             2 Comments
@@ -569,6 +569,8 @@ Access and Transform Data in Minutes with Alteryx and Databricks
 ACE THE INTERVIEW
 
 
+» What is Process Mining?
+
 » What is Zero-Trust Architecture (ZTA)?
 
 » Explain the Data Mesh paradigm and contrast it with a Centralized Data Lake
@@ -576,8 +578,6 @@ ACE THE INTERVIEW
 » What is Wardley Mapping?
 
 » What is Value Stream Mapping?
-
-» How do you decide whether to optimize or re-engineer a process?
 
 Submit Questions »
 
