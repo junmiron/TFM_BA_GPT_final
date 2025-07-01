@@ -107,4 +107,3 @@ async def create_agents_from_config(yaml_path: str, agent_names: list, model_cli
             raise ValueError(f"Unsupported agent type: {agent_type}")
 
     return user_proxy, agents
-
