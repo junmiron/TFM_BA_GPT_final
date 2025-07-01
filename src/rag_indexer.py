@@ -12,12 +12,9 @@ STATE_FILE = "../index_state.json"
 
 SITES = [
     "https://www.morebusiness.com/business-analyst-interview-questions/",
-    "https://ellogy.ai/comprehensive-guide-asking-the-right-questions-in-it-requirements-gathering/",
-    "https://medium.com/@alishadhillon__/typical-requirements-gathering-questions-in-a-data-viz-project-fa7c04f0b2ad",
     "https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/",
     "https://practicalanalyst.com/requirements-elicitation-most-valuable-questions/",
     "https://www.modernanalyst.com/Resources/Articles/tabid/115/ID/179/8-Questions-Every-Business-Analyst-Should-Ask.aspx",
-    "https://www.thenarratologist.com/best-business-analyst-questions-to-gather-requirements/",
     "https://www.requiment.com/business-analyst-requirements-gathering-interview-questions-answers/",
 ]
 
