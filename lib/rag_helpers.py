@@ -9,9 +9,10 @@ returns a vector memory object for use in RAG-enabled applications.
 import asyncio
 import json
 import os
-from typing import Union
-
+import sys
+import yaml  # Requires pyyaml
 import lxml.html
+from lxml.html.clean import Cleaner
 from autogen_core.memory import MemoryContent, MemoryMimeType
 from autogen_ext.memory.chromadb import (ChromaDBVectorMemory,
                                          PersistentChromaDBVectorMemoryConfig)
@@ -19,8 +20,9 @@ from chromadb.utils import embedding_functions
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
     PyMuPDFLoader, TextLoader, UnstructuredWordDocumentLoader, WebBaseLoader)
-from lxml_html_clean import Cleaner
 from readability import Document
+from pathlib import Path
+from typing import Union
 
 
 async def create_chromadb_memory(
@@ -265,3 +267,53 @@ def load_index_state(state_file_path):
 def save_index_state(state, state_file_path):
     with open(state_file_path, "w") as f:
         json.dump(state, f, indent=2)
+
+def load_config(yaml_path):
+    with open(yaml_path, "r") as f:
+        return yaml.safe_load(f)
+
+async def rag_indexer_runner(config_path):
+    # Load config
+    config = load_config(config_path)
+    CHROMA_DIR = config["CHROMA_DIR"]
+    DOCS_DIR = config["DOCS_DIR"]
+    COLLECTION_NAME = config["COLLECTION_NAME"]
+    STATE_FILE = config["STATE_FILE"]
+    SITES = config["SITES"]
+
+    state = load_index_state(STATE_FILE)
+    already_indexed_files = set(state.get("indexed_files", []))
+    already_indexed_urls = set(state.get("indexed_urls", []))
+
+    vector_memory = await create_chromadb_memory(CHROMA_DIR, COLLECTION_NAME)
+
+    # --- Find all files in DOCS_DIR
+    all_files = {
+        str(f.relative_to(DOCS_DIR)) for f in Path(DOCS_DIR).rglob("*")
+        if f.is_file() and f.suffix.lower() in {".pdf", ".docx", ".txt"}
+    }
+
+    new_files = all_files - already_indexed_files
+    new_urls = set(SITES) - already_indexed_urls
+
+    if new_files or new_urls:
+        print("🔄 Indexing new content...")
+
+        # Documents
+        if new_files:
+            print(f"📄 Found {len(new_files)} new documents.")
+            await load_and_index_documents(DOCS_DIR, vector_memory)
+            state["indexed_files"] = sorted(list(all_files))
+            print(f"✅ Indexed documents in {DOCS_DIR}.")
+
+        # URLs
+        if new_urls:
+            print(f"🌐 Found {len(new_urls)} new URLs.")
+            await load_and_index_web_page(list(new_urls), vector_memory)
+            state["indexed_urls"] = sorted(list(already_indexed_urls.union(new_urls)))
+            print("✅ Indexed web pages.")
+
+        save_index_state(state, STATE_FILE)
+    else:
+        print("✅ All documents and URLs are already indexed.")
+    return vector_memory

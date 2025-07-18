@@ -1,14 +1,19 @@
 import os
 import yaml
+from autogen_core.memory import MemoryContent, MemoryMimeType
+from autogen_core.models import ChatCompletionClient, ModelInfo
+from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
+from autogen_agentchat.teams import RoundRobinGroupChat, Swarm, SelectorGroupChat
+from autogen_agentchat.conditions import TextMentionTermination, HandoffTermination, TextMentionTermination, MaxMessageTermination
+from autogen_agentchat.messages import HandoffMessage
+from autogen_agentchat.ui import Console
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_ext.models.ollama import OllamaChatCompletionClient
+from autogen_ext.memory.chromadb import ChromaDBVectorMemory, PersistentChromaDBVectorMemoryConfig
+from autogen_ext.memory.canvas import TextCanvasMemory
 from autogen_ext.auth.azure import AzureTokenProvider
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 
-# Import your actual model client class; replace with correct import as needed
-# For example:
-# from autogen.oai.client import ChatCompletionClient
-from autogen.oai.client import ChatCompletionClient
 
 def get_base_path():
     try:

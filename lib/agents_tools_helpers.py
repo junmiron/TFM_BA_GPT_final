@@ -11,8 +11,9 @@ from langchain_community.document_loaders import (
     PyMuPDFLoader,
     TextLoader,
     UnstructuredWordDocumentLoader,
+    WebBaseLoader,
 )
-from langchain.document_loaders import WebBaseLoader
+import fitz  # PyMuPDF
 from autogen_core.memory import MemoryContent, MemoryMimeType
 
 # --- INDEXING UTILITIES --- #
@@ -27,7 +28,7 @@ from autogen_core.memory import MemoryContent, MemoryMimeType
 # errors during processing.
 
 
-def read_txt_file(file_path: str) -> str:
+def read_txt_file_tool(file_path: str) -> str:
     """
     Reads the content of a .txt file and returns it as a string.
     """
@@ -38,7 +39,7 @@ def read_txt_file(file_path: str) -> str:
         return f"Error reading file: {e}"
 
 
-def read_pdf_file(file_path: str) -> str:
+def read_pdf_file_tool(file_path: str) -> str:
     """
     Reads the content of a .pdf file and returns it as a string.
     """
@@ -50,7 +51,23 @@ def read_pdf_file(file_path: str) -> str:
         return f"Error reading file: {e}"
 
 
-def write_mermaid_to_file(mermaid_code: str, filename: str) -> None:
+def write_pdf_file_tool(text: str, file_path: str):
+    """
+    Writes the given text into a PDF file at the specified path.
+    """
+    try:
+        doc = fitz.open()  # New empty PDF
+        page = doc.new_page()  # Add a new page
+        # Simple insertion: top-left corner, can be customized
+        page.insert_text((72, 72), text, fontsize=12)
+        doc.save(file_path)
+        doc.close()
+        return f"PDF successfully written to {file_path}"
+    except Exception as e:
+        return f"Error writing PDF: {e}"
+
+
+def write_mermaid_to_file_tool(mermaid_code: str, filename: str) -> None:
     """
     Write Mermaid diagram code to a .mmd file.
 

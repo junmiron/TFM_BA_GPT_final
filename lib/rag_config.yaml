@@ -1,0 +1,10 @@
+CHROMA_DIR: "../chromadb_storage"
+DOCS_DIR: "../data"
+COLLECTION_NAME: "rag_collection"
+STATE_FILE: "../index_state.json"
+SITES:
+  - "https://www.morebusiness.com/business-analyst-interview-questions/"
+  - "https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/"
+  - "https://practicalanalyst.com/requirements-elicitation-most-valuable-questions/"
+  - "https://www.modernanalyst.com/Resources/Articles/tabid/115/ID/179/8-Questions-Every-Business-Analyst-Should-Ask.aspx"
+  - "https://www.requiment.com/business-analyst-requirements-gathering-interview-questions-answers/"

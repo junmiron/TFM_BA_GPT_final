@@ -45,7 +45,6 @@ import importlib
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 
 def import_from_string(dotted_path: str):
-    """Dynamically import a symbol from a dotted path like 'agents_tools_helpers.read_pdf_file'."""
     try:
         module_path, attr = dotted_path.rsplit('.', 1)
         module = importlib.import_module(module_path)
@@ -58,15 +57,27 @@ def load_agent_config(yaml_path: str) -> dict:
         return yaml.safe_load(f)
 
 def inject_team_members(system_message: str, agent_names: list, planning_agent_name: str = "planning_agent"):
-    """
-    Inserts team member names into the system message under 'Your team members are:'.
-    Replaces the placeholder with a generated list.
-    """
     team_members = [name for name in agent_names if name != planning_agent_name and name != "user_proxy"]
     formatted_list = "\n".join(f"  - {member}" for member in team_members)
     return system_message.replace("Your team members are:", f"Your team members are:\n{formatted_list}")
 
-async def create_agents_from_config(yaml_path: str, agent_names: list, model_client=None, vector_memory=None, input_func=input):
+def resolve_memory(cfg, vector_memory, canvas_memory):
+    mem_type = str(cfg.get("use_memory", "false")).lower()
+    if mem_type == "vector_memory":
+        return [vector_memory]
+    elif mem_type == "canvas_memory":
+        return [canvas_memory]
+    else:
+        return None
+
+async def create_agents_from_config(
+    yaml_path: str,
+    agent_names: list,
+    model_client=None,
+    vector_memory=None,
+    canvas_memory=None,
+    input_func=input
+):
     config = load_agent_config(yaml_path)
 
     user_proxy = None
@@ -94,11 +105,13 @@ async def create_agents_from_config(yaml_path: str, agent_names: list, model_cli
             if name == "planning_agent":
                 system_message = inject_team_members(system_message, agent_names)
 
+            agent_memory = resolve_memory(cfg, vector_memory, canvas_memory)
+
             agents[name] = AssistantAgent(
                 name=name,
                 description=cfg.get("description", ""),
                 model_client=model_client,
-                memory=[vector_memory] if cfg.get("use_memory", False) else None,
+                memory=agent_memory,
                 tools=tools if tools else None,
                 system_message=system_message,
                 model_client_stream=cfg.get("stream", False)
@@ -107,3 +120,4 @@ async def create_agents_from_config(yaml_path: str, agent_names: list, model_cli
             raise ValueError(f"Unsupported agent type: {agent_type}")
 
     return user_proxy, agents
+
