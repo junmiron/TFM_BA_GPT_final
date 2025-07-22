@@ -1,0 +1,35 @@
+Quiero que escribas un trabajo final de master de una maestria de IA. Este trabajo debe representar el marco teorico, state of the art y metodologia de siguiente proyecto.
+
+"a Business analyst GTP multi agent bot that have the job to collect the project requirements interviewing the customer, then writing the functional specification document.
+For the Agent framework Im using autogen Ihave 7 agents defined in agents_config.yaml 0.6.2. I have 7 Agents and the user_proxy defined and described in agents_config.yaml.
+The workflow should be like this:
+1- The team is managed using SelectorGroupChat from autogen 0.6.2
+2- the planing agent get assigned first to make the plan of action
+    a- The interviewer agent start the interview with the user to collect the requirements, it use the RAG memory as a refferece to know what to ask
+    b- The summarizer Agent Summarize the the information provided by the interviewer then handoff the "summary" to the user and ask the user if he wants to add more information
+    c- The doc_writter Agent use the summary to writte the functional specification document
+    d- funct_spec_checker agent verify that nothing is missing in the functional specification document
+    e- diagram_creator_agent use the functinal spec document to create a diagram of the process
+    f- mermaid_code_reviewer_agent review the diagram code and make sure nothing is missing
+
+You can find in project/lib:
+
+- agents_creator.py a library to create agents
+- agents_tools_helpers.py a library with agent agents_tools_helpers
+- rag_helpers.py functions to index and create the RAG and autogen vector memeory
+
+in project/src you can find:
+
+- model_loader.py library with functions to load an LLM model_loader
+- rag_indexer.py library that use the functions of rag_helpers.py to create the RAG
+- model_config_azure.yaml, model_config_llmstudio.yaml, model_config_ollama.yaml the model configuartion that are used by model_loader"
+
+El trabajo final de master no debe centrarse en el codigo fuente sino en el marco teorico, state of the art y metodologia, para este debes realizar una investigación detallada de Systemas y frameworks de agentes IA, sistemas y frame works de multiagentes de IA.
+
+Para el marco teorico y el state of the art debes utilizar la informacion de los siguientes papers adjuntos: METAGPT - METAP ROGRAMMING FOR A MULTI -AGENT COLLABORATIVE FRAMEWORK.pdf; ChatDev - Communicative Agents for Software Development; An organizational theory for multi-agent interactions integrating human agents  LLMs and specialized AI.pdf; Large Language Model Agent - A Survey on Methodology Applications and Challenges.pdf pero tambien debes buscam mas informacion en internet.
+
+Para Metodologia e implementacion puedes usar los siguientes archivos de codigo adjuntos: agents_config.yaml, agents_creator.py, agents_tools_helpers.py, rag_config.yaml, rag_helpers.py, agents_config.yaml, agents_creator.py, agents_tools_helpers.py, rag_config.yaml, rag_helpers.py, BA_GPT.ipynb
+
+Para la estructura del tranajo final de master puedes usar "Contreras - Predicción e interpolación dinámica de los niveles de contaminación atmosférica media.pdf" solo para la estructura y el formato, no utilices el contenido!
+
+No olvides de poner referencias y toma todo el timepo necesario para hacer un buen trabajo

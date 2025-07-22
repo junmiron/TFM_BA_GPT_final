@@ -1,0 +1,6 @@
+Framework,Tipo de Orquestación,Paradigma Principal,Flexibilidad,Control Centralizado,Aplicación Típica
+AutoGen,Colaborativa deliberativa (flujo dinámico),Topic-Based Debate / MAD / TB-CSPN,Alta (flujo dinámico y reconfigurable),No (selección dinámica por selector o Swarm),"Bots deliberativos, agentes adaptativos, RAG contextual"
+MetaGPT,Jerárquica controlada (flujo estático),ReAct + Workflow explícito,Media (estructura fija con especialización por rol),Sí (controlador asigna fases y tareas),"Simulación de empresas, desarrollo de software colaborativo"
+ChatDev,Secuencial con roles fijos (flujo estructurado),ReAct + Protocolos de interacción técnica,Media (estructura fija con etapas definidas),Sí (secuencia rígida de ejecución),"Generación y validación de código, flujo completo de software"
+LangChain,Orquestación modular de cadenas y herramientas,ReAct + Llamadas a herramientas externas,Alta (composición libre de flujos y herramientas),Opcional (según diseño de flujo),"Construcción de pipelines LLM, asistentes inteligentes"
+LlamaIndex,Indexación y recuperación orientada a datos,RAG (Retrieval-Augmented Generation),Alta (acoplamiento con múltiples fuentes de datos),No (el modelo decide con base en recuperación),"Sistemas de búsqueda semántica, Q&A, asistentes documentales"
