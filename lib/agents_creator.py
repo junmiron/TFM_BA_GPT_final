@@ -113,11 +113,12 @@ async def create_agents_from_config(
                 model_client=model_client,
                 memory=agent_memory,
                 tools=tools if tools else None,
+                reflect_on_tool_use=cfg.get("reflect_on_tool_use", False),
                 system_message=system_message,
-                model_client_stream=cfg.get("stream", False)
+                model_client_stream=cfg.get("stream", False),
             )
+
         else:
             raise ValueError(f"Unsupported agent type: {agent_type}")
 
     return user_proxy, agents
-

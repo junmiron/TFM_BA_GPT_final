@@ -1,0 +1,13 @@
+```mermaid
+graph TD
+    A[Start: AI Dialer System] --> B[Retrieve customer info from CRM]
+    B --> C[Customer answers the call?]
+    C -->|No| D[End Call]
+    C -->|Yes| E[Offer predefined travel package]
+    E --> F[Customer interested?]
+    F -->|Yes| G[Transfer to human agent]
+    F -->|No| H[Retry offer (Max 3 attempts)]
+    H --> I[Max retries reached?]
+    I -->|Yes| J[End Call]
+    I -->|No| E
+```

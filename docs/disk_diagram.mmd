@@ -1,27 +1,18 @@
 ```mermaid
-graph TD
-  A[Customer Project Starts] -->|Interview Process| B[Interviewer Agent]
-  B -->|Stores Raw Requirements| C[Requirement Database]
-  C -->|Shares Requirements| D[Validator Agent]
-  D -->|Removes Ambiguities| E[Summarizer Agent]
-  E -->|Generates Draft Specification| F[Final Functional Specification Document]
-  F -->|Shares for Review| G[Stakeholder Feedback Process]
-  G -->|Updated Document| F
-
-%% Detailed Interactions:
-subgraph Interview Process
-  B1[Schedules Meetings with Customers] --> B2[Asks Requirement Specific Questions]
-end
-
-subgraph Validator and Summarizer Workflow
-  D1[Analyzes Conflicting Inputs] --> D2[Validates with Customer]
-  D2 --> E1[Summarizes Scope and Needs]
-end
-
-%% Overall System Architecture:
-subgraph Multi-Agent GPT Bot
-  B[Interviewer Agent] --> C[Requirement Database]
-  C --> D[Validator Agent]
-  D --> E[Summarizer Agent]
-end
+%% Functional Specification Diagram with System Integration Labels
+flowchart TD
+    A[Start] --> B[Retrieve customer data from CRM]
+    B -.->|CRM Integration| C[Initiate outbound call via Call Center System]
+    C -.->|Call Center System| D{Customer answers?}
+    D -- Yes --> E[AI Bot presents initial offer]
+    E --> F{Offer accepted?}
+    F -- Yes --> G[Transfer call to human agent]
+    G -.->|Call Center System| H[End call]
+    F -- No --> I[AI Bot retries with next offer (up to 3 times)]
+    I --> J{Attempts exhausted?}
+    J -- No --> E
+    J -- Yes --> K[End call]
+    D -- No --> K
+    K -.->|Database Integration| L[Save call outcome to Database]
+    L --> M[Stop]
 ```

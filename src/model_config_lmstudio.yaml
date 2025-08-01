@@ -1,0 +1,12 @@
+provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+config:
+  model: "llama4-dolphin-8b"
+  api_key: LMStudio_key
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: True
+    family: unknown
+    structured_output: false
+    multiple_system_messages: true
+  base_url: "http://127.0.0.1:1234/v1"
