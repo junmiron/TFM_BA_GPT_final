@@ -1,0 +1,22 @@
+```mermaid
+%% Functional Specification Diagram: AI Dialer System
+flowchart TD
+    A[Start: Customer's Phone Dialed by AI]
+    B{Customer Answers?}
+    C[Request for Clarification or Retry Up to 3 Times]
+    D{Interested in Offer?}
+    E[Transfer Call to Human Agent]
+    F[Log Errors and End Call]
+    G[Retry Offering up to 3 Times if Necessary]
+    H[Close Call Successfully]
+
+    A --> B
+    B -->|Yes| C
+    B -->|No| F
+    C --> D
+    D -->|Yes| E
+    D -->|No| G
+    G --> F
+    E --> H
+    H --> F
+```

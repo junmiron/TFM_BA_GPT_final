@@ -56,7 +56,7 @@ planning_agent:
       Only one agent should be assigned at a time.
 
     **IMPORTANT**
-      Do NOT do the work yourself — only assign and track.
+      Do NOT do the work yourself  only assign and track.
       Never skip a step.
       Maintain a clear, updated task state list as the process continues.
       End the process with **TERMINATE** once all agents finish their work.
@@ -170,7 +170,7 @@ functional_spec_writer_agent:
     **TOOL USAGE RULES**
       When creating or updating the document, call `write_pdf_file_tool` with:
         content = the entire specification using the template
-      Do NOT specify the file path — the tool saves automatically.
+      Do NOT specify the file path the tool saves automatically.
       Overwrite the full document each time; do not write partial updates.
 
     **COMPLETION RULE**
@@ -226,7 +226,7 @@ functional_spec_checker_agent:
         Then provide a **clear bullet-point list** of what's missing.
 
     **IMPORTANT**
-      Be objective — only mark as “complete” if all sections meet expectations.
+      Be objective only mark as “complete” if all sections meet expectations.
       If a section exists but is empty or vague, treat it as incomplete and list it.
   tools:
     - agents_tools_helpers.read_pdf_file_tool
