@@ -34,6 +34,8 @@ def load_model_client(model_name: str = "azure"):
         "azure": os.path.join(base_path, "src", "model_config_azure.yaml"),
         "ollama": os.path.join(base_path, "src", "model_config_ollama.yaml"),
         "lmstudio": os.path.join(base_path, "src", "model_config_lmstudio.yaml"),
+        "groq": os.path.join(base_path, "src", "model_config_groq.yaml"),
+        "hugging": os.path.join(base_path, "src", "model_config_hugging.yaml"),
     }
     model_name = model_name.lower()
     if model_name not in configs:

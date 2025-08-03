@@ -9,13 +9,12 @@ returns a vector memory object for use in RAG-enabled applications.
 import asyncio
 import json
 import os
-import sys
 import yaml  # Requires pyyaml
 import lxml.html
 from lxml.html.clean import Cleaner
 from autogen_core.memory import MemoryContent, MemoryMimeType
 from autogen_ext.memory.chromadb import (ChromaDBVectorMemory,
-                                         PersistentChromaDBVectorMemoryConfig)
+    PersistentChromaDBVectorMemoryConfig)
 from chromadb.utils import embedding_functions
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
