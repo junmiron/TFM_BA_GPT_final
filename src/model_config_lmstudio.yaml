@@ -1,6 +1,6 @@
 provider: autogen_ext.models.openai.OpenAIChatCompletionClient
 config:
-  model: "llama4-dolphin-8b"
+  model: "microsoft/phi-4"
   api_key: LMStudio_key
   model_info:
     vision: false
