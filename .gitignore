@@ -2,6 +2,5 @@
 /venv
 /install
 /src/model_config_azure.yaml
-/src/model_config_ollama.yaml
-/src/model_config_llmstudio.yaml
 /src/model_config_groq.yaml
+/src/model_config_hugging.yaml

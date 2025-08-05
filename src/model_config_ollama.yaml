@@ -1,0 +1,10 @@
+provider: autogen_ext.models.ollama.OllamaChatCompletionClient
+config:
+  model: "orieg/gemma3-tools:27b-it-qat"
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: True
+    family: gemma3
+    structured_output: true
+  host: "http://localhost:11434"
