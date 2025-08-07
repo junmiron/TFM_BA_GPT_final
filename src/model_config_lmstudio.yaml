@@ -1,6 +1,6 @@
 provider: autogen_ext.models.openai.OpenAIChatCompletionClient
 config:
-  model: "microsoft/phi-4"
+  model: "openai/gpt-oss-20b"
   api_key: LMStudio_key
   model_info:
     vision: false
