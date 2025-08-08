@@ -3,7 +3,7 @@ This module provides helper functions for dynamically creating and managing agen
 using configuration from a YAML file.
 
 The primary function, `create_agents_from_config`, loads agent definitions from
-a YAML configuration file and instantiates both assistant agents and a user proxy agent.
+a YAML configuration file and instantiates both assistant agents and a user agent.
 It supports memory attachment, model streaming, and automatic tool loading via dotted paths.
 
 This factory pattern allows flexible orchestration of multi-agent workflows using
@@ -28,9 +28,9 @@ Python:
 
 from agents_creator import create_agents_from_config
 
-agent_names = ["user_proxy", "summarizer"]
+agent_names = ["user", "summarizer"]
 
-user_proxy, agents = await create_agents_from_config(
+user, agents = await create_agents_from_config(
     yaml_path="agents_config.yaml",
     agent_names=agent_names,
     model_client=model_client,
@@ -57,7 +57,7 @@ def load_agent_config(yaml_path: str) -> dict:
         return yaml.safe_load(f)
 
 def inject_team_members(system_message: str, agent_names: list, planning_agent_name: str = "planning_agent"):
-    team_members = [name for name in agent_names if name != planning_agent_name and name != "user_proxy"]
+    team_members = [name for name in agent_names if name != planning_agent_name and name != "user"]
     formatted_list = "\n".join(f"  - {member}" for member in team_members)
     return system_message.replace("Your team members are:", f"Your team members are:\n{formatted_list}")
 
@@ -80,7 +80,7 @@ async def create_agents_from_config(
 ):
     config = load_agent_config(yaml_path)
 
-    user_proxy = None
+    user = None
     agents = {}
 
     for name in agent_names:
@@ -91,7 +91,7 @@ async def create_agents_from_config(
         agent_type = cfg.get("type", "assistant")
 
         if agent_type == "user_proxy":
-            user_proxy = UserProxyAgent(
+            user = UserProxyAgent(
                 name=name,
                 description=cfg.get("description", ""),
                 input_func=input_func
@@ -121,4 +121,4 @@ async def create_agents_from_config(
         else:
             raise ValueError(f"Unsupported agent type: {agent_type}")
 
-    return user_proxy, agents
+    return user, agents
