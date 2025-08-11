@@ -1,0 +1,30 @@
+{
+	"servers": {
+		"Mermaid-MCP": {
+			"type": "stdio",
+			"command": "/run/media/jun/Jun_6T/Code/mcp_servers/Mermaid-MCP/venv/bin/python",
+			"args": [
+				"/run/media/jun/Jun_6T/Code/mcp_servers/Mermaid-MCP/Mermaid-MCP.py",
+				"-d",
+				"/run/media/jun/Jun_6T/Code/TFM_BA_GPT/",
+				"-d",
+				"/tmp/"
+			]
+		},
+		"PyMCP-FS": {
+			"type": "stdio",
+			"command": "/run/media/jun/Jun_6T/Code/mcp_servers/PyMCP-FS/.venv/bin/python",
+			"args": [
+				"/run/media/jun/Jun_6T/Code/mcp_servers/PyMCP-FS/main.py",
+				"-d",
+				"/run/media/jun/Jun_6T/Code/TFM_BA_GPT/",
+				"/tmp/",
+				"--log-level",
+				"DEBUG",
+				"--log-file",
+				"mcp_debug.log"
+			]
+		}
+	},
+	"inputs": []
+}

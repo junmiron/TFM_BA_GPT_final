@@ -5,9 +5,11 @@ import os
 import json
 import uuid
 import time
-from datetime import datetime, timezone
+import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union 
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional, Union, Sequence, Tuple
+from autogen_agentchat.messages import BaseAgentEvent, BaseChatMessage
 
 
 DEFAULT_JSONL_PATH = "../conversation/interview.jsonl"
@@ -16,6 +18,10 @@ DEFAULT_MD_SPEC_PATH = "../conversation/functional_specification.md"
 DEFAULT_MERMAID_PATH = "../conversation/process_diagram.mmd"
 
 ISO8601 = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+PLANNING = "planning_agent"
+INTERVIEWER = "interviewer_agent"
+USER = "user"
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime(ISO8601)
@@ -293,3 +299,96 @@ def write_mermaid_to_file_tool(mermaid_code: str, file_path: str = DEFAULT_MERMA
         return f"Mermaid diagram successfully written to {file_path}"
     except Exception as e:
         return f"Error writing Mermaid file: {e}"
+
+VALID_AGENT_NAMES = {
+    "planning_agent",
+    "interviewer_agent",
+    "summarizer_agent",
+    "functional_spec_writer_agent",
+    "functional_spec_checker_agent",
+    "diagram_creator_agent",
+    "mermaid_code_reviewer_agent",
+    USER,
+}
+
+ASSIGNMENT_RE = re.compile(
+    r"""(?mx)            # multiline, verbose
+    ^\s*                 # start of line, optional spaces
+    (?P<num>\d+)\.?      # leading number with optional dot (1 or 1.)
+    \s+                  # spaces
+    (?P<agent>[a-z_]+)   # agent name
+    \s*:\s*              # colon with spaces
+    (?P<task>.+?)        # task text (non-greedy)
+    \s*$                 # end of line
+    """
+)
+
+def _src_txt(m: BaseAgentEvent | BaseChatMessage) -> Tuple[Optional[str], str]:
+    src = getattr(m, "source", None) or getattr(m, "name", None)
+    txt = getattr(m, "text", None) or getattr(m, "content", None) or ""
+    if isinstance(txt, list):
+        txt = "\n".join(str(t) for t in txt if t)
+    return src, str(txt)
+
+def _last(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> Tuple[Optional[str], str]:
+    if not messages:
+        return None, ""
+    return _src_txt(messages[-1])
+
+def _last_from(messages, agent_name: str) -> Optional[str]:
+    for m in reversed(messages):
+        src, txt = _src_txt(m)
+        if src == agent_name:
+            return txt
+    return None
+
+def _parse_single_assignment(text: Optional[str]) -> Optional[str]:
+    """
+    Return the assigned agent IF there is exactly one well-formed assignment line,
+    and the agent name is valid. Otherwise return None.
+    """
+    if not text:
+        return None
+    matches = list(ASSIGNMENT_RE.finditer(text))
+    if len(matches) != 1:
+        return None
+    agent = matches[0].group("agent")
+    return agent if agent in VALID_AGENT_NAMES else None
+
+async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> Optional[str]:
+    # If no history, start with planner
+    if not messages:
+        return PLANNING
+
+    last_src, last_txt = _last(messages)
+    last_interviewer_txt = _last_from(messages, INTERVIEWER)
+    # last_planner_txt = _last_from(messages, PLANNING)
+
+    # SAFETY: if planner indicates awaiting user, force USER
+    if "awaiting_user_reply = true" in (last_txt or ""):
+        return USER
+
+    # HARD RULES
+    # 1) interviewer asked a question → user
+    if last_src == INTERVIEWER and last_txt.strip().startswith("QUESTION:"):
+        return USER
+
+    # 2) user replied to interviewer’s question → interviewer
+    if last_src == USER and last_interviewer_txt and "QUESTION:" in last_interviewer_txt:
+        return INTERVIEWER
+
+    # 3) interviewer printed STATUS → interviewer emits **READY** next
+    if last_src == INTERVIEWER and last_txt.strip().startswith("STATUS:"):
+        return INTERVIEWER
+
+    # 4) logging retry hook
+    if last_src == INTERVIEWER and "LOG_RETRY" in last_txt:
+        return INTERVIEWER
+
+    # # 5) planner explicit single assignment → route to that agent
+    # assigned_agent = _parse_single_assignment(last_planner_txt)
+    # if assigned_agent:
+    #     return assigned_agent
+
+    # No hard rule -> let the model choose (will use selector_prompt)
+    return None

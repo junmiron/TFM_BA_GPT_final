@@ -1,0 +1,12 @@
+provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+config:
+  model: "gpt-oss-20b-cuda-gpu"
+  api_key: onnx_key
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: true
+    family: gpt
+    structured_output: true
+    multiple_system_messages: true
+  base_url: "http://127.0.0.1:5272/v1"

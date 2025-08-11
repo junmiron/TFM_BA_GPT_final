@@ -1,0 +1,16 @@
+flowchart TD
+    Start["Start"] --> AI_Dialer
+    AI_Dialer["AI Dialer Initialization"] --> |Fetch customer data from CRM| FetchData{"Fetch Data"}
+    FetchData --> |Fetch successful| VerifyHours["Verify call time is within 8 AM to 5 PM"]
+    VerifyHours --> |Within allowed hours| MakeCall["Initiate Call"]
+    MakeCall --> |Call connected| HandleInteraction["Handle Customer Interaction"]
+    MakeCall --> |Call fails| RetryCall["Retry Call (Up to 3 times)"]
+    RetryCall --> |Retries exhausted| RecordFail["Record Call as Failed"]
+    RecordFail --> End["End"]
+    HandleInteraction --> |Customer accepts offer| TransferToAgent["Transfer to Human Agent"]
+    HandleInteraction --> |Customer declines repeatedly| RecordDecline["Record Declined Deal"]
+    HandleInteraction --> |Customer has doubts/questions| UseRAG["Consult RAG System"]
+    TransferToAgent --> End
+    RecordDecline --> End
+    UseRAG --> HandleInteraction
+    End["End"]

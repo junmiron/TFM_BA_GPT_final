@@ -2,7 +2,6 @@ provider: autogen_ext.models.openai.OpenAIChatCompletionClient
 config:
   model: "google/gemma-3-27b"
   api_key: LMStudio_key
-  parallel_tool_calls: false
   model_info:
     vision: false
     function_calling: true
@@ -11,3 +10,4 @@ config:
     structured_output: true
     multiple_system_messages: true
   base_url: "http://127.0.0.1:1234/v1"
+  parallel_tool_calls: False
