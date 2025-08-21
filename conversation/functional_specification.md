@@ -30,17 +30,6 @@ The purpose of this project is to develop an AI-powered dialer system designed t
    - Reports featuring charts, tables, and a dynamic dashboard.
 5. Real-time decision-making based on predefined offers and call status.
 
-
-### Business Requirements
-
-| Business Requirement ID | Description |
-| --- | --- |
-| BR1 | Integration with the call center to: Initiate and transfer calls.; Support up to 300 simultaneous calls. |
-| BR2 | Integration with CRM systems for accessing the following customer details: Name, phone number, location, and salary. |
-| BR3 | Database usage for: Predefined offers and responses.; Storing call results (successful, rejected, or error calls).; Storing additional resources for generating responses to customer questions using a Rules and Guidance System (RAG). |
-| BR4 | Generation of end-of-shift metrics and KPIs, which include: Successful calls, errors, successful deals, and rejected deals.; Reports featuring charts, tables, and a dynamic dashboard. |
-| BR5 | Real-time decision-making based on predefined offers and call status. |
-
 ### Out-of-Scope Features
 1. Integration with WhatsApp or other social networks.
 2. Expansion to non-English languages.
@@ -58,18 +47,6 @@ The purpose of this project is to develop an AI-powered dialer system designed t
 
 ---
 
-
-### Functional Requirements Mapping
-
-| Business Requirement ID | Functional Requirement ID | Description |
-| --- | --- | --- |
-| BR1 | FR1 | The AI dialer must integrate with the call center system to initiate, manage, and transfer calls in real time. |
-| BR2 | FR2 | The AI must access relevant customer data from the CRM system during the call execution process. |
-| BR3 | FR3 | The system must store and retrieve predefined offers and responses from a database. |
-| BR4 | FR4 | The AI should generate reports at the end of each shift, summarizing KPIs and metrics. |
-| BR5 | FR5 | The system should allow marketing teams to update offers and predefined responses in the database. |
-|  | FR6 | Calls should operate only within the hours of 8:00 AM to 5:00 PM. |
-|  | FR7 | All data, including call results and customer interactions, must be stored securely with encryption. --- |
 ## Non-Functional Requirements
 1. **Performance**:
    - Support up to 300 simultaneous calls.
@@ -113,8 +90,8 @@ The purpose of this project is to develop an AI-powered dialer system designed t
 
 ### Constraints
 1. Calls will be restricted to working hours (8:00 AM–5:00 PM).
-2. The system must comply with GDPR and PII regulations. 
-3. All offers and answers are predefined and stored in the database.  
+2. The system must comply with GDPR and PII regulations.
+3. All offers and answers are predefined and stored in the database.
 
 ---
 
@@ -149,7 +126,7 @@ The AI Dialer enables human agents to make outbound calls efficiently to custome
 1. **Call Fails to Connect:**
    1.1 The system retries the call three times before marking it as "Failed to Connect."
    1.2 A notification is sent to the agent regarding failure.
- 
+
 2. **Customer Busy:**
    2.1 The system schedules a callback and notifies the agent.
 
@@ -207,8 +184,3 @@ The AI Dialer provides detailed call reports for the marketing team and IT suppo
 ### General Terms
 - **Communication Protocols:** Standards governing the exchange of information between systems and devices. In AI Dialer software, robust protocols ensure reliable and flexible communication processes.
 - **Interoperability:** The capability of the AI Dialer system to integrate with other software or systems (e.g., CRM, VoIP platforms) seamlessly.
-
-## Process Diagram
-
-![Process Diagram](process_diagram.png){ width=95% }
-
