@@ -1,6 +1,0 @@
-{
-    "yaml.schemas": {
-        "https://www.schemastore.org/yamllint.json": "file:///c%3A/Master%20IA/TFM_BA_GPT/lib/agents_config.yaml"
-    },
-    "python.analysis.autoImportCompletions": true
-}
