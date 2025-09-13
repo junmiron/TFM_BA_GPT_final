@@ -1,0 +1,31 @@
+%%{init:{
+  "flowchart":{"htmlLabels":true},
+  "themeVariables":{"fontSize":"16px"},
+  "themeCSS":".edgeLabel,.edgeLabel text,.edgeLabel tspan{font-weight:700 !important}"
+}}%%
+flowchart TB
+CALLER["**Caller (PSTN / SIP)**"]
+TWILIO["**Twilio Voice (Media Streams / SIP Interface)**"]
+WS["**WS Bridge**"]
+RT["**OpenAI Realtime (GPT-4o-mini Realtime)**"]
+SUMMARY["**Resumen (texto)**"]
+PA["**planning_agent**"]
+SGC["**SelectorGroupChat**"]
+SA["**summarizer_agent**"]
+DAPP{"**APPROVE SUMMARY?**"}
+FSW["**functional_spec_writer_agent**"]
+IA["**interviewer_agent**"]
+
+CALLER -->|"llamada SIP/PSTN"| TWILIO
+TWILIO -->|"Stream de audio"| WS
+WS -->|"WebSocket/WebRTC"| RT
+RT -->|"audio de respuesta"| WS
+WS -->|"audio a llamada"| TWILIO
+
+RT -->|"generar"| SUMMARY
+SUMMARY -.->|"ingesta"| PA
+PA --> SGC
+SGC --> SA
+SA --> DAPP
+DAPP -- "**SI**" --> FSW
+DAPP -- "**NO**" --> IA

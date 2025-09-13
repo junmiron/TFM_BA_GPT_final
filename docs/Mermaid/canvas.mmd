@@ -1,0 +1,37 @@
+%%{init:{
+  "flowchart":{"htmlLabels":true},
+  "themeVariables":{"fontSize":"16px"},
+  "themeCSS":".edgeLabel,.edgeLabel text,.edgeLabel tspan{font-weight:700 !important}"
+}}%%
+flowchart TB
+START(["**Inicio**"])
+
+DC["**diagram_creator_agent**"]
+READMD["**read_md_file_tool**"]
+FSD["**conversation/functional_specification.md**"]
+
+CANVAS_UPDATE["**canvas.update_file_tool**"]
+CANVAS["**Canvas_Memory_canvas_diagram.md**"]
+
+MCR["**mermaid_code_reviewer_agent**"]
+DREV{"**Diagrama aprobado?**"}
+
+WRITE_MMD["**write_mermaid_to_file_tool**"]
+MMD["**conversation/process_diagram.mmd**"]
+
+START --> DC
+DC --> READMD
+READMD --> FSD
+
+%% Generacion e iteracion en Canvas
+DC --> CANVAS_UPDATE
+CANVAS_UPDATE --> CANVAS
+
+%% Revisor trabaja sobre Canvas
+MCR --> CANVAS_UPDATE
+
+%% Decision del revisor
+MCR --> DREV
+DREV -- "**No (feedback)**" --> DC
+DREV -- "**Si (aprobado)**" --> WRITE_MMD
+WRITE_MMD --> MMD

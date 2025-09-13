@@ -300,6 +300,7 @@ def write_mermaid_to_file_tool(mermaid_code: str, file_path: str = DEFAULT_MERMA
     except Exception as e:
         return f"Error writing Mermaid file: {e}"
 
+
 VALID_AGENT_NAMES = {
     "planning_agent",
     "interviewer_agent",
@@ -308,6 +309,7 @@ VALID_AGENT_NAMES = {
     "functional_spec_checker_agent",
     "diagram_creator_agent",
     "mermaid_code_reviewer_agent",
+    "terminate_agent",
     USER,
 }
 
@@ -355,6 +357,16 @@ def _parse_single_assignment(text: Optional[str]) -> Optional[str]:
     agent = matches[0].group("agent")
     return agent if agent in VALID_AGENT_NAMES else None
 
+
+# --- add near other globals ---
+AWAIT_RE = re.compile(r"awaiting[_\s]*user[_\s]*reply\s*=\s*(true|1)\b", re.I)
+APPROVE_TOKEN = re.compile(r"\bAPPROVE SUMMARY\b", re.I)
+
+def _last_n_src_txt(messages, n: int = 8):
+    for m in reversed(messages[-n:]):
+        yield _src_txt(m)
+
+# --- replace selector_func with the following ---
 async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> Optional[str]:
     # If no history, start with planner
     if not messages:
@@ -362,33 +374,46 @@ async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) ->
 
     last_src, last_txt = _last(messages)
     last_interviewer_txt = _last_from(messages, INTERVIEWER)
-    # last_planner_txt = _last_from(messages, PLANNING)
+    last_planner_txt = _last_from(messages, PLANNING)  # re-enable
 
-    # SAFETY: if planner indicates awaiting user, force USER
-    if "awaiting_user_reply = true" in (last_txt or ""):
+    
+    # 1) If planner indicates awaiting user anywhere in the recent tail → USER
+    for src, txt in _last_n_src_txt(messages, n=8):
+        # accept both planner chunks and echoed [ASSIGNMENT] text
+        if AWAIT_RE.search(txt or ""):
+            return USER
+
+    # 2) Any agent showing a QUESTION: → USER
+    if (last_txt or "").strip().startswith("QUESTION:"):
         return USER
 
-    # HARD RULES
-    # 1) interviewer asked a question → user
-    if last_src == INTERVIEWER and last_txt.strip().startswith("QUESTION:"):
+    # 3) interviewer asked a question → USER (kept for clarity/intent)
+    if last_src == INTERVIEWER and (last_txt or "").strip().startswith("QUESTION:"):
         return USER
 
-    # 2) user replied to interviewer’s question → interviewer
-    if last_src == USER and last_interviewer_txt and "QUESTION:" in last_interviewer_txt:
+    # 4) user replied to interviewer’s question → back to interviewer
+    if last_src == USER and last_interviewer_txt and "QUESTION:" in (last_interviewer_txt or ""):
         return INTERVIEWER
 
-    # 3) interviewer printed STATUS → interviewer emits **READY** next
-    if last_src == INTERVIEWER and last_txt.strip().startswith("STATUS:"):
-        return INTERVIEWER
+    # 5) summarizer asked for approval (contains APPROVE SUMMARY in its *own* text)
+    #    unless user already approved exactly, force USER
+    if last_src == "summarizer_agent" and APPROVE_TOKEN.search(last_txt or ""):
+        last_user_txt = _last_from(messages, USER)
+        if not (last_user_txt and re.fullmatch(r"\s*APPROVE SUMMARY\s*", last_user_txt, re.I)):
+            return USER
 
-    # 4) logging retry hook
-    if last_src == INTERVIEWER and "LOG_RETRY" in last_txt:
-        return INTERVIEWER
+    # 6) user approved exactly → give summarizer the turn to emit READY
+    if last_src == USER and re.fullmatch(r"\s*APPROVE SUMMARY\s*", last_txt or "", re.I):
+        return "summarizer_agent"
 
-    # # 5) planner explicit single assignment → route to that agent
-    # assigned_agent = _parse_single_assignment(last_planner_txt)
-    # if assigned_agent:
-    #     return assigned_agent
+    # 7) any agent signaled READY → go to planner to assign next task
+    if re.search(r"\bREADY\b", last_txt or "", re.I):
+        return PLANNING
+    
+    # 8) Planner explicit single assignment → obey immediately
+    assigned_agent = _parse_single_assignment(last_planner_txt)
+    if assigned_agent:
+        return assigned_agent
 
-    # No hard rule -> let the model choose (will use selector_prompt)
+    # 9) otherwise, let the model choose
     return None

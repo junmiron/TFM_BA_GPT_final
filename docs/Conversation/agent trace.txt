@@ -1,5 +1,4 @@
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
-  response = await self._model_client.create(messages=select_speaker_messages)
+response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
 Selected speaker: planning_agent
@@ -26,8 +25,7 @@ Assigning the first task:
 1 interviewer_agent : Start gathering requirements from the user for the new product.
 
 [ASSIGNMENT] agent=interviewer_agent task="Start gathering requirements from the user for the new product." awaiting_user_reply=false
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
-  response = await self._model_client.create(messages=select_speaker_messages)
+response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
 Selected speaker: interviewer_agent
@@ -59,8 +57,7 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: What are the key features or functionalities that you envision for this AI dialer?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
-  response = await self._model_client.create(messages=select_speaker_messages)
+response = await self._model_client.create(messages=select_speaker_messages)
 Model selected the previous speaker: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected the previous speaker: interviewer_agent (attempt 1)
 Model selected a valid name: user (attempt 2)
@@ -92,8 +89,7 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: What are the primary metrics or KPIs you would use to measure the success of the AI dialer?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
-  response = await self._model_client.create(messages=select_speaker_messages)
+response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
 Selected speaker: interviewer_agent
@@ -127,8 +123,7 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Should additional reporting capabilities or real-time data visualization options be part of the MVP?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
-  response = await self._model_client.create(messages=select_speaker_messages)
+response = await self._model_client.create(messages=select_speaker_messages)
 Model selected the previous speaker: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected the previous speaker: interviewer_agent (attempt 1)
 Model selected a valid name: planning_agent (attempt 2)
@@ -139,8 +134,7 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's last question about additional reporting capabilities or real-time data visualization options in the MVP.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's last question about additional reporting capabilities or real-time data visualization options in the MVP." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
-  response = await self._model_client.create(messages=select_speaker_messages)
+response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: user (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: user (attempt 1)
 Selected speaker: user
@@ -168,7 +162,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: What functionalities or integrations are absolutely essential to include in the product scope?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -203,7 +196,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Are there specific use cases or customer demographics the product should prioritize first?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected the previous speaker: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected the previous speaker: interviewer_agent (attempt 1)
@@ -215,7 +207,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about specific use cases or customer demographics the product should prioritize first.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about specific use cases or customer demographics the product should prioritize first." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: user (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: user (attempt 1)
@@ -244,7 +235,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: What are the performance, security, compliance, or availability requirements for this AI dialer?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -279,7 +269,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Are there additional constraints like language support, accessibility, or anything else we should consider?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -289,7 +278,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about additional constraints like language support, accessibility, or other considerations.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about additional constraints like language support, accessibility, or other considerations." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -322,7 +310,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Who are the main user roles that will interact with the AI dialer?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -332,7 +319,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about the main user roles that will interact with the AI dialer.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about the main user roles that will interact with the AI dialer." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -367,7 +353,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Are there specific user personas or scenarios that need to be addressed in the system design?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected the previous speaker: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected the previous speaker: interviewer_agent (attempt 1)
@@ -379,7 +364,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about specific user personas or scenarios to address in the system design.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about specific user personas or scenarios to address in the system design." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -389,7 +373,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 [MemoryContent(content='55 Business Analyst Requirements Gathering Interview Questions and Answers | Requiment     +321 123 4567[email\xa0protected]My AccountWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoLog InStart Free TrialWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoStart', mime_type='MemoryMimeType.TEXT', metadata={'chunk_index': 0, 'source': 'https://www.requiment.com/business-analyst-requirements-gathering-interview-questions-answers/', 'mime_type': 'MemoryMimeType.TEXT', 'score': 0.41443580389022827, 'id': 'f5dd5537-a7a3-437c-9192-3a0360271147'}), MemoryContent(content='addressing a comprehensive array of questions for requirements gathering and shedding light on the nuanced art of elicitation.We recognize that the process of gathering requirements is not merely about collecting data but about engaging in a dialogue that helps us elicit requirements effectively. To achieve this, we will explore a variety of requirements gathering interview questions. These questions are designed not just to gather information but to actively engage stakeholders, thereby', mime_type='MemoryMimeType.TEXT', metadata={'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'chunk_index': 2, 'mime_type': 'MemoryMimeType.TEXT', 'score': 0.40751177072525024, 'id': 'ccc91593-229a-4c49-a4a5-f6e8971aa361'})]
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 Could you clarify the specific scenarios you want the system to address for each user persona (e.g., travel agencies, airlines, marketing teams, IT team, human agents)? Also, are there additional features tailored to the final customer experience?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -422,7 +405,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: What systems or external integrations are necessary for the AI dialer to function effectively?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -432,7 +414,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about systems or external integrations necessary for the AI dialer to function effectively.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about systems or external integrations necessary for the AI dialer to function effectively." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: user (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: user (attempt 1)
@@ -463,7 +444,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Are there any additional external tools or APIs that may be optional but beneficial for the system?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -473,7 +453,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 [MemoryContent(content='business needs. Example: “What functionalities do you consider essential for this feature?”For project managers: Ask questions about project scope, timelines, and resource allocation. Example: “What is the deadline for this feature’s completion?”For developers: Inquire about technical feasibility, integration with existing systems, and technical constraints. Example: “What technical challenges might we encounter in implementing this feature?”Utilizing Stakeholder Feedback in Questionnaire', mime_type='MemoryMimeType.TEXT', metadata={'chunk_index': 41, 'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'mime_type': 'MemoryMimeType.TEXT', 'score': 0.5337441265583038, 'id': '55b90fd8-6400-4098-9eee-fa31a1bcf5e2'}), MemoryContent(content='NFRs - Checklist \nThe Checklist gives some topics against each Non-Functional Category to give you some ideas \nof requirements you might wish to include depending on your project/system. \nCategory \nTopics covered \n1. Availability \n• \nSystem up-time \n• \nDefined maintenance window \n• \nBusiness opening times \n• \nBusiness access to system requirements \n2. Backup \nThese requirements address plans and provisions for backup and \nrestore operations. \n•', mime_type='MemoryMimeType.TEXT', metadata={'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 0, 'source': 'NFRs Checklist.doc.pdf', 'score': 0.5178769826889038, 'id': '5f022400-ced0-4ebf-9bdc-09b99b457b83'}), MemoryContent(content='addressing a comprehensive array of questions for requirements gathering and shedding light on the nuanced art of elicitation.We recognize that the process of gathering requirements is not merely about collecting data but about engaging in a dialogue that helps us elicit requirements effectively. To achieve this, we will explore a variety of requirements gathering interview questions. These questions are designed not just to gather information but to actively engage stakeholders, thereby', mime_type='MemoryMimeType.TEXT', metadata={'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 2, 'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'score': 0.5070003867149353, 'id': 'ccc91593-229a-4c49-a4a5-f6e8971aa361'})]
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 Would the inclusion of optional external tools such as analytics platforms, additional AI frameworks, or marketing automation systems enhance the system's capabilities or future scalability?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -506,7 +485,6 @@ Constraints & Assumptions  asked=0, status=not started
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Are there any specific constraints or assumptions that will define the system's functionality or process?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -516,7 +494,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about specific constraints or assumptions that will define the system's functionality or process.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about specific constraints or assumptions that will define the system's functionality or process." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -526,7 +503,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 [MemoryContent(content='55 Business Analyst Requirements Gathering Interview Questions and Answers | Requiment     +321 123 4567[email\xa0protected]My AccountWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoLog InStart Free TrialWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoStart', mime_type='MemoryMimeType.TEXT', metadata={'source': 'https://www.requiment.com/business-analyst-requirements-gathering-interview-questions-answers/', 'chunk_index': 0, 'mime_type': 'MemoryMimeType.TEXT', 'score': 0.43205726146698, 'id': 'f5dd5537-a7a3-437c-9192-3a0360271147'}), MemoryContent(content='Requirements Gathering - Most Asked Questions | Requiment     +321 123 4567[email\xa0protected]My AccountWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoLog InStart Free TrialWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoStart Free TrialLog inRequirements', mime_type='MemoryMimeType.TEXT', metadata={'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 0, 'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'score': 0.4146654009819031, 'id': '943e53d4-63ac-47aa-a8d9-933dbbb47476'}), MemoryContent(content='addressing a comprehensive array of questions for requirements gathering and shedding light on the nuanced art of elicitation.We recognize that the process of gathering requirements is not merely about collecting data but about engaging in a dialogue that helps us elicit requirements effectively. To achieve this, we will explore a variety of requirements gathering interview questions. These questions are designed not just to gather information but to actively engage stakeholders, thereby', mime_type='MemoryMimeType.TEXT', metadata={'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 2, 'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'score': 0.4122704863548279, 'id': 'ccc91593-229a-4c49-a4a5-f6e8971aa361'})]
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 Are there any specific environmental, legal, or resource constraints we should be aware of, such as availability of infrastructure, compliance with regulations, or assumptions about user behavior or system usage?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -561,7 +537,6 @@ Constraints & Assumptions  asked=1, status=pending
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: Are there any assumptions about resource availability, stakeholder responsibilities, or system limitations we should document?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -571,7 +546,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 [MemoryContent(content='business needs. Example: “What functionalities do you consider essential for this feature?”For project managers: Ask questions about project scope, timelines, and resource allocation. Example: “What is the deadline for this feature’s completion?”For developers: Inquire about technical feasibility, integration with existing systems, and technical constraints. Example: “What technical challenges might we encounter in implementing this feature?”Utilizing Stakeholder Feedback in Questionnaire', mime_type='MemoryMimeType.TEXT', metadata={'mime_type': 'MemoryMimeType.TEXT', 'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'chunk_index': 41, 'score': 0.5398960709571838, 'id': '55b90fd8-6400-4098-9eee-fa31a1bcf5e2'}), MemoryContent(content='and supportability requirements \n• \nOther requirements such as operating systems and environments, compatibility \nrequirements, and design constraints \n• \nLegal and regulatory requirements, including application standards \nPurpose \nThis document is intended to be used by project teams to ensure that systems are built, tested and \nimplemented to the satisfaction of the business users whilst complying with all appropriate', mime_type='MemoryMimeType.TEXT', metadata={'source': 'NFRs Overview.doc.pdf', 'chunk_index': 1, 'mime_type': 'MemoryMimeType.TEXT', 'score': 0.5336329936981201, 'id': 'c9e6a46d-a29b-4956-93ad-02b647b8ded6'}), MemoryContent(content='The scope of the Non-Functional requirements are covered broadly by the following \nrequirements categories: \n1. Availability \n2. Backup \n3. Disaster Recovery \n4. Supportability \n5. Reliability \n6. Maintainability \n7. Integration \n8. Interoperability \n9. Compatibility \n10. Portability \n11. Performance \n12. Capacity \n13. Scalability \n14. Elasticity \n15. Data Management \n16. Data integrity \n17. Security \n18. Usability \n19. Legal & Regulatory', mime_type='MemoryMimeType.TEXT', metadata={'source': 'NFRs Overview.doc.pdf', 'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 5, 'score': 0.531560093164444, 'id': 'dbe4a841-f8a0-47d7-b99a-8459706f6b3c'})]
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 Are there particular assumptions about the availability of marketing or IT team resources, or limitations tied to call infrastructure, database scalability, or predefined content updates that we should capture?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -604,7 +578,6 @@ Constraints & Assumptions  asked=2, status=done
 Dependencies & Risks  asked=0, status=not started
 
 QUESTION: What are the potential risks or dependencies we should be aware of for this project?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -614,7 +587,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about potential risks or dependencies for this project.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about potential risks or dependencies for this project." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -624,7 +596,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 [MemoryContent(content='55 Business Analyst Requirements Gathering Interview Questions and Answers | Requiment     +321 123 4567[email\xa0protected]My AccountWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoLog InStart Free TrialWhy Requiment?FeaturesGuided ProcessOutput ReportsCreate WireframesUpdate EasilyTask GenerationPricingWho We AreResourcesBlogVideo WalkthroughBitesize DemosFAQBook a DemoStart', mime_type='MemoryMimeType.TEXT', metadata={'source': 'https://www.requiment.com/business-analyst-requirements-gathering-interview-questions-answers/', 'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 0, 'score': 0.43523144721984863, 'id': 'f5dd5537-a7a3-437c-9192-3a0360271147'}), MemoryContent(content='addressing a comprehensive array of questions for requirements gathering and shedding light on the nuanced art of elicitation.We recognize that the process of gathering requirements is not merely about collecting data but about engaging in a dialogue that helps us elicit requirements effectively. To achieve this, we will explore a variety of requirements gathering interview questions. These questions are designed not just to gather information but to actively engage stakeholders, thereby', mime_type='MemoryMimeType.TEXT', metadata={'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 2, 'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'score': 0.42885029315948486, 'id': 'ccc91593-229a-4c49-a4a5-f6e8971aa361'}), MemoryContent(content='Jonathan Babcock - New blog post: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o\t\ndoug goldberg - RT RT @jonbab1New blog post: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o Always thought provoking.\t\nRob - Pondering sharing reqs interview questions thx to @jonbab1: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o #baot', mime_type='MemoryMimeType.TEXT', metadata={'chunk_index': 29, 'mime_type': 'MemoryMimeType.TEXT', 'source': 'https://practicalanalyst.com/requirements-elicitation-most-valuable-questions/', 'score': 0.403475284576416, 'id': '0fd9bd06-3a10-4054-9450-fdb21487ff15'})]
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 What are the key risks (e.g., delays in resource allocation, technical challenges, data privacy concerns) or dependencies (e.g., reliance on external systems or third-party vendors) that could impact project timelines or deliverables?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -657,7 +628,6 @@ Constraints & Assumptions  asked=2, status=done
 Dependencies & Risks  asked=1, status=pending
 
 QUESTION: How will these dependencies on cloud and SIP trunk providers be managed to avoid downtime or disruptions?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -667,7 +637,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 [MemoryContent(content='The scope of the Non-Functional requirements are covered broadly by the following \nrequirements categories: \n1. Availability \n2. Backup \n3. Disaster Recovery \n4. Supportability \n5. Reliability \n6. Maintainability \n7. Integration \n8. Interoperability \n9. Compatibility \n10. Portability \n11. Performance \n12. Capacity \n13. Scalability \n14. Elasticity \n15. Data Management \n16. Data integrity \n17. Security \n18. Usability \n19. Legal & Regulatory', mime_type='MemoryMimeType.TEXT', metadata={'source': 'NFRs Overview.doc.pdf', 'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 5, 'score': 0.5221370756626129, 'id': 'dbe4a841-f8a0-47d7-b99a-8459706f6b3c'}), MemoryContent(content='remain relevant, realistic, and aligned with the changing dynamics of the project environment.Key Requirements Gathering Questions and AnswersWhat is requirements gathering?Requirements gathering is the process of identifying and documenting the needs and expectations of stakeholders for a particular project or system. This process helps to ensure that the final product or solution meets the needs of all stakeholders and is aligned with the overall goals and objectives of the organisation. It', mime_type='MemoryMimeType.TEXT', metadata={'source': 'https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/', 'chunk_index': 10, 'mime_type': 'MemoryMimeType.TEXT', 'score': 0.46620213985443115, 'id': 'a860d0c6-920b-454b-9d78-624ac20872a8'}), MemoryContent(content='NFRs - Checklist \nThe Checklist gives some topics against each Non-Functional Category to give you some ideas \nof requirements you might wish to include depending on your project/system. \nCategory \nTopics covered \n1. Availability \n• \nSystem up-time \n• \nDefined maintenance window \n• \nBusiness opening times \n• \nBusiness access to system requirements \n2. Backup \nThese requirements address plans and provisions for backup and \nrestore operations. \n•', mime_type='MemoryMimeType.TEXT', metadata={'source': 'NFRs Checklist.doc.pdf', 'mime_type': 'MemoryMimeType.TEXT', 'chunk_index': 0, 'score': 0.45796793699264526, 'id': '5f022400-ced0-4ebf-9bdc-09b99b457b83'})]
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 Do you have specific measures in place, such as backup providers, contracts with SLAs (Service Level Agreements), or redundancy systems, to manage potential risks with your cloud and SIP trunk providers?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -677,7 +646,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 user : Answer the interviewer_agent's question about measures to manage dependencies on cloud and SIP trunk providers, such as backup or redundancy.
 
 [ASSIGNMENT] agent=user task="Answer the interviewer_agent's question about measures to manage dependencies on cloud and SIP trunk providers, such as backup or redundancy." awaiting_user_reply=true
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -687,7 +655,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 [MemoryContent(content='More \n\t\t\t\t\ton August 24, 2015 at 4:22 AM\t\t\t\t\n\n\n\nwhat is meant by a use case during the elicitation of requirements.\nReply \n\n\n\n\n\nTrackbacks/Pingbacks', mime_type='MemoryMimeType.TEXT', metadata={'mime_type': 'MemoryMimeType.TEXT', 'source': 'https://practicalanalyst.com/requirements-elicitation-most-valuable-questions/', 'chunk_index': 28, 'score': 0.4405231475830078, 'id': '5bb8c88e-08d0-479d-95d4-fcb10b19a5b5'})]
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 How do you plan to ensure continuity and mitigate risks related to these dependencies? For example, do you have backup providers, redundancy mechanisms, or specific SLAs in contracts to handle disruptions?
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: interviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: interviewer_agent (attempt 1)
@@ -728,7 +695,6 @@ User Roles & Personas  asked=2, status=done
 Integrations & External Systems  asked=2, status=done
 Constraints & Assumptions  asked=2, status=done
 Dependencies & Risks  asked=2, status=done
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -835,7 +801,6 @@ Here is the summary of the requirements and scope for the AI dialer project:
 
 Would you like to add or clarify any information, or do you APPROVE the summary?
 If it's final, please reply with **APPROVE SUMMARY**.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected the previous speaker: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected the previous speaker: summarizer_agent (attempt 1)
@@ -857,7 +822,6 @@ DEBUG:autogen_agentchat.events:id='70ebe37f-53ac-43c6-b380-a2cd6ae98a3a' source=
 [FunctionExecutionResult(content='Markdown spec successfully written to ../conversation/functional_specification.md', name='write_md_file_tool', call_id='call_h4eBu7CSSDH9sv4Y01bZRvxJ', is_error=False)]
 ---------- ModelClientStreamingChunkEvent (functional_spec_writer_agent) ----------
 The functional specification document has been successfully compiled and saved. I'll now proceed to generate the Use Cases and Glossary sections.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -867,7 +831,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 summarizer_agent : Summarize gathered requirements and scope information, then finalize the summary for the system proposal.
 
 [ASSIGNMENT] agent=summarizer_agent task="Summarize gathered requirements and scope information, then finalize the summary for the system proposal." awaiting_user_reply=false
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: summarizer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: summarizer_agent (attempt 1)
@@ -876,7 +839,6 @@ DEBUG:autogen_agentchat:Selected speaker: summarizer_agent
 ---------- ModelClientStreamingChunkEvent (summarizer_agent) ----------
 The requirements and scope summary for the AI dialer were already presented and are awaiting approval for further progression. Please confirm whether you would like to modify this summary, proceed to finalize it, or specify additional instructions.
 To finalize, simply respond with **APPROVE SUMMARY**.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: functional_spec_writer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: functional_spec_writer_agent (attempt 1)
@@ -1092,7 +1054,6 @@ DEBUG:autogen_agentchat.events:id='4e64d661-cb7e-4bf5-a9a7-a71594703e0f' source=
 [FunctionExecutionResult(content='use_case_agent: # Use Cases and User Stories for AI Dialer System\n\n## Use Cases\n\n### **Use Case 1: Make an Outbound Call**\n#### Description:\nThe AI Dialer enables human agents to make outbound calls efficiently to customers, providing behavioral insights to tailor the call experience.\n\n#### Actors:\n- Human Agents  \n- Customers  \n\n#### Preconditions:\n1. The agent must be logged into the AI Dialer system.  \n2. The customer’s contact information must exist in the database.  \n3. The outbound call feature must be enabled for the agent.\n\n#### Postconditions:\n1. The customer receives the call.  \n2. The system records call details such as duration, outcome, and notes.\n\n#### Main Flow:\n1. The agent initiates the outbound call through the AI Dialer system.  \n2. The AI Dialer retrieves the customer\'s contact information from the database.  \n3. The system analyzes the mood and behavior of the customer using past interactions or real-time data.  \n4. The dialer connects the call to the customer.  \n5. The agent communicates with the customer.  \n6. At the end of the call, the system prompts the agent to record notes and the call outcome.  \n7. If applicable, the system suggests follow-up actions based on the call\'s result.  \n\n#### Alternate Flows:\n1. **Call Fails to Connect:**  \n   1.1 The system retries the call three times before marking it as "Failed to Connect."  \n   1.2 A notification is sent to the agent regarding failure.  \n \n2. **Customer Busy:**  \n   2.1 The system schedules a callback and notifies the agent.  \n\n---\n\n### **Use Case 2: Generate Call Reports**\n#### Description:\nThe AI Dialer provides detailed call reports for the marketing team and IT support to analyze performance and troubleshoot issues.\n\n#### Actors:\n- Marketing Teams  \n- IT Support  \n\n#### Preconditions:\n1. Reports must have data from completed calls.  \n2. The user must have access permissions to view reports.\n\n#### Postconditions:\n1. A summarized report is generated with metrics like call duration, success rate, and agent performance.  \n2. Users can download or share the report for further analysis.\n\n#### Main Flow:\n1. The user logs into the AI Dialer system.  \n2. The user navigates to the reporting module.  \n3. The user requests a custom report by selecting filters such as date range, agent ID, or call outcomes.  \n4. The system processes and generates the report.  \n5. The user views the report on the screen and downloads it if necessary.\n\n#### Alternate Flows:\n1. **Missing Data:**  \n   1.1 The system alerts the user about incomplete or missing records relevant to the report.  \n   1.2 The user can adjust the filters or wait for the data to refresh.  \n\n2. **Export Error:**  \n   2.1 The system retries the export process automatically.  \n   2.2 If unsuccessful, the system prompts the user to make manual corrections.  \n\n---\n\n### **Use Case 3: Update Customer Database**\n#### Description:\nThe AI Dialer allows IT support to update customer information in the database to ensure accurate contact and interaction records.\n\n#### Actors:\n- IT Support  \n\n#### Preconditions:\n1. The user (IT Support) must have administrative access to the database.  \n2. The system must have an operational database linked to the AI Dialer.\n\n#### Postconditions:\n1. Customer information is updated and validated in the database.  \n2. The system reflects updated data for calls.\n\n#### Main Flow:\n1. IT support logs into the AI Dialer system.  \n2. IT support navigates to the database management module.  \n3. IT support searches for the relevant customer record using filters (e.g., name, phone number).  \n4. IT support updates the customer details, such as phone number, email, or preferences.  \n5. The system validates the changes and synchronizes them across related modules.  \n6. IT support receives confirmation of a successful update.\n\n#### Alternate Flows:\n1. **Validation Errors:**  \n   1.1 The system flags validation errors during the update process (e.g., incomplete fields).  \n   1.2 IT support corrects the errors before resubmitting.  \n\n2. **Conflict with Existing Records:**  \n   2.1 If duplicate records are detected, the system recommends merging instead of updating.  \n\n---\n\n### **Use Case 4: Behavioral AI Insights During Calls**\n#### Description:\nThe AI Dialer provides real-time behavioral insights to human agents during calls.\n\n#### Actors:\n- Human Agents  \n- Customers  \n\n#### Preconditions:\n1. The AI Dialer is configured to provide behavioral analysis.  \n2. The agent is actively on a call with the customer.\n\n#### Postconditions:\n1. The agent receives real-time analysis to improve communication.  \n2. The system logs the behavioral insights for future use.\n\n#### Main Flow:\n1. The AI Dialer analyzes customer behavior in real-time using voice tone, language patterns, and pauses.  \n2. The system displays insights (e.g., "Customer appears frustrated") to the agent during the call.  \n3. The agent adjusts their communication style accordingly.  \n4. Insights are saved in the customer profile for future calls.  \n\n---\n\n## User Stories\n\n### **Outbound Calls**\n1. **Human Agent:**  \n   *As a human agent, I want to use the AI Dialer to make calls, so that I can quickly reach customers with accurate insights.*  \n\n   #### Acceptance Criteria:  \n   - The system must connect calls in under five seconds.  \n   - The system must retrieve and display customer information on-call initiation.  \n\n---\n\n### **Reporting and Analysis**\n1. **Marketing Team:**  \n   *As a marketing team member, I want to generate call reports, so that I can analyze campaign effectiveness.*  \n\n   #### Acceptance Criteria:  \n   - Reports must include metrics like call duration, success rate, and conversions.  \n   - Reports must be exportable in formats like CSV and PDF.  \n\n2. **IT Support:**  \n   *As IT support, I want to view error reports, so that I can troubleshoot call connectivity issues.*  \n\n   #### Acceptance Criteria:  \n   - Error reports must include timestamps and error codes.  \n   - Reports must highlight recurring issues with potential solutions.  \n\n---\n\n### **Database Management**\n1. **IT Support:**  \n   *As IT support, I want to update customer information, so that the database reflects accurate contact details.*  \n\n   #### Acceptance Criteria:  \n   - The system must prevent duplicate records.  \n   - Updates must synchronize across all modules.  \n\n---\n\n### **Behavioral AI Insights**\n1. **Human Agent:**  \n   *As a human agent, I want real-time behavioral AI insights during calls, so that I can improve my communication with customers.*  \n\n   #### Acceptance Criteria:  \n   - Behavioral insights must appear in the agent\'s dashboard during the call.  \n   - Insights must update dynamically based on new customer inputs.  \n\n---\n\n### **Customer Perspective**\n1. **Customer:**  \n   *As a customer, I want agents to understand my preferences during calls, so that my experience feels personalized.*  \n\n   #### Acceptance Criteria:  \n   - The system must store and retrieve customer preferences.  \n   - Notes and insights from previous calls must guide future interactions.  \n\n---\n\n**READY**', name='use_case_agent', call_id='call_Y3Xs7n5K6RYiFW7Cps49EhwI', is_error=False)]
 ---------- ModelClientStreamingChunkEvent (functional_spec_writer_agent) ----------
 The Use Cases and User Stories have been generated and integrated into the Functional Specification Document. I will now proceed to generate the Glossary section.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: functional_spec_checker_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: functional_spec_checker_agent (attempt 1)
@@ -1124,7 +1085,6 @@ DEBUG:autogen_agentchat.events:id='ba786229-fbee-4a28-8000-0f8077aee3ad' source=
 2. Complete the Use Cases section with key scenarios, examples, and user interactions for clarity.
 
 Let me know once the document has been updated or if you need further guidance.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -1134,7 +1094,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 interviewer_agent : Ask the user to provide clarity or details necessary for the Glossary section and Use Cases.
 
 [ASSIGNMENT] agent=interviewer_agent task="Ask the user to provide clarity or details for the Glossary section and Use Cases." awaiting_user_reply=false
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: functional_spec_writer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: functional_spec_writer_agent (attempt 1)
@@ -1181,7 +1140,6 @@ DEBUG:autogen_agentchat.events:id='45d8fe52-dd58-44b9-88de-4ba7404fb72a' source=
 [FunctionExecutionResult(content="glossary_agent: ### Glossary for AI Dialer System\n\n#### Business Terms:\n- **CRM (Customer Relationship Management):** A system or software that manages a company's interactions with current and potential customers. In the context of AI Dialer, CRM integration allows for optimized customer outreach and data handling.\n- **KPI (Key Performance Indicator):** Metrics used to evaluate the success of specific activities or overall performance. In the AI Dialer system, KPIs could include call success rates, conversion rates, and average call handling time.\n- **GDPR Compliance (General Data Protection Regulation Compliance):** Adherence to data protection and privacy laws established by the European Union. For AI Dialers, this means safeguarding customer information during data storage, transmission, and processing.\n\n#### Technical Terms:\n- **SIP (Session Initiation Protocol):** A communication protocol used for initiating, maintaining, and terminating real-time sessions, like voice and video calls. Crucial for AI Dialers in interacting with VoIP systems.\n- **Natural Language Processing (NLP):** A field of artificial intelligence focused on enabling computers to understand, interpret, and respond to human language. In AI Dialers, NLP is used for interpreting customer speech and generating appropriate responses.\n- **RAG (Red-Amber-Green):** A status indicator framework frequently used in project management. For AI Dialers, it could represent live monitoring of system performance or issue resolution status.\n\n#### System Features:\n- **Predefined Responses:** A library of canned or templated answers programmed into the AI Dialer for common queries or circumstances, ensuring quick and consistent communication.\n- **Navigation:** Tools and features within the AI Dialer interface that assist users in moving through the system efficiently.\n- **Multilingual Capabilities:** The ability of the AI system to communicate and interpret languages other than English, broadening regional or global usage.\n\n#### General Terms:\n- **Communication Protocols:** Standards governing the exchange of information between systems and devices. In AI Dialer software, robust protocols ensure reliable and flexible communication processes.\n- **Interoperability:** The capability of the AI Dialer system to integrate with other software or systems (e.g., CRM, VoIP platforms) seamlessly.\n\n**READY**", name='glossary_agent', call_id='call_OFKQLPnXpJp6TyMCgGf8Jqhf', is_error=False)]
 ---------- ModelClientStreamingChunkEvent (functional_spec_writer_agent) ----------
 The Use Cases and Glossary sections have been completed. I will now integrate these updates into the Functional Specification Document.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -1191,7 +1149,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 functional_spec_writer_agent : Finalize the Functional Specification Document using the completed Use Cases and Glossary sections.
 
 [ASSIGNMENT] agent=functional_spec_writer_agent task="Finalize the Functional Specification Document using the completed Use Cases and Glossary sections." awaiting_user_reply=false
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: functional_spec_writer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: functional_spec_writer_agent (attempt 1)
@@ -1211,7 +1168,6 @@ DEBUG:autogen_agentchat.events:id='cef0b969-e661-4ca8-9f6c-e3357eca5447' source=
 [FunctionExecutionResult(content='Markdown spec successfully written to ../conversation/functional_specification.md', name='write_md_file_tool', call_id='call_gLtgTsq1FcF69HafGVPTiyJ3', is_error=False)]
 ---------- ModelClientStreamingChunkEvent (functional_spec_writer_agent) ----------
 The Functional Specification Document has been successfully updated with the completed Use Cases and Glossary sections. It is now finalized and saved. Let me know if any further modifications are required.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -1221,7 +1177,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 functional_spec_checker_agent : Review the finalized Functional Specification Document for completeness and accuracy.
 
 [ASSIGNMENT] agent=functional_spec_checker_agent task="Review the finalized Functional Specification Document for completeness and accuracy." awaiting_user_reply=false
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: functional_spec_checker_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: functional_spec_checker_agent (attempt 1)
@@ -1243,7 +1198,6 @@ DEBUG:autogen_agentchat.events:id='6d70c49c-e18e-4510-972d-995975460ee5' source=
 **The functional specification document is complete.**
 
 **READY**
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -1253,7 +1207,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 diagram_creator_agent : Create process flow diagrams based on the reviewed Functional Specification Document.
 
 [ASSIGNMENT] agent=diagram_creator_agent task="Create process flow diagrams based on the reviewed Functional Specification Document." awaiting_user_reply=false
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: diagram_creator_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: diagram_creator_agent (attempt 1)
@@ -1273,7 +1226,6 @@ DEBUG:autogen_agentchat.events:id='fb944a98-4072-4fe8-a6df-93e13ea7117b' source=
 [FunctionExecutionResult(content='# Functional Specification Document\n\n## Title Page\n**Project Name**: AI Dialer for Travel Packages\n\n**Version**: 1.0\n\n**Date**: 2023-11-03\n\n---\n\n## Introduction\nThe purpose of this project is to develop an AI-powered dialer system designed to call customers and offer travel packages. The AI will handle call interactions, transfer customers to human agents for finalizing deals, and aim to improve efficiency and customer engagement. By leveraging integrations with existing systems, the AI dialer will streamline outbound campaigns and provide comprehensive reporting on KPIs.\n\n---\n\n## Scope\n### In-Scope Features\n1. Integration with the call center to:\n   - Initiate and transfer calls.\n   - Support up to 300 simultaneous calls.\n2. Integration with CRM systems for accessing the following customer details:\n   - Name, phone number, location, and salary.\n3. Database usage for:\n   - Predefined offers and responses.\n   - Storing call results (successful, rejected, or error calls).\n   - Storing additional resources for generating responses to customer questions using a Rules and Guidance System (RAG).\n4. Generation of end-of-shift metrics and KPIs, which include:\n   - Successful calls, errors, successful deals, and rejected deals.\n   - Reports featuring charts, tables, and a dynamic dashboard.\n5. Real-time decision-making based on predefined offers and call status.\n\n### Out-of-Scope Features\n1. Integration with WhatsApp or other social networks.\n2. Expansion to non-English languages.\n\n---\n\n## Functional Requirements\n1. The AI dialer must integrate with the call center system to initiate, manage, and transfer calls in real time.\n2. The AI must access relevant customer data from the CRM system during the call execution process.\n3. The system must store and retrieve predefined offers and responses from a database.\n4. The AI should generate reports at the end of each shift, summarizing KPIs and metrics.\n5. The system should allow marketing teams to update offers and predefined responses in the database.\n6. Calls should operate only within the hours of 8:00 AM to 5:00 PM.\n7. All data, including call results and customer interactions, must be stored securely with encryption.\n\n---\n\n## Non-Functional Requirements\n1. **Performance**:\n   - Support up to 300 simultaneous calls.\n2. **Availability and Reliability**:\n   - Ensure a system availability of 99.96%.\n3. **Language & Voice Quality**:\n   - Support only the English language.\n   - Use natural language processing to achieve human-like voice quality with respectful and convincing tones.\n4. **Security**:\n   - Comply with GDPR and PII regulations.\n   - Implement access controls: developers have full access, while the marketing team has restricted access to reports.\n5. **Usability**:\n   - Follow best practices for UI/UX design.\n\n---\n\n## User Roles & Personas\n\n### Internal Users\n1. **Marketing Team**:\n   - Updates predefined offers, answers, and reports.\n2. **Human Agents**:\n   - Handle transferred calls and close deals.\n3. **IT Team**:\n   - Provide technical support and ongoing system maintenance.\n4. **Sponsor**:\n   - Marketing VP oversees funding and priority alignment.\n\n### External Users\n1. **Travel Agencies and Airlines**:\n   - Organizations using the system to connect with end customers.\n2. **Final Customers**:\n   - Recipients of the AI dialer calls.\n\n---\n\n## Assumptions & Constraints\n### Assumptions\n1. The marketing team will provide predefined offers and customer surveys to input in the database.\n2. The IT team has suitable resources for system deployment and maintenance.\n\n### Constraints\n1. Calls will be restricted to working hours (8:00 AM–5:00 PM).\n2. The system must comply with GDPR and PII regulations. \n3. All offers and answers are predefined and stored in the database.  \n\n---\n\n## Use Cases\n### **Use Case 1: Make an Outbound Call**\n#### Description:\nThe AI Dialer enables human agents to make outbound calls efficiently to customers, providing behavioral insights to tailor the call experience.\n\n#### Actors:\n- Human Agents\n- Customers\n\n#### Preconditions:\n1. The agent must be logged into the AI Dialer system.\n2. The customer’s contact information must exist in the database.\n3. The outbound call feature must be enabled for the agent.\n\n#### Postconditions:\n1. The customer receives the call.\n2. The system records call details such as duration, outcome, and notes.\n\n#### Main Flow:\n1. The agent initiates the outbound call through the AI Dialer system.\n2. The AI Dialer retrieves the customer\'s contact information from the database.\n3. The system analyzes the mood and behavior of the customer using past interactions or real-time data.\n4. The dialer connects the call to the customer.\n5. The agent communicates with the customer.\n6. At the end of the call, the system prompts the agent to record notes and the call outcome.\n7. If applicable, the system suggests follow-up actions based on the call\'s result.\n\n#### Alternate Flows:\n1. **Call Fails to Connect:**\n   1.1 The system retries the call three times before marking it as "Failed to Connect."\n   1.2 A notification is sent to the agent regarding failure.\n \n2. **Customer Busy:**\n   2.1 The system schedules a callback and notifies the agent.\n\n---\n\n### **Use Case 2: Generate Call Reports**\n#### Description:\nThe AI Dialer provides detailed call reports for the marketing team and IT support to analyze performance and troubleshoot issues.\n\n#### Actors:\n- Marketing Teams\n- IT Support\n\n#### Preconditions:\n1. Reports must have data from completed calls.\n2. The user must have access permissions to view reports.\n\n#### Postconditions:\n1. A summarized report is generated with metrics like call duration, success rate, and agent performance.\n2. Users can download or share the report for further analysis.\n\n#### Main Flow:\n1. The user logs into the AI Dialer system.\n2. The user navigates to the reporting module.\n3. The user requests a custom report by selecting filters such as date range, agent ID, or call outcomes.\n4. The system processes and generates the report.\n5. The user views the report on the screen and downloads it if necessary.\n\n#### Alternate Flows:\n1. **Missing Data:**\n   1.1 The system alerts the user about incomplete or missing records relevant to the report.\n   1.2 The user can adjust the filters or wait for the data to refresh.\n\n2. **Export Error:**\n   2.1 The system retries the export process automatically.\n   2.2 If unsuccessful, the system prompts the user to make manual corrections.\n\n---\n\n## Glossary\n### Business Terms\n- **CRM (Customer Relationship Management):** A system or software that manages a company\'s interactions with current and potential customers. In the context of AI Dialer, CRM integration allows for optimized customer outreach and data handling.\n- **KPI (Key Performance Indicator):** Metrics used to evaluate the success of specific activities or overall performance. In the AI Dialer system, KPIs could include call success rates, conversion rates, and average call handling time.\n- **GDPR Compliance (General Data Protection Regulation Compliance):** Adherence to data protection and privacy laws established by the European Union. For AI Dialers, this means safeguarding customer information during data storage, transmission, and processing.\n\n### Technical Terms\n- **SIP (Session Initiation Protocol):** A communication protocol used for initiating, maintaining, and terminating real-time sessions, like voice and video calls. Crucial for AI Dialers in interacting with VoIP systems.\n- **Natural Language Processing (NLP):** A field of artificial intelligence focused on enabling computers to understand, interpret, and respond to human language. In AI Dialers, NLP is used for interpreting customer speech and generating appropriate responses.\n- **RAG (Red-Amber-Green):** A status indicator framework frequently used in project management. For AI Dialers, it could represent live monitoring of system performance or issue resolution status.\n\n### System Features\n- **Predefined Responses:** A library of canned or templated answers programmed into the AI Dialer for common queries or circumstances, ensuring quick and consistent communication.\n- **Navigation:** Tools and features within the AI Dialer interface that assist users in moving through the system efficiently.\n\n### General Terms\n- **Communication Protocols:** Standards governing the exchange of information between systems and devices. In AI Dialer software, robust protocols ensure reliable and flexible communication processes.\n- **Interoperability:** The capability of the AI Dialer system to integrate with other software or systems (e.g., CRM, VoIP platforms) seamlessly.', name='read_md_file_tool', call_id='call_iLnVs1DXFwaoVLRvbtzGIuWL', is_error=False)]
 ---------- ModelClientStreamingChunkEvent (diagram_creator_agent) ----------
 I have read the functional specification document. I will now create a process flow diagram for the AI dialer system.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)
@@ -1283,7 +1235,6 @@ DEBUG:autogen_agentchat:Selected speaker: planning_agent
 1 diagram_creator_agent : Finalize and submit the process flow diagrams for the AI dialer system.
 
 [ASSIGNMENT] agent=diagram_creator_agent task="Finalize and submit the process flow diagrams for the AI dialer system." awaiting_user_reply=false
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: diagram_creator_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: diagram_creator_agent (attempt 1)
@@ -1303,7 +1254,6 @@ DEBUG:autogen_agentchat.events:id='2a0388c7-bb5a-42f9-80f8-198fee9cdab7' source=
 [FunctionExecutionResult(content='{"status": "OK"}', name='update_file', call_id='call_20bUiiDTRVjsUWZR3i09wuwR', is_error=False)]
 ---------- ModelClientStreamingChunkEvent (diagram_creator_agent) ----------
 Diagram code complete. Handing off to mermaid_code_reviewer_agent.
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: mermaid_code_reviewer_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: mermaid_code_reviewer_agent (attempt 1)
@@ -1324,7 +1274,6 @@ DEBUG:autogen_agentchat.events:id='5e9d8c07-786c-4718-aacf-676701f51d0a' source=
 ---------- ModelClientStreamingChunkEvent (mermaid_code_reviewer_agent) ----------
 Diagram code complete
 **READY**
-/run/media/jun/Jun 6T/Code/TFM_BA_GPT/venv/lib/python3.13/site-packages/autogen_agentchat/teams/_group_chat/_selector_group_chat.py:269: UserWarning: Resolved model mismatch: gpt-4o-2024-08-06 != gpt-4o-2024-11-20. Model mapping in autogen_ext.models.openai may be incorrect. Set the model to gpt-4o-2024-11-20 to enhance token/cost estimation and suppress this warning.
   response = await self._model_client.create(messages=select_speaker_messages)
 Model selected a valid name: planning_agent (attempt 1)
 DEBUG:autogen_agentchat:Model selected a valid name: planning_agent (attempt 1)

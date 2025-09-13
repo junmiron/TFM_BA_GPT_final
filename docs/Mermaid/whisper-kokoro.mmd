@@ -1,0 +1,52 @@
+%%{init:{
+  "flowchart":{"htmlLabels":true},
+  "themeVariables":{"fontSize":"35px"},
+  "themeCSS":".edgeLabel,.edgeLabel text,.edgeLabel tspan{font-weight:700 !important}"
+}}%%
+%%{init:{
+  "flowchart":{"htmlLabels":true},
+  "themeVariables":{"fontSize":"16px"},
+  "themeCSS":".edgeLabel,.edgeLabel text,.edgeLabel tspan{font-weight:700 !important}"
+}}%%
+%%{init:{
+  "flowchart":{"htmlLabels":true},
+  "themeVariables":{"fontSize":"16px"},
+  "themeCSS":".edgeLabel,.edgeLabel text,.edgeLabel tspan{font-weight:700 !important}"
+}}%%
+flowchart TB
+START(["**Inicio**"])
+PL["**planning_agent**"]
+SGC["**SelectorGroupChat**"]
+
+IA["**interviewer_agent**"]
+USER["**Usuario**"]
+TTS["**Kokoro (TTS)**"]
+ASR["**Whisper (ASR)**"]
+SAVE["**save_conversation_to_jsonl**"]
+LOG["**conversation/interview.jsonl**"]
+
+SA["**summarizer_agent**"]
+DAPP{"**APPROVE SUMMARY?**"}
+FSW["**functional_spec_writer_agent**"]
+
+%% Orquestación inicial
+START --> PL
+PL --> SGC
+SGC --> IA
+
+%% Entrevista por voz (workaround audio: los agentes solo ven texto)
+IA -->|"**texto (pregunta)**"| TTS
+TTS -->|"**audio → usuario**"| USER
+USER -->|"**audio (respuesta)**"| ASR
+ASR -->|"**transcripción (texto)**"| IA
+
+%% Trazabilidad Q&A
+IA --> SAVE
+SAVE --> LOG
+
+%% Handoff a resumen y decisión
+PL --> SGC
+SGC --> SA
+SA --> DAPP
+DAPP -- "**SI**" --> FSW
+DAPP -- "**NO**" --> IA

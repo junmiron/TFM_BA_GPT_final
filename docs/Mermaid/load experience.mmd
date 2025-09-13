@@ -1,0 +1,134 @@
+flowchart TB
+Astart([Inicio])
+A0[load_experience_agent]
+A1[planning_agent]
+A2[SelectorGroupChat]
+A3[interviewer_agent]
+A4[user_proxy]
+A5[summarizer_agent]
+A6[functional_spec_writer_agent]
+A7[functional_spec_checker_agent]
+A8[diagram_creator_agent]
+A9[mermaid_code_reviewer_agent]
+A10[terminate_agent]
+Aend([TERMINATE])
+
+T1[save_conversation_to_jsonl]
+T2[read_md_file_tool]
+T3[write_md_file_tool]
+T4[write_mermaid_to_file_tool]
+
+AT1[use_case_agent]
+AT2[glossary_agent]
+
+C1[canvas.update_file_tool]
+
+E1[move_file]
+E2[clean_mermaid]
+E3[render_mermaid_png]
+E4[format_and_export_pdf]
+E5[save_experience_to_chromadb]
+
+L1[load_experience_from_chromadb]
+
+M1[(RAG_ChromaDB)]
+M2[(Episodic_ChromaDB)]
+M3[(Canvas_Memory_canvas_diagram.md)]
+
+F1[conversation/interview.jsonl]
+F2[conversation/functional_specification.md]
+F3[conversation/process_diagram.mmd]
+F4[experience/<SESSION_ID>/]
+FX1[interview.jsonl]
+FX2[process_diagram.png]
+FX3[functional_specification.md]
+FX4[functional_specification.pdf]
+
+DAPP{APPROVE SUMMARY?}
+DCHK{FSD completo 1..9?}
+DREV{Diagrama aprobado?}
+
+%% Inicio con carga de experiencia (tool entre agente y episodic)
+Astart --> A0
+A0 --> L1
+L1 --> M2
+A0 --> F4
+A0 --> A1
+
+%% Orquestacion por planner + selector
+A1 --> A2
+A2 --> A3
+A2 --> A5
+A2 --> A6
+A2 --> A7
+A2 --> A8
+A2 --> A9
+A2 --> A10
+
+%% Interviewer
+A3 --> A4
+A3 --> T1
+T1 --> F1
+A3 --> M1
+
+%% Summarizer -> decision de aprobacion
+A5 --> M1
+A5 --> DAPP
+DAPP -- Si --> A6
+DAPP -- No --> A3
+
+%% Writer: agent tools + escritura MD
+A6 --> M1
+A6 --> AT1
+AT1 --> A6
+A6 --> AT2
+AT2 --> A6
+A6 --> T3
+T3 --> F2
+
+%% Checker: lectura MD + decision de completitud
+A7 --> T2
+T2 --> F2
+A7 --> M1
+A7 --> DCHK
+DCHK -- Si --> A8
+DCHK -- NEEDS_INFO user --> A3
+DCHK -- NEEDS_INFO UC/Glosario --> A6
+
+%% Diagram creator: lee MD y escribe en Canvas
+A8 --> T2
+A8 --> C1
+C1 --> M3
+
+%% Reviewer: itera en Canvas y commit final
+A9 --> C1
+A9 --> DREV
+DREV -- Si --> T4
+DREV -- No --> A8
+T4 --> F3
+
+%% Terminate pipeline
+F1 --> A10
+F2 --> A10
+F3 --> A10
+A10 --> E1
+E1 --> F4
+A10 --> E2
+E2 --> F4
+A10 --> E3
+E3 --> F4
+A10 --> E4
+E4 --> F4
+A10 --> E5
+E5 --> M2
+A10 --> Aend
+
+%% Contenido del directorio experience/<SESSION_ID>/
+F4 --> FX1
+F4 --> FX2
+F4 --> FX3
+F4 --> FX4
+
+%% Consumo de RAG por agent tools
+AT1 --> M1
+AT2 --> M1
