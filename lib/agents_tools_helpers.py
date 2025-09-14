@@ -342,6 +342,14 @@ TERMINATE = "terminate_agent"
 READY_TOKEN = re.compile(r"^\s*\*{0,2}READY\*{0,2}\s*$", re.I)
 QUESTION_PREFIX = "QUESTION:"
 STATUS_PREFIX = "STATUS:"
+MISSING_WRITER_SECTIONS = re.compile(
+    r"\b("  # key sections the writer must generate
+    r"use\s*cases?|"          # Use Case / Use Cases
+    r"user\s*stor(?:y|ies)|"  # User Story / User Stories
+    r"glossar(?:y|ies)"       # Glossary / Glossaries
+    r")\b",
+    re.IGNORECASE,
+)
 
 ASSIGNMENT_MARKER = re.compile(
     r'^\[ASSIGNMENT\]\s+agent=(?P<agent>[a-z_]+)\s+task="[^"]*"\s+awaiting_user_reply=(?P<await>true|false)\s*$',
@@ -458,7 +466,9 @@ async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]):
     - After any 'QUESTION:' to the user, pick planning_agent next (so it assigns 'user').
     - After a user reply, pick planning_agent next (so it assigns interviewer to process/save).
     - After any **READY**, pick planning_agent to assign the next task.
-    - Handle checker 'NEEDS_INFO' by routing back to planning_agent.
+    - Handle checker 'NEEDS_INFO' by routing back to planning_agent,
+      EXCEPT when missing sections are Use Cases, User Stories, or Glossary;
+      in that case select functional_spec_writer_agent to generate them.
     """
     if not messages:
         return PLANNING
@@ -500,9 +510,13 @@ async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]):
             return PLANNING
         return PLANNING
 
-    # CHECKER: if NEEDS_INFO -> planner (to send interviewer loop); READY -> planner
+    # CHECKER: if NEEDS_INFO ->
+    #   - If the missing items are Use Cases/User Stories/Glossary, route to WRITER to generate them.
+    #   - Otherwise hand control to PLANNING (it will run the interviewer loop with the user).
     if last_src == CHECKER:
         if "NEEDS_INFO" in last_txt:
+            if MISSING_WRITER_SECTIONS.search(last_txt or ""):
+                return WRITER
             return PLANNING
         if READY_TOKEN.match(last_txt):
             return PLANNING

@@ -46,35 +46,7 @@ async def on_chat_start():
     rag_config_path = os.path.join(LIB_PATH, "rag_config.yaml")
     rag_vector_memory = await rag_indexer_runner(rag_config_path)
 
-    # Lightweight event relay to show QUESTIONS in the UI
-    # Store last question to display alongside input prompts
-    global LAST_QUESTION
-    LAST_QUESTION = None
-
-    class ChainlitEventHandler(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            try:
-                msg = self.format(record)
-                if (
-                    "ModelClientStreamingChunkEvent (interviewer_agent)" in msg
-                    or "ModelClientStreamingChunkEvent (summarizer_agent)" in msg
-                ):
-                    m = re.search(r"QUESTION:\s.*", msg, re.S)
-                    if m:
-                        q = m.group(0).strip()
-                        # Save for input bridge; also show it in UI
-                        def _post():
-                            asyncio.create_task(cl.Message(content=q).send())
-                        # update global
-                        global LAST_QUESTION
-                        LAST_QUESTION = q
-                        _post()
-            except Exception:
-                pass
-
-    ev_logger = logging.getLogger(EVENT_LOGGER_NAME)
-    ev_logger.setLevel(logging.DEBUG)
-    ev_logger.addHandler(ChainlitEventHandler())
+    # Note: suppress logger-based UI relay to avoid duplicate messages
 
     # 2) Create the canvas memory & expose update_file_tool under module name 'canvas'
     text_canvas_memory = TextCanvasMemory()
@@ -174,26 +146,13 @@ async def on_chat_start():
         return None
 
     async def chainlit_user_input(prompt: str | None = None, cancellation_token=None) -> str:
-        """Collect user input via Chainlit UI. Compatible with (prompt, cancellation_token)."""
-        # Try to surface the most recent QUESTION from the team buffer
-        try:
-            ctx = cl.user_session.get("team_ctx") or {}
-            team_ref = ctx.get("team")
-            if team_ref is not None:
-                q = _extract_last_question(team_ref)
-                if q:
-                    await cl.Message(content=q).send()
-        except Exception:
-            pass
-
-        # Echo any generic prompt from the agent as a secondary hint
-        if prompt and prompt.strip():
-            await cl.Message(content=prompt).send()
+        """Collect user input via Chainlit UI without echoing agent messages to avoid duplicates."""
         # Keep asking until we have a non-empty answer or cancellation is requested
         while True:
             if cancellation_token is not None and getattr(cancellation_token, "is_canceled", False):
                 raise asyncio.CancelledError()
-            resp = await cl.AskUserMessage(content="Please enter your reply:", timeout=3600).send()
+            # Keep the Ask bubble minimal to avoid duplicate prompt outside agent output
+            resp = await cl.AskUserMessage(content=" ", timeout=3600).send()
             text = None
             if resp:
                 text = resp.get("content") or resp.get("output") or resp.get("text")
@@ -276,6 +235,7 @@ async def on_chat_start():
     # Stream the team outputs so user can see questions/messages live
     try:
         streaming_by_agent: dict[str, cl.Message] = {}
+        last_by_source: dict[str, str] = {}
         async for evt in team.run_stream(task=initial_task, cancellation_token=CancellationToken()):
             if isinstance(evt, ModelClientStreamingChunkEvent):
                 src = evt.source or "agent"
@@ -285,12 +245,25 @@ async def on_chat_start():
                     streaming_by_agent[src] = msg
                 await msg.stream_token(evt.content)
             elif isinstance(evt, TextMessage):
-                # finalize any streaming message for this source
                 src = evt.source or "agent"
+                # If we were streaming this source, just finalize; don't re-send content.
                 msg = streaming_by_agent.pop(src, None)
                 if msg is not None:
                     await msg.send()
-                await cl.Message(content=str(evt.content), author=src).send()
+                    continue
+                # Skip echoing user messages; Chainlit already shows user input
+                if src == "user":
+                    continue
+                text = str(evt.content).strip()
+                # De-duplicate identical consecutive content per source
+                prev = last_by_source.get(src)
+                if prev == text:
+                    continue
+                # Also collapse trivial whitespace diffs for planner assignments
+                if src == "planning_agent" and prev and prev.replace(" ", "") == text.replace(" ", ""):
+                    continue
+                last_by_source[src] = text
+                await cl.Message(content=text, author=src).send()
             elif isinstance(evt, TaskResult):
                 # finalize all streams
                 for m in list(streaming_by_agent.values()):
@@ -347,6 +320,7 @@ async def on_message(msg: cl.Message):
 
     try:
         streaming_by_agent: dict[str, cl.Message] = {}
+        last_by_source: dict[str, str] = {}
         async for evt in team.run_stream(task=task_text, cancellation_token=CancellationToken()):
             if isinstance(evt, ModelClientStreamingChunkEvent):
                 src = evt.source or "agent"
@@ -357,10 +331,21 @@ async def on_message(msg: cl.Message):
                 await msg.stream_token(evt.content)
             elif isinstance(evt, TextMessage):
                 src = evt.source or "agent"
+                # If we were streaming this source, just finalize; don't re-send content.
                 msg = streaming_by_agent.pop(src, None)
                 if msg is not None:
                     await msg.send()
-                await cl.Message(content=str(evt.content), author=src).send()
+                    continue
+                if src == "user":
+                    continue
+                text = str(evt.content).strip()
+                prev = last_by_source.get(src)
+                if prev == text:
+                    continue
+                if src == "planning_agent" and prev and prev.replace(" ", "") == text.replace(" ", ""):
+                    continue
+                last_by_source[src] = text
+                await cl.Message(content=text, author=src).send()
             elif isinstance(evt, TaskResult):
                 for m in list(streaming_by_agent.values()):
                     await m.send()
