@@ -301,119 +301,199 @@ def write_mermaid_to_file_tool(mermaid_code: str, file_path: str = DEFAULT_MERMA
         return f"Error writing Mermaid file: {e}"
 
 
-VALID_AGENT_NAMES = {
-    "planning_agent",
-    "interviewer_agent",
-    "summarizer_agent",
-    "functional_spec_writer_agent",
-    "functional_spec_checker_agent",
-    "diagram_creator_agent",
-    "mermaid_code_reviewer_agent",
-    "terminate_agent",
-    USER,
-}
+# ---- Constants (ensure defined once) ----
+PLANNING = "planning_agent"
+INTERVIEWER = "interviewer_agent"
+USER = "user"
+SUMMARIZER = "summarizer_agent"
+WRITER = "functional_spec_writer_agent"
+CHECKER = "functional_spec_checker_agent"
+DIAGRAM = "diagram_creator_agent"
+MERMAID = "mermaid_code_reviewer_agent"
+TERMINATE = "terminate_agent"
 
-ASSIGNMENT_RE = re.compile(
-    r"""(?mx)            # multiline, verbose
-    ^\s*                 # start of line, optional spaces
-    (?P<num>\d+)\.?      # leading number with optional dot (1 or 1.)
-    \s+                  # spaces
-    (?P<agent>[a-z_]+)   # agent name
-    \s*:\s*              # colon with spaces
-    (?P<task>.+?)        # task text (non-greedy)
-    \s*$                 # end of line
-    """
+READY_TOKEN = re.compile(r"^\s*\*{0,2}READY\*{0,2}\s*$", re.I)
+QUESTION_PREFIX = "QUESTION:"
+STATUS_PREFIX = "STATUS:"
+
+ASSIGNMENT_MARKER = re.compile(
+    r'^\[ASSIGNMENT\]\s+agent=(?P<agent>[a-z_]+)\s+task="[^"]*"\s+awaiting_user_reply=(?P<await>true|false)\s*$',
+    re.M
 )
 
-def _src_txt(m: BaseAgentEvent | BaseChatMessage) -> Tuple[Optional[str], str]:
-    src = getattr(m, "source", None) or getattr(m, "name", None)
-    txt = getattr(m, "text", None) or getattr(m, "content", None) or ""
-    if isinstance(txt, list):
-        txt = "\n".join(str(t) for t in txt if t)
-    return src, str(txt)
+def _to_text(content: Any) -> str:
+    """
+    Normalize message content to a single string.
+    Handles:
+      - str
+      - list[str]
+      - list[dict|objects] (tries 'text' or 'content' fields)
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, (list, tuple)):
+        parts = []
+        for c in content:
+            if isinstance(c, str):
+                parts.append(c)
+            elif isinstance(c, dict):
+                # common structured part
+                if "text" in c and isinstance(c["text"], str):
+                    parts.append(c["text"])
+                elif "content" in c and isinstance(c["content"], str):
+                    parts.append(c["content"])
+            else:
+                # fallback: try .text or .content attr
+                txt = getattr(c, "text", None) or getattr(c, "content", None)
+                if isinstance(txt, str):
+                    parts.append(txt)
+        return "\n".join(parts)
+    # fallback: attempt str()
+    try:
+        return str(content)
+    except Exception:
+        return ""
 
-def _last(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> Tuple[Optional[str], str]:
+def _src(m): 
+    return getattr(m, "source", getattr(m, "sender", None))
+
+def _txt(m) -> str:
+    raw = getattr(m, "content", "")
+    return _to_text(raw).strip()
+
+def _last(messages: Sequence):
     if not messages:
         return None, ""
-    return _src_txt(messages[-1])
+    return _src(messages[-1]), _txt(messages[-1])
 
-def _last_from(messages, agent_name: str) -> Optional[str]:
+def _latest_assignment(messages: Sequence):
     for m in reversed(messages):
-        src, txt = _src_txt(m)
-        if src == agent_name:
-            return txt
-    return None
+        if _src(m) == PLANNING:
+            mt = ASSIGNMENT_MARKER.search(_txt(m))
+            if mt:
+                return mt.group("agent"), (mt.group("await") == "true")
+    return None, None
 
-def _parse_single_assignment(text: Optional[str]) -> Optional[str]:
-    """
-    Return the assigned agent IF there is exactly one well-formed assignment line,
-    and the agent name is valid. Otherwise return None.
-    """
+def _agent_has_ready(messages: Sequence, agent: str) -> bool:
+    for m in reversed(messages):
+        if _src(m) == agent:
+            if READY_TOKEN.match(_txt(m)):
+                return True
+    return False
+
+def _phase(messages: Sequence) -> int:
+    # 0 interviewing; 1 summarizing; 2 writing; 3+ post-writer linear
+    if not _agent_has_ready(messages, INTERVIEWER):
+        return 0
+    if not _agent_has_ready(messages, SUMMARIZER):
+        return 1
+    if not _agent_has_ready(messages, WRITER):
+        return 2
+    return 3
+
+def _prev_agent_question(messages: Sequence, agent: str) -> bool:
+    for m in reversed(messages):
+        s = _src(m)
+        if s == agent:
+            return _txt(m).startswith(QUESTION_PREFIX)
+    return False
+
+def _is_question(text: str) -> bool:
     if not text:
-        return None
-    matches = list(ASSIGNMENT_RE.finditer(text))
-    if len(matches) != 1:
-        return None
-    agent = matches[0].group("agent")
-    return agent if agent in VALID_AGENT_NAMES else None
+        return False
+    t = text.strip()
+    if t.lower().startswith("question:"):
+        return True
+    # Be forgiving if the agent forgot the prefix but clearly asks a question
+    if t.endswith("?") and len(t) < 400:  # heuristic to avoid long bodies
+        return True
+    return False
 
 
-# --- add near other globals ---
-AWAIT_RE = re.compile(r"awaiting[_\s]*user[_\s]*reply\s*=\s*(true|1)\b", re.I)
-APPROVE_TOKEN = re.compile(r"\bAPPROVE SUMMARY\b", re.I)
+def _latest_assignment_from_last_planner(messages: Sequence) -> tuple[str | None, bool | None]:
+    # Return assignment from the most recent planning_agent message only (if present)
+    for m in reversed(messages):
+        if _src(m) == PLANNING:
+            mt = ASSIGNMENT_MARKER.search(_txt(m))
+            if mt:
+                return mt.group("agent"), (mt.group("await") == "true")
+            break
+    return None, None
 
-def _last_n_src_txt(messages, n: int = 8):
-    for m in reversed(messages[-n:]):
-        yield _src_txt(m)
 
-# --- replace selector_func with the following ---
-async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> Optional[str]:
-    # If no history, start with planner
+async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]):
+    """
+    Strict, planner-gated selector with robust interview/summarizer loops:
+    - Always let planning_agent assign before any role switch.
+    - Obey explicit [ASSIGNMENT] markers from planning_agent.
+    - After any 'QUESTION:' to the user, pick planning_agent next (so it assigns 'user').
+    - After a user reply, pick planning_agent next (so it assigns interviewer to process/save).
+    - After any **READY**, pick planning_agent to assign the next task.
+    - Handle checker 'NEEDS_INFO' by routing back to planning_agent.
+    """
     if not messages:
         return PLANNING
 
     last_src, last_txt = _last(messages)
-    last_interviewer_txt = _last_from(messages, INTERVIEWER)
-    last_planner_txt = _last_from(messages, PLANNING)  # re-enable
 
-    
-    # 1) If planner indicates awaiting user anywhere in the recent tail → USER
-    for src, txt in _last_n_src_txt(messages, n=8):
-        # accept both planner chunks and echoed [ASSIGNMENT] text
-        if AWAIT_RE.search(txt or ""):
-            return USER
-
-    # 2) Any agent showing a QUESTION: → USER
-    if (last_txt or "").strip().startswith("QUESTION:"):
-        return USER
-
-    # 3) interviewer asked a question → USER (kept for clarity/intent)
-    if last_src == INTERVIEWER and (last_txt or "").strip().startswith("QUESTION:"):
-        return USER
-
-    # 4) user replied to interviewer’s question → back to interviewer
-    if last_src == USER and last_interviewer_txt and "QUESTION:" in (last_interviewer_txt or ""):
-        return INTERVIEWER
-
-    # 5) summarizer asked for approval (contains APPROVE SUMMARY in its *own* text)
-    #    unless user already approved exactly, force USER
-    if last_src == "summarizer_agent" and APPROVE_TOKEN.search(last_txt or ""):
-        last_user_txt = _last_from(messages, USER)
-        if not (last_user_txt and re.fullmatch(r"\s*APPROVE SUMMARY\s*", last_user_txt, re.I)):
-            return USER
-
-    # 6) user approved exactly → give summarizer the turn to emit READY
-    if last_src == USER and re.fullmatch(r"\s*APPROVE SUMMARY\s*", last_txt or "", re.I):
-        return "summarizer_agent"
-
-    # 7) any agent signaled READY → go to planner to assign next task
-    if re.search(r"\bREADY\b", last_txt or "", re.I):
+    # If the last message is from planner and includes a valid assignment, follow it strictly.
+    if last_src == PLANNING:
+        ag, awaiting = _latest_assignment_from_last_planner(messages)
+        if ag:
+            return ag
+        # If planner didn't provide a valid marker, keep the floor to planner until it does.
         return PLANNING
-    
-    # 8) Planner explicit single assignment → obey immediately
-    assigned_agent = _parse_single_assignment(last_planner_txt)
-    if assigned_agent:
-        return assigned_agent
 
-    # 9) otherwise, let the model choose
-    return None
+    # USER messages must always be followed by planner for routing next steps.
+    if last_src == USER:
+        return PLANNING
+
+    # INTERVIEWER loop: after QUESTION -> planner assigns user; after READY -> planner
+    if last_src == INTERVIEWER:
+        if READY_TOKEN.match(last_txt):
+            return PLANNING
+        if _is_question(last_txt):
+            return PLANNING
+        # Default: keep planner in control between interviewer turns
+        return PLANNING
+
+    # SUMMARIZER loop: after QUESTION (approval) -> planner (it will assign interviewer/user as needed)
+    if last_src == SUMMARIZER:
+        if READY_TOKEN.match(last_txt):
+            return PLANNING
+        if _is_question(last_txt):
+            return PLANNING
+        return PLANNING
+
+    # WRITER: after READY -> planner; otherwise planner re-assigns until READY
+    if last_src == WRITER:
+        if READY_TOKEN.match(last_txt):
+            return PLANNING
+        return PLANNING
+
+    # CHECKER: if NEEDS_INFO -> planner (to send interviewer loop); READY -> planner
+    if last_src == CHECKER:
+        if "NEEDS_INFO" in last_txt:
+            return PLANNING
+        if READY_TOKEN.match(last_txt):
+            return PLANNING
+        return PLANNING
+
+    # DIAGRAM and MERMAID reviewer: READY -> planner; otherwise planner keeps assigning next step
+    if last_src == DIAGRAM:
+        if READY_TOKEN.match(last_txt):
+            return PLANNING
+        return PLANNING
+
+    if last_src == MERMAID:
+        # The reviewer says "Diagram code complete" then READY; always hand control to planner
+        return PLANNING if READY_TOKEN.match(last_txt) or True else PLANNING
+
+    # TERMINATE: nothing else to pick; but return planner to finalize loop if needed
+    if last_src == TERMINATE:
+        return PLANNING
+
+    # Fallback: always give control to planner
+    return PLANNING
