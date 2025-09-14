@@ -12,10 +12,34 @@ from typing import List, Dict, Any, Optional, Union, Sequence, Tuple
 from autogen_agentchat.messages import BaseAgentEvent, BaseChatMessage
 
 
-DEFAULT_JSONL_PATH = "../conversation/interview.jsonl"
-DEFAULT_MD_PATH = "../conversation/final_summary.md"
-DEFAULT_MD_SPEC_PATH = "../conversation/functional_specification.md"
-DEFAULT_MERMAID_PATH = "../conversation/process_diagram.mmd"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+def _normalize_project_relative(p: str | Path) -> Path:
+    """Resolve conversation files relative to the project root, not CWD.
+    - If absolute: return as-is.
+    - If starts with '../conversation' or './conversation': map to 'conversation'.
+    - Otherwise: treat as project-root relative.
+    """
+    if isinstance(p, Path):
+        if p.is_absolute():
+            return p
+        p_str = str(p)
+    else:
+        p_str = p
+    # Normalize common prefixes used in YAML/notebook
+    if p_str.startswith("../conversation/"):
+        p_str = p_str[3:]  # drop '../'
+    elif p_str == "../conversation":
+        p_str = "conversation"
+    elif p_str.startswith("./conversation/"):
+        p_str = p_str[2:]
+    # Join to project root (safe even if already 'conversation/...')
+    return (_PROJECT_ROOT / p_str).resolve()
+
+DEFAULT_JSONL_PATH = str((_PROJECT_ROOT / "conversation/interview.jsonl").resolve())
+DEFAULT_MD_PATH = str((_PROJECT_ROOT / "conversation/final_summary.md").resolve())
+DEFAULT_MD_SPEC_PATH = str((_PROJECT_ROOT / "conversation/functional_specification.md").resolve())
+DEFAULT_MERMAID_PATH = str((_PROJECT_ROOT / "conversation/process_diagram.mmd").resolve())
 
 ISO8601 = "%Y-%m-%dT%H:%M:%S.%fZ"
 
@@ -100,7 +124,7 @@ def save_records(
     Append a list of records to a JSONL file atomically with a lock and retries.
     If session_id is provided, a metadata header is prepended before the records.
     """
-    p = Path(path)
+    p = _normalize_project_relative(path)
     _ensure_parent_dir(p)
     stamped = _with_timestamps(records)
 
@@ -183,7 +207,7 @@ def save_conversation_to_jsonl(
     2) A generic list of records.
     """
     try:
-        path = Path(file_path)
+        path = _normalize_project_relative(file_path)
 
         # Case 1: Already a list of records
         if isinstance(speaker_or_records, list):
@@ -239,10 +263,11 @@ def write_md_file_tool(content: str, file_path: str = DEFAULT_MD_SPEC_PATH) -> s
     Writes the functional specification to a Markdown file.
     """
     try:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "w", encoding="utf-8") as f:
+        abs_path = _normalize_project_relative(file_path)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "w", encoding="utf-8") as f:
             f.write(content)
-        return f"Markdown spec successfully written to {file_path}"
+        return f"Markdown spec successfully written to {abs_path}"
     except Exception as e:
         return f"Error writing Markdown spec: {e}"
 
@@ -259,10 +284,11 @@ def read_md_file_tool(file_path: str = DEFAULT_MD_SPEC_PATH) -> str:
     """
     import os
     try:
-        if not os.path.exists(file_path):
-            return f"Error: Markdown file not found at {file_path}"
+        abs_path = _normalize_project_relative(file_path)
+        if not os.path.exists(abs_path):
+            return f"Error: Markdown file not found at {abs_path}"
 
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(abs_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
         return content if content.strip() else "Markdown file is empty — no readable text found."
@@ -283,20 +309,21 @@ def write_mermaid_to_file_tool(mermaid_code: str, file_path: str = DEFAULT_MERMA
     """
 
     try:
+        abs_path = _normalize_project_relative(file_path)
         # Ensure the folder exists
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
 
         # Validate file extension
-        if not file_path.endswith('.mmd'):
+        if not abs_path.as_posix().endswith('.mmd'):
             return "Error: Filename must end with '.mmd'"
 
         # Write the Mermaid code into a fenced code block
-        with open(file_path, 'w', encoding='utf-8') as file:
+        with open(abs_path, 'w', encoding='utf-8') as file:
             file.write("```mermaid\n")
             file.write(mermaid_code)
             file.write("\n```")
 
-        return f"Mermaid diagram successfully written to {file_path}"
+        return f"Mermaid diagram successfully written to {abs_path}"
     except Exception as e:
         return f"Error writing Mermaid file: {e}"
 
@@ -491,9 +518,11 @@ async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]):
         # The reviewer says "Diagram code complete" then READY; always hand control to planner
         return PLANNING if READY_TOKEN.match(last_txt) or True else PLANNING
 
-    # TERMINATE: nothing else to pick; but return planner to finalize loop if needed
+    # TERMINATE: keep control with terminate_agent until it outputs explicit TERMINATE
     if last_src == TERMINATE:
-        return PLANNING
+        if re.search(r"\bTERMINATE\b", last_txt):
+            return PLANNING
+        return TERMINATE
 
     # Fallback: always give control to planner
     return PLANNING

@@ -1,0 +1,19 @@
+%% Functional Specification Diagram
+flowchart TD
+    A[Visitor/Buyer] --> |Search Apparel| B[Product Listing]
+    B --> |View Product Details| C[Product Details Page]
+    C --> |Add Product to Wishlist| D[Wishlist]
+    C --> |Add Product to Cart| E[Shopping Cart]
+    E --> |Checkout| F[Payment Gateway]
+    F --> |Enter Payment Details| G[Payment Confirmation]
+    G --> |Place Order| H[Order Summary]
+    H --> |Track Order| I[Order Tracking Page]
+    I --> |Receive Notifications| J[Email Notifications]
+
+    subgraph Admin Panel
+        K[Admin Login] --> L[Manage Product Catalog]
+        L --> M[Manage Categories]
+        M --> N[Manage Orders]
+        N --> O[Manage Customers]
+        O --> P[Generate Reports]
+    end

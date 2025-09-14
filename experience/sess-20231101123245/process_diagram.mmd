@@ -1,0 +1,25 @@
+%% Functional Specification Diagram
+flowchart TD
+    %% Subgraph for User Interactions
+    subgraph UserFlow["User Interactions"]
+        direction TB
+        A[Visit Homepage] --> B[Search Products]
+        B --> C[View Products]
+        C -->|Choose Product| D[View Product Details]
+        D -->|Add to Wishlist| E[Wishlist]
+        D -->|Add to Cart| F[Shopping Cart]
+        F -->|Proceed to Checkout| G[Checkout]
+        G --> H[Make Online Payment]
+        H -->|Order Confirmed| I[Order Confirmation]
+    end
+
+    %% Subgraph for Admin Interactions
+    subgraph AdminFlow["Admin Interactions"]
+        direction TB
+        J[Login to Admin Panel]
+        J --> K[Manage Catalog]
+        K -->|Update Categories| L[Create Inventory]
+        L --> M[Process Orders]
+        M --> N[Shipping Logistics]
+        N --> O[Generate Reports]
+    end
