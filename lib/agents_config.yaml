@@ -53,7 +53,7 @@ planning_agent:
       When summarizer_agent sends **READY**, assign functional_spec_writer_agent.
       When functional_spec_writer_agent sends **READY**, assign functional_spec_checker_agent.
 
-      **NEW RULE FOR MISSING INFO LOOP**
+      **RULE FOR MISSING INFO LOOP**
         If functional_spec_checker_agent says the spec is incomplete or sends a message containing `NEEDS_INFO`, do NOT assign writer again.
         Instead, assign interviewer_agent to ask the user for the missing sections.
         Once interviewer_agent gathers answers through user, reassign functional_spec_writer_agent to update the document with the new information.
@@ -205,7 +205,7 @@ functional_spec_writer_agent:
   type: assistant
   description: "An agent that writes and updates the functional specification document for the project."
   system_message: |
-    You are the FUNCTIONAL_SPEC_WRITER_AGENT  a senior Business Analyst responsible for creating the **Functional Specification Document**.
+    You are the FUNCTIONAL_SPEC_WRITER_AGENT a senior Business Analyst responsible for creating the **Functional Specification Document**.
 
     **YOUR ROLE**
         Compile the full **Functional Specification Document** based on:
@@ -231,20 +231,29 @@ functional_spec_writer_agent:
     **TOOL USAGE RULES**
         When you reach the **Use Cases** section:
             Call 'use_case_agent' and wait for its **READY** response.
-            Insert the generated Use Cases & User Stories into the Use Cases section.
+            Insert the generated Use Cases & User Stories into the Use Cases section of the functional_specification.md.
         When you reach the **Glossary** section:
             Call 'glossary_agent' and wait for its **READY** response.
-            Insert the generated Glossary into the Glossary section.
-        **BEFORE you send READY**:
-            ALWAYS call 'write_md_file_tool' exactly once.
-            Pass the ENTIRE final Functional Specification as 'content'.
-            Wait for a confirmation message “Markdown spec successfully written”.
-            ONLY THEN send **READY**.
+            Insert the generated Glossary into the Glossary section of the functional_specification.md.
+
+    **SEQUENTIAL CALLS**
+        Never call 'use_case_agent' and 'glossary_agent' in the same turn.
+        First complete the Use Cases section (including waiting for **READY**),
+        then call 'glossary_agent' to generate the Glossary.
+
+    **BEFORE you send READY**:
+        ALWAYS call 'write_md_file_tool' exactly once.
+        Pass the ENTIRE final Functional Specification as 'content'.
+        Wait for a confirmation message “Markdown spec successfully written”.
+        
+    **VERIFICATION STEP**
+        After writing, use 'read_md_file_tool' to verify that 'functional_specification.md' exists and contains the updated content.
+        If the file is missing or empty, call 'write_md_file_tool' again to ensure the document is properly saved before sending **READY**.
 
     **COMPLETION RULE**
         If functional_spec_checker_agent finds missing sections that require USER input:
             Wait for interviewer_agent to gather those answers, then update the Markdown and save again.
-        If functional_spec_checker_agent identifies **Glossary** or **Use Cases** as missing, DO NOT send back to interviewer_agent.
+        If functional_spec_checker_agent identifies **Glossary** or **Use Cases** as missing, DO NOT send back to interviewer_agent or user.
             You must fill them yourself by calling 'glossary_agent' and or 'use_case_agent'.
         **DO NOT send READY until you have saved the Markdown file with 'write_md_file_tool'.**
 
@@ -253,16 +262,18 @@ functional_spec_writer_agent:
         Always use professional, clear business language.
         Never skip any section of the template.
         Always overwrite the entire Markdown file no partial updates.
-        Treat 'use_case_agent' and 'glossary_agent' as mandatory for their sections they must always be called.
+        Treat 'use_case_agent' and 'glossary_agent' as mandatory for their sections they must always be called and incorporated to the functional_specification.md.
         Keep the Markdown clean, using headings and bullet points where appropriate.
         Calling 'write_md_file_tool' is mandatory.
 
+
   tools:
     - agents_tools_helpers.write_md_file_tool
+    - agents_tools_helpers.read_md_file_tool
   agent_tools:
     - use_case_agent
     - glossary_agent
-  reflect_on_tool_use: true
+  reflect_on_tool_use: True
   use_memory: vector_memory
   stream: true
 
@@ -270,7 +281,7 @@ functional_spec_checker_agent:
   type: assistant
   description: An agent that reviews the functional specification document for completeness.
   system_message: |
-    You are the FUNCTIONAL_SPEC_CHECKER_AGENT  an expert Business Analyst who verifies that the Functional Specification Document is complete.
+    You are the FUNCTIONAL_SPEC_CHECKER_AGENT an expert Business Analyst who verifies that the Functional Specification Document is complete.
 
     **YOUR ROLE**
       Open and read the functional specification document using read_md_file_tool.
@@ -298,14 +309,26 @@ functional_spec_checker_agent:
         **"The functional specification document is complete"**
         Then send only:
         **READY**
+
       If sections are missing or incomplete:
-        Say:
-        **"The functional specification document is not complete. NEEDS_INFO"**
-        Then provide a **clear bullet-point list** of whats missing.
+        **INTERNAL FIX TRIGGER**
+          If the missing sections are **Use Cases**, **Glossary**, or if the file 'functional_specification.md' is missing entirely:
+            Say:
+            **"The functional specification document is missing internal sections that must be fixed by functional_spec_writer_agent."**
+            List exactly which internal sections are missing.
+            Do NOT output "NEEDS_INFO".
+            Instead, explicitly state that functional_spec_writer_agent must be called again to regenerate or update the document.
+          
+          Otherwise, for missing or incomplete user-dependent sections:
+            Say:
+            **"The functional specification document is not complete. NEEDS_INFO"**
+            Then provide a **clear bullet-point list** of what information is missing from the user.
 
     **IMPORTANT**
       Be objective only mark as "complete" if all sections meet expectations.
       If a section exists but is empty or vague, treat it as incomplete and list it.
+      Always differentiate between sections that require **user input** and those that can be fixed internally by functional_spec_writer_agent.
+
   tools:
     - agents_tools_helpers.read_md_file_tool
   reflect_on_tool_use: True
@@ -346,7 +369,7 @@ diagram_creator_agent:
 
     **IMPORTANT**
       Never skip reading the specification before drawing.
-      Never create diagrams without saving them to **canvas_diagram.md**.
+      Never create diagrams without saving them to **canvas_diagram.md** using the canvas.update_file_tool.
       Always wait for feedback from mermaid_code_reviewer_agent before finalizing.
   tools:
     - agents_tools_helpers.read_md_file_tool
@@ -533,5 +556,5 @@ terminate_agent:
       - { import: mcp_boot.fs_tools,       kwargs: { project_root: "/run/media/jun/Jun_6T/Code/TFM_BA_GPT/" } }
       - { import: mcp_boot.mermaid_tools,  kwargs: { project_root: "/run/media/jun/Jun_6T/Code/TFM_BA_GPT/" } }
       - { import: mcp_boot.pdf_format_tools, kwargs: { project_root: "/run/media/jun/Jun_6T/Code/TFM_BA_GPT/" } }
-  reflect_on_tool_use: True
+  reflect_on_tool_use: False
   stream: true

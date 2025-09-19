@@ -35,12 +35,14 @@ async def on_chat_start():
     )
     from autogen_agentchat.base import TaskResult
     from autogen_core import CancellationToken
+    from autogen_ext.memory.canvas import TextCanvasMemory
+    from autogen_agentchat.agents import AssistantAgent
 
     from rag_helpers import rag_indexer_runner
     from model_loader import load_model_client
     from agents_creator import create_agents_from_config
     from agents_tools_helpers import selector_func
-    from autogen_ext.memory.canvas import TextCanvasMemory
+
 
     # 1) Load RAG vector memory (same as the notebook)
     rag_config_path = os.path.join(LIB_PATH, "rag_config.yaml")
@@ -171,17 +173,45 @@ async def on_chat_start():
         input_func=chainlit_user_input,
     )
 
+    # Load the second model client (you can adjust to match your loader)
+    model_client2 = load_model_client("openai")  # Or "azure-alt" if you have another profile
+
+    def _clone_agent_with_new_client(agent: AssistantAgent, new_client) -> AssistantAgent:
+        """Create a copy of an agent but with a different model_client, preserving tools, memory, system message."""
+        try:
+            system_message = agent._system_messages[0].content if agent._system_messages else None
+        except Exception:
+            system_message = None
+        return AssistantAgent(
+            name=agent._name,
+            description=getattr(agent, "_description", ""),
+            model_client=new_client,
+            memory=getattr(agent, "_memory", None),
+            tools=getattr(agent, "_tools", None),
+            reflect_on_tool_use=getattr(agent, "_reflect_on_tool_use", False),
+            system_message=system_message,
+            model_client_stream=getattr(agent, "_model_client_stream", False),
+        )
+
+    # Agents to override
+    agents_to_override = ["planning_agent", "interviewer_agent", "glossary_agent", "use_case_agent"]
+
+    for name in agents_to_override:
+        if name in agents:
+            agents[name] = _clone_agent_with_new_client(agents[name], model_client2)
+
+
     member_agents = [agents[name] for name in agent_order if name in agents] + [user]
 
     # 5) Selector prompt (same text as the notebook)
     selector_prompt = (
-        "Select an agent to perform task.\n\n"
-        "{roles}\n\n"
-        "Current conversation context:\n"
-        "{history}\n\n"
-        "Read the above conversation, then select an agent from {participants} to perform the next task.\n"
-        "Make sure the planner agent has assigned tasks before other agents start working.\n"
-        "Only select one agent.\n"
+        "Select an agent to perform task."
+        "{roles}"
+        "Current conversation context:"
+        "{history}"
+        "Read the above conversation, then select an agent from {participants} to perform the next task."
+        "Make sure the planner agent has assigned tasks before other agents start working."
+        "Only select one agent."
     )
 
     # 6) Termination condition (mirrors the notebook)
@@ -190,7 +220,7 @@ async def on_chat_start():
     # 7) Build the team with our custom selector
     team = SelectorGroupChat(
         member_agents,
-        model_client=model_client,
+        model_client=model_client2,
         termination_condition=termination,
         selector_prompt=selector_prompt,
         allow_repeated_speaker=False,

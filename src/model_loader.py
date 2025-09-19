@@ -38,6 +38,8 @@ def load_model_client(model_name: str = "azure"):
         "hugging": os.path.join(base_path, "src", "model_config_hugging.yaml"),
         "github": os.path.join(base_path, "src", "model_config_github.yaml"),
         "onnx": os.path.join(base_path, "src", "model_config_onnx.yaml"),
+        "openai": os.path.join(base_path, "src", "model_config_openai.yaml"),
+        "openai_npt": os.path.join(base_path, "src", "model_config_openai_npt.yaml"),
     }
     model_name = model_name.lower()
     if model_name not in configs:

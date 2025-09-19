@@ -1,0 +1,29 @@
+graph TD
+    A[Start] --> B[User Registration]
+    B --> C{Is User Registered?}
+    C -- Yes --> D[Login]
+    C -- No --> E[Sign Up]
+    D --> F[Dashboard]
+    E --> F[Dashboard]
+    F --> G[Product Search]
+    G --> H{Product Found?}
+    H -- Yes --> I[View Details]
+    H -- No --> G
+    I --> J[Add to Cart]
+    J --> K[Checkout]
+    K --> L[Payment]
+    L --> M[Order Confirmation]
+    M --> N[Order Tracking]
+    F --> O[Profile & Settings]
+    O --> P[Manage Address]
+    F --> Q[Wishlist]
+    Q --> R[Add/Remove Items]
+    F --> S[Admin Panel]
+    S --> T[Manage Products]
+    S --> U[Manage Orders]
+    S --> V[Manage Users]
+    S --> W[View Reports]
+    N --> A
+    R --> A
+    P --> A
+    W --> A
