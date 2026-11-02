@@ -1,7 +1,8 @@
-CHROMA_DIR: "../chromadb_storage"
-DOCS_DIR: "../data"
+# Paths are resolved relative to the project root (see lib/rag_helpers.py).
+CHROMA_DIR: "chromadb_storage"
+DOCS_DIR: "data"
 COLLECTION_NAME: "rag_collection"
-STATE_FILE: "../index_state.json"
+STATE_FILE: "index_state.json"
 SITES:
   - "https://www.morebusiness.com/business-analyst-interview-questions/"
   - "https://www.requiment.com/the-most-asked-questions-about-requirements-gathering/"

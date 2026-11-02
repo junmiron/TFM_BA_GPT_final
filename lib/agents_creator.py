@@ -27,9 +27,9 @@ def inject_team_members(system_message: str, agent_names: list, planning_agent_n
 
 def resolve_memory(cfg, vector_memory, canvas_memory):
     mem_type = str(cfg.get("use_memory", "false")).lower()
-    if mem_type == "vector_memory":
+    if mem_type == "vector_memory" and vector_memory:
         return [vector_memory]
-    elif mem_type == "canvas_memory":
+    elif mem_type == "canvas_memory" and canvas_memory:
         return [canvas_memory]
     else:
         return None
@@ -73,12 +73,6 @@ async def _aload_mcp_tools(specs):
         else:
             raise ValueError(f"Invalid mcp_tools entry: {entry!r}")
     return tools
-
-def _gather_base_tools(cfg: dict) -> List[Any]:
-    """Combine function tools + mcp tools for the first pass."""
-    fn_tools = _load_function_tools(cfg.get("tools", []))
-    mcp_tools = _load_mcp_tools(cfg.get("mcp_tools", []))
-    return [*fn_tools, *mcp_tools]
 
 def _rebuild_agent_with_tools(old: AssistantAgent, extra_tools: List[Any]) -> AssistantAgent:
     """Re-create an AssistantAgent with old properties + new tools (preserves everything else)."""

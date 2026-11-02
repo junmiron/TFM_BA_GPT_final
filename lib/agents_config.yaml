@@ -14,7 +14,8 @@ planning_agent:
       `1. <agent> : <task>`
       Track which tasks are **pending** and **done**.
       Update the status every time an agent sends **READY**.
-      Continue until all tasks are completed, then summarize the results and end with **TERMINATE**.
+      Continue until all tasks are completed, then summarize the results and assign terminate_agent.
+      Do NOT output TERMINATE yourself - only terminate_agent ends the run.
 
     **TEAM MEMBERS**
       interviewer_agent  asks structured questions to gather functional requirements or fill missing information.
@@ -505,9 +506,9 @@ terminate_agent:
         If multiple lines: pick the first non-empty "session_id".
         If not found: set SESSION_ID = "sess-unknown".
 
-      2 Create folder project_root/experience/<SESSION_ID>/
+      2 Create folder project_root/experience/<SESSION_ID>/ using 'ensure_dir_tool'
 
-      3 MOVE the three source files into that folder using 'move_file':
+      3 MOVE the three source files into that folder using 'move_file_tool':
           project_root/conversation/interview.jsonl             -> project_root/experience/<SESSION_ID>/interview.jsonl
           project_root/conversation/functional_specification.md -> project_root/experience/<SESSION_ID>/functional_specification.md
           project_root/conversation/process_diagram.mmd         -> project_root/experience/<SESSION_ID>/process_diagram.mmd
@@ -552,9 +553,11 @@ terminate_agent:
       Be explicit about each steps success or failure.
       If a tool call fails, retry up to 1 times with the same arguments.
 
+  tools:
+    - agents_tools_helpers.move_file_tool
+    - agents_tools_helpers.ensure_dir_tool
   mcp_tools:
-      - { import: mcp_boot.fs_tools,       kwargs: { project_root: "/run/media/jun/Jun_6T/Code/TFM_BA_GPT/" } }
-      - { import: mcp_boot.mermaid_tools,  kwargs: { project_root: "/run/media/jun/Jun_6T/Code/TFM_BA_GPT/" } }
-      - { import: mcp_boot.pdf_format_tools, kwargs: { project_root: "/run/media/jun/Jun_6T/Code/TFM_BA_GPT/" } }
+      - mcp_boot.mermaid_tools
+      - mcp_boot.pdf_format_tools
   reflect_on_tool_use: False
   stream: true

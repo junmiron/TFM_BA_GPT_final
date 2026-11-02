@@ -209,7 +209,7 @@ def build_payload(session_dir: Path, session_id: str) -> dict:
         "type": "TFM_BA_GPT.experience",
         "session_id": session_id,
         "root": str(session_dir),
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "files": files,
     }
 
@@ -219,7 +219,13 @@ def _make_chroma_memory(collection: str, persistence_path: Path,
                         k: int = 12, score_threshold: float = 0.15):
 
     model = SentenceTransformer('all-MiniLM-L6-v2')
-    model = model.to('cuda')  # This moves the model to GPU
+    try:
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device)
+    except Exception:
+        # torch unavailable / no GPU: keep the default CPU embedding model
+        pass
 
     cfg = PersistentChromaDBVectorMemoryConfig(
         collection_name=collection,

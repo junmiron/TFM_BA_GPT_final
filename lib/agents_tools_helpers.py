@@ -3,6 +3,7 @@ This module provides agent tools.
 """
 import os
 import json
+import shutil
 import uuid
 import time
 import re
@@ -228,7 +229,7 @@ def save_conversation_to_jsonl(
                     "message": message,
                     "subject": subject,
                     "q_index": q_index,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             }
             return f"Stored interviewer question for subject={subject}, q_index={q_index}"
@@ -243,7 +244,7 @@ def save_conversation_to_jsonl(
                 "message": message,
                 "subject": subject,
                 "q_index": q_index,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
             save_records(path, [interviewer_rec, user_rec], session_id=session_id)
@@ -326,6 +327,33 @@ def write_mermaid_to_file_tool(mermaid_code: str, file_path: str = DEFAULT_MERMA
         return f"Mermaid diagram successfully written to {abs_path}"
     except Exception as e:
         return f"Error writing Mermaid file: {e}"
+
+
+def move_file_tool(source_path: str, destination_path: str) -> str:
+    """Move/rename a file inside the project (used by terminate_agent).
+
+    Replaces the external PyMCP-FS `move_file` tool with a project-scoped one.
+    """
+    try:
+        src = _normalize_project_relative(source_path)
+        dst = _normalize_project_relative(destination_path)
+        if not src.exists():
+            return f"Error: source file not found: {src}"
+        _ensure_parent_dir(dst)
+        shutil.move(str(src), str(dst))
+        return f"Moved {src} -> {dst}"
+    except Exception as e:
+        return f"Error moving file: {e}"
+
+
+def ensure_dir_tool(dir_path: str) -> str:
+    """Create a directory (relative to the project root) if it does not exist."""
+    try:
+        target = _normalize_project_relative(dir_path)
+        target.mkdir(parents=True, exist_ok=True)
+        return f"Directory ready: {target}"
+    except Exception as e:
+        return f"Error creating directory: {e}"
 
 
 # ---- Constants (ensure defined once) ----

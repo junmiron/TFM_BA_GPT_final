@@ -1,0 +1,13 @@
+# OpenAI profile used by the tool-heavy agents (no parallel tool calls).
+provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+config:
+  model: gpt-4o
+  api_key: REPLACE_WITH_YOUR_API_KEY
+  parallel_tool_calls: false
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: true
+    family: gpt-4o
+    structured_output: false
+    multiple_system_messages: true

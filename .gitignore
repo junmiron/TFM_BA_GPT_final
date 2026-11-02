@@ -35,6 +35,24 @@ index_state.json
 docs/Screencasts
 docs/data.7z
 
+# large binaries / media kept locally but not in the repo
+docs/papers/
+docs/TFM/*.pdf
+docs/TFM/*.docx
+docs/TFM/*.pptx
+docs/Examples FDS/*.pdf
+docs/Examples FDS/*.docx
+docs/Conversation/*.pdf
+docs/Conversation/*.png
+docs/Conversation/*.zip
+docs/Conversation/*.tar.gz
+*.sqlite3
+*.7z
+*.mp4
+*.webm
+.chainlit/translations
+.files
+
 # frontend build artifacts
 frontend/talk-wiz-chat/node_modules
 frontend/talk-wiz-chat/dist

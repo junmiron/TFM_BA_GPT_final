@@ -1,95 +1,57 @@
-# mcp_boot.py
-import os
+"""Boot the bundled MCP servers used by the terminate agent.
+
+Each helper starts a stdio MCP server that lives in mcp_servers/ and is
+scoped to the project root, so no absolute machine paths are hard-coded.
+"""
+
 import sys
 from pathlib import Path
+from typing import List
+
 from autogen_ext.tools.mcp import StdioServerParams, mcp_server_tools
 
-# Optional: import sys to locate python exe if needed
-# import sys
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-async def fs_tools(project_root: str) -> list:
-    pr = Path(project_root)
-
-    # Try common venv locations first; fall back to current python
+def _python_cmd(project_root: Path) -> str:
+    """Prefer the interpreter that is actually running the app."""
     candidates = [
-        pr / ".venv" / "bin" / "python",
-        pr / "venv"  / "bin" / "python",
-        pr / ".venv" / "Scripts" / "python.exe",   # Windows
-        pr / "venv"  / "Scripts" / "python.exe",   # Windows
+        sys.executable,
+        project_root / ".venv_win" / "Scripts" / "python.exe",
+        project_root / ".venv" / "Scripts" / "python.exe",
+        project_root / ".venv" / "bin" / "python",
     ]
-    python_cmd = next((str(p) for p in candidates if p.exists()), sys.executable)
+    return next(str(p) for p in candidates if Path(p).exists())
+
+
+def _server_tools(server_script: Path, project_root: Path) -> StdioServerParams:
+    if not server_script.exists():
+        raise FileNotFoundError(f"MCP server not found: {server_script}")
 
     params = StdioServerParams(
-        command=python_cmd,
+        command=_python_cmd(project_root),
         args=[
-            str(pr / "mcp_servers" / "PyMCP-FS" / "main.py"),   # adjust to your server entrypoint
-            "-d", project_root,
-            "-d", "/tmp",
-            "--project-root", project_root,
-            "--log-level", "DEBUG",
-            "--log-file",   str(pr / "mcp_debug.log"),
+            str(server_script),
+            "-d", str(project_root),
+            "--project-root", str(project_root),
         ],
-        # keep the server’s CWD stable so relative paths don’t pick up the notebook folder
-        cwd=str(pr),          # if your StdioServerParams uses `cwd`
-        # working_dir=str(pr), # if your version uses `working_dir` instead of `cwd`
+        # Keep the server CWD at the project root so relative paths behave.
+        cwd=str(project_root),
         env={"PYTHONUNBUFFERED": "1"},
         read_timeout_seconds=60.0,
     )
+    return params
+
+
+async def mermaid_tools(project_root: str | None = None) -> list:
+    """Mermaid clean/render tools (requires the `mmdc` mermaid-cli binary)."""
+    pr = Path(project_root) if project_root else PROJECT_ROOT
+    params = _server_tools(pr / "mcp_servers" / "Mermaid-MCP" / "Mermaid-MCP.py", pr)
     return await mcp_server_tools(params)
 
-async def mermaid_tools(project_root: str) -> list:
-    pr = Path(project_root)
 
-    # Try common venv locations first; fall back to current python
-    candidates = [
-        pr / ".venv" / "bin" / "python",
-        pr / "venv"  / "bin" / "python",
-        pr / ".venv" / "Scripts" / "python.exe",   # Windows
-        pr / "venv"  / "Scripts" / "python.exe",   # Windows
-    ]
-    python_cmd = next((str(p) for p in candidates if p.exists()), sys.executable)
-
-    params = StdioServerParams(
-        command=python_cmd,
-        args=[
-            str(pr / "mcp_servers" / "Mermaid-MCP" / "Mermaid-MCP.py"),   # adjust to your server entrypoint
-            "-d", project_root,
-            "-d", "/tmp",
-            "--project-root", project_root,
-        ],
-        # keep the server’s CWD stable so relative paths don’t pick up the notebook folder
-        cwd=str(pr),          # if your StdioServerParams uses `cwd`
-        # working_dir=str(pr), # if your version uses `working_dir` instead of `cwd`
-        env={"PYTHONUNBUFFERED": "1"},
-        read_timeout_seconds=60.0,
-    )
-    return await mcp_server_tools(params)
-
-async def pdf_format_tools(project_root: str) -> list:
-    pr = Path(project_root)
-
-    # Try common venv locations first; fall back to current python
-    candidates = [
-        pr / ".venv" / "bin" / "python",
-        pr / "venv"  / "bin" / "python",
-        pr / ".venv" / "Scripts" / "python.exe",   # Windows
-        pr / "venv"  / "Scripts" / "python.exe",   # Windows
-    ]
-    python_cmd = next((str(p) for p in candidates if p.exists()), sys.executable)
-
-    params = StdioServerParams(
-        command=python_cmd,
-        args=[
-            str(pr / "mcp_servers" / "Final_deliverable_MCP_server" / "PDF_format_mcp_server.py"),   # adjust to your server entrypoint
-            "-d", project_root,
-            "-d", "/tmp",
-            "--project-root", project_root,
-        ],
-        # keep the server’s CWD stable so relative paths don’t pick up the notebook folder
-        cwd=str(pr),          # if your StdioServerParams uses `cwd`
-        # working_dir=str(pr), # if your version uses `working_dir` instead of `cwd`
-        env={"PYTHONUNBUFFERED": "1"},
-        read_timeout_seconds=60.0,
-    )
+async def pdf_format_tools(project_root: str | None = None) -> list:
+    """Spec formatting + PDF export tools (PDF needs pandoc + a LaTeX engine)."""
+    pr = Path(project_root) if project_root else PROJECT_ROOT
+    params = _server_tools(pr / "mcp_servers" / "Final_deliverable_MCP_server" / "PDF_format_mcp_server.py", pr)
     return await mcp_server_tools(params)

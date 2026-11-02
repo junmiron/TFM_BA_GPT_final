@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional, List
@@ -46,13 +47,44 @@ def resolve_under_allowed(path: str | Path,
 
     raise ValueError(f"Path not in allowed directories:\n{p}")
 
+def _mmdc_command() -> list[str]:
+    """Resolve the mermaid-cli executable.
+
+    On Windows npm installs `mmdc` as a shell script plus a `mmdc.cmd` shim;
+    CreateProcess cannot run the extension-less script, so prefer the .cmd.
+    """
+    if os.name == "nt":
+        resolved = shutil.which("mmdc.cmd") or shutil.which("mmdc")
+        if resolved:
+            return [resolved]
+    return ["mmdc"]
+
+
+def _strip_mermaid_fences(text: str) -> str:
+    """Mermaid files written by other tools are fenced with ```mermaid ... ```;
+    mmdc cannot parse fences, so unwrap them before rendering."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[1] if "\n" in stripped else ""
+        if stripped.rstrip().endswith("```"):
+            stripped = stripped.rstrip()[:-3]
+    return stripped.strip()
+
+
 def run_mmdc(input_path: Path, output_path: Path, fmt: str,
              theme: Optional[str] = None,
              width: Optional[int] = None,
              height: Optional[int] = None,
              background: Optional[str] = None,
              puppeteer_config: Optional[str] = None) -> None:
-    cmd = ["mmdc", "-i", str(input_path), "-o", str(output_path)]
+    raw = input_path.read_text(encoding="utf-8", errors="ignore")
+    cleaned = _strip_mermaid_fences(raw)
+    if cleaned != raw.strip():
+        tmp = input_path.with_suffix(".clean.mmd")
+        tmp.write_text(cleaned + "\n", encoding="utf-8")
+        input_path = tmp
+
+    cmd = _mmdc_command() + ["-i", str(input_path), "-o", str(output_path)]
     if theme:
         cmd += ["-t", theme]
     if width:
@@ -67,11 +99,16 @@ def run_mmdc(input_path: Path, output_path: Path, fmt: str,
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        subprocess.run(cmd, check=True)
+        # Capture output: mmdc's stdout would otherwise corrupt the MCP
+        # JSON-RPC stream (it shares the server's stdout).
+        proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
     except FileNotFoundError:
         raise RuntimeError("mmdc not found. Install with: npm i -g @mermaid-js/mermaid-cli")
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"mmdc failed (exit {e.returncode}): {' '.join(shlex.quote(c) for c in cmd)}")
+        raise RuntimeError(
+            f"mmdc failed (exit {e.returncode}): {' '.join(shlex.quote(c) for c in cmd)}\n"
+            f"{e.stderr or e.stdout or ''}"
+        )
 
 try:
     from PIL import Image
@@ -350,7 +387,7 @@ def create_server(allowed_dirs: List[Path], project_root: Path | None = None) ->
                     tout = _P(td) / "_out.svg"
                     cleaned, _ = clean_mermaid_text(raw)
                     tin.write_text(cleaned, encoding="utf-8")
-                    cmd = ["mmdc", "-i", str(tin), "-o", str(tout)]
+                    cmd = _mmdc_command() + ["-i", str(tin), "-o", str(tout)]
                     if theme:
                         cmd += ["-t", theme]
                     if puppeteer_config:

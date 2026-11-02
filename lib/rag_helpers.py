@@ -271,13 +271,24 @@ def load_config(yaml_path):
     with open(yaml_path, "r") as f:
         return yaml.safe_load(f)
 
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _project_relative(path: str) -> str:
+    """Resolve a config path against the project root instead of the CWD."""
+    if os.path.isabs(path):
+        return path
+    return str((_PROJECT_ROOT / path).resolve())
+
+
 async def rag_indexer_runner(config_path):
     # Load config
     config = load_config(config_path)
-    CHROMA_DIR = config["CHROMA_DIR"]
-    DOCS_DIR = config["DOCS_DIR"]
+    CHROMA_DIR = _project_relative(config["CHROMA_DIR"])
+    DOCS_DIR = _project_relative(config["DOCS_DIR"])
     COLLECTION_NAME = config["COLLECTION_NAME"]
-    STATE_FILE = config["STATE_FILE"]
+    STATE_FILE = _project_relative(config["STATE_FILE"])
     SITES = config["SITES"]
 
     state = load_index_state(STATE_FILE)
@@ -287,10 +298,15 @@ async def rag_indexer_runner(config_path):
     vector_memory = await create_chromadb_memory(CHROMA_DIR, COLLECTION_NAME)
 
     # --- Find all files in DOCS_DIR
-    all_files = {
-        str(f.relative_to(DOCS_DIR)) for f in Path(DOCS_DIR).rglob("*")
-        if f.is_file() and f.suffix.lower() in {".pdf", ".docx", ".txt"}
-    }
+    docs_path = Path(DOCS_DIR)
+    if not docs_path.exists():
+        print(f"⚠️  Documents directory not found: {DOCS_DIR} — skipping local document indexing.")
+        all_files = set()
+    else:
+        all_files = {
+            str(f.relative_to(DOCS_DIR)) for f in docs_path.rglob("*")
+            if f.is_file() and f.suffix.lower() in {".pdf", ".docx", ".txt"}
+        }
 
     new_files = all_files - already_indexed_files
     new_urls = set(SITES) - already_indexed_urls

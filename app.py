@@ -58,7 +58,7 @@ async def on_chat_start():
     sys.modules["canvas"] = canvas
 
     # 3) Load the model client (same loader used in the notebook)
-    model_client = load_model_client("azure")
+    model_client = load_model_client(os.getenv("MODEL_CLIENT", "openai"))
 
     # 4) Create all agents from YAML configuration
     agents_config_path = os.path.join(LIB_PATH, "agents_config.yaml")
@@ -173,8 +173,8 @@ async def on_chat_start():
         input_func=chainlit_user_input,
     )
 
-    # Load the second model client (you can adjust to match your loader)
-    model_client2 = load_model_client("openai")  # Or "azure-alt" if you have another profile
+    # Load the second model client for the tool-heavy agents
+    model_client2 = load_model_client(os.getenv("MODEL_CLIENT_TOOLS", "openai_npt"))
 
     def _clone_agent_with_new_client(agent: AssistantAgent, new_client) -> AssistantAgent:
         """Create a copy of an agent but with a different model_client, preserving tools, memory, system message."""
@@ -205,17 +205,17 @@ async def on_chat_start():
 
     # 5) Selector prompt (same text as the notebook)
     selector_prompt = (
-        "Select an agent to perform task."
-        "{roles}"
-        "Current conversation context:"
-        "{history}"
-        "Read the above conversation, then select an agent from {participants} to perform the next task."
-        "Make sure the planner agent has assigned tasks before other agents start working."
+        "Select an agent to perform task.\n"
+        "{roles}\n"
+        "Current conversation context:\n"
+        "{history}\n"
+        "Read the above conversation, then select an agent from {participants} to perform the next task.\n"
+        "Make sure the planner agent has assigned tasks before other agents start working.\n"
         "Only select one agent."
     )
 
     # 6) Termination condition (mirrors the notebook)
-    termination = MaxMessageTermination(100000000) | TextMentionTermination("TERMINATE")
+    termination = MaxMessageTermination(int(os.getenv("MAX_MESSAGES", "300"))) | TextMentionTermination("TERMINATE")
 
     # 7) Build the team with our custom selector
     team = SelectorGroupChat(

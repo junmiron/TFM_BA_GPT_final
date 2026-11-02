@@ -26,18 +26,26 @@ import mcp_boot
 from lib import agents_tools_helpers
 from rag_helpers import rag_indexer_runner
 from model_loader import load_model_client
-from agents_tools_helpers import selector_func, save_conversation_to_jsonl, write_md_file_tool, read_md_file_tool, write_mermaid_to_file_tool
+from agents_tools_helpers import (
+    selector_func,
+    save_conversation_to_jsonl,
+    write_md_file_tool,
+    read_md_file_tool,
+    write_mermaid_to_file_tool,
+    move_file_tool,
+    ensure_dir_tool,
+)
 
 
 @cl.on_chat_start
 async def on_chat_start():
-    rag_vector_memory = await rag_indexer_runner(os.path.join("lib", "rag_config.yaml"))
+    rag_vector_memory = await rag_indexer_runner(os.path.join(PROJECT_ROOT, "lib", "rag_config.yaml"))
     text_canvas_memory = TextCanvasMemory()
     update_file_tool = text_canvas_memory.get_update_file_tool()
     sys.modules["canvas"] = types.SimpleNamespace(update_file_tool=update_file_tool)
 
-    model_client = load_model_client("openai")
-    model_client_tools = load_model_client("openai_npt")
+    model_client = load_model_client(os.getenv("MODEL_CLIENT", "openai"))
+    model_client_tools = load_model_client(os.getenv("MODEL_CLIENT_TOOLS", "openai_npt"))
 
     async def chainlit_user_input(prompt=None, cancellation_token=None):
         while True:
@@ -66,7 +74,8 @@ async def on_chat_start():
     `1. <agent> : <task>`
     Track which tasks are **pending** and **done**.
     Update the status every time an agent sends **READY**.
-    Continue until all tasks are completed, then summarize the results and end with **TERMINATE**.
+    Continue until all tasks are completed, then summarize the results and assign terminate_agent.
+    Do NOT output TERMINATE yourself - only terminate_agent ends the run.
 
     **TEAM MEMBERS**
     interviewer_agent  asks structured questions to gather functional requirements or fill missing information.
@@ -574,7 +583,7 @@ async def on_chat_start():
       Be explicit about each steps success or failure.
       If a tool call fails, retry up to 1 times with the same arguments.
     """,
-        tools=[*(await mcp_boot.fs_tools(PROJECT_ROOT)),
+        tools=[move_file_tool, ensure_dir_tool,
           *(await mcp_boot.mermaid_tools(PROJECT_ROOT)),
           *(await mcp_boot.pdf_format_tools(PROJECT_ROOT))],
         reflect_on_tool_use=True,
@@ -607,7 +616,7 @@ async def on_chat_start():
     Make sure the planner agent has assigned tasks before other agents start working.
     Only select one agent."""
     )
-    termination = MaxMessageTermination(100000000) | TextMentionTermination("TERMINATE")
+    termination = MaxMessageTermination(int(os.getenv("MAX_MESSAGES", "300"))) | TextMentionTermination("TERMINATE")
 
     team = SelectorGroupChat(
         participants=agents,  # ✅ updated keyword
