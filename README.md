@@ -10,6 +10,7 @@ stdio **MCP servers** for diagram rendering and document export.
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue)
 ![AutoGen](https://img.shields.io/badge/autogen--agentchat-0.7.4-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![CI](https://github.com/junmiron/TFM_BA_GPT_final/actions/workflows/ci.yml/badge.svg)
 
 ---
 
