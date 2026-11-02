@@ -1,80 +1,105 @@
-# BA-GPT — Multi-Agent Business Analyst (AutoGen + Chainlit)
+# BA-GPT — Multi-Agent Business Analyst
 
-A multi-agent interviewer that runs a budgeted requirements interview with a
-human, then produces a traceable **Functional Specification Document** plus a
-process diagram and a PDF deliverable.
+A local-first AI business analyst that runs a budgeted, deterministic requirements
+interview with a human and produces a traceable **Functional Specification
+Document (FSD)**, a Mermaid process diagram, and a PDF deliverable.
 
-```
-user  <->  planning_agent (orchestrator)
-              |
-              v
-   interviewer_agent -> summarizer_agent -> functional_spec_writer_agent
-                              (uses use_case_agent, glossary_agent)
-                                    -> functional_spec_checker_agent
-                                    -> diagram_creator_agent
-                                    -> mermaid_code_reviewer_agent
-                                    -> terminate_agent  (exports .mmd/.png/.pdf)
-```
+Built on **AutoGen 0.7** (selector group chat), **Chainlit** (web UI), and two
+stdio **MCP servers** for diagram rendering and document export.
 
-Outputs land in `experience/<SESSION_ID>/`:
-`interview.jsonl`, `functional_specification.md`, `functional_specification.formatted.md`,
-`process_diagram.mmd`, `process_diagram.png`, `deliverable.pdf`.
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue)
+![AutoGen](https://img.shields.io/badge/autogen--agentchat-0.7.4-red)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## Requirements
+---
 
-| Requirement | Why |
+## What you get
+
+After one session, `experience/<SESSION_ID>/` contains:
+
+| File | What it is |
 |---|---|
-| Python 3.11+ (tested on 3.13) | AutoGen 0.7, Chainlit |
-| Node.js + `mermaid-cli` (`mmdc`) | renders the process diagram PNG |
-| `pandoc` + a LaTeX engine (`xelatex`) | renders `deliverable.pdf` (optional: without it you still get the Markdown) |
-| An OpenAI (or Ollama / LM Studio) model | the agents |
+| `interview.jsonl` | every Q&A turn, timestamped |
+| `functional_specification.md` | 9-section FSD: scope, FRs, NFRs, roles, assumptions, use cases, glossary |
+| `process_diagram.mmd` | Mermaid source of the process flow |
+| `process_diagram.png` | rendered diagram |
+| `functional_specification.formatted.md` | FSD with requirements tables and page breaks |
+| `deliverable.pdf` | PDF export (needs `pandoc` + `xelatex`) |
 
-## Setup
+## Quick start
 
 ```bash
+# 1. Install
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # Linux/macOS
+.venv\Scripts\activate              # Windows
+# source .venv/bin/activate         # Linux / macOS
 
 pip install -r requirements.txt
-npm i -g @mermaid-js/mermaid-cli    # for the diagram
-# optional: winget install pandoc / choco install texlive
-```
+npm i -g @mermaid-js/mermaid-cli    # required for the PNG diagram
 
-Copy the env template and add your key:
+# 2. Configure
+cp .env.example .env                # then set OPENAI_API_KEY
 
-```bash
-cp .env.example .env    # then set OPENAI_API_KEY
-```
-
-Check the machine is ready:
-
-```bash
+# 3. Verify the machine
 python scripts/smoke_check.py
-```
 
-## Run
-
-```bash
+# 4. Run
 chainlit run app2.py -w
 ```
 
-`app.py` is the YAML-driven variant of the same team (agents defined in
-`lib/agents_config.yaml`); `app2.py` instantiates them explicitly. Both use the
-same model loader, selector and tools.
+Open http://localhost:8000, type a task ("Design an order fulfilment process"),
+and answer the interviewer. The run ends when `terminate_agent` exports the
+deliverables.
 
-Choose the model profile with `MODEL_CLIENT` in `.env`
-(`openai`, `openai_npt`, `ollama`, `lmstudio`, `onnx`, ...).
+Detailed setup: [docs/configuration.md](docs/configuration.md)
+Design and agent flow: [docs/architecture.md](docs/architecture.md)
+Common failures: [docs/troubleshooting.md](docs/troubleshooting.md)
 
-## Configuration
+## How the team works
 
-| File | Purpose |
-|---|---|
-| `.env` | secrets and runtime switches (**never committed**) |
-| `src/model_config_*.yaml` | model profiles; keys are injected from the environment |
-| `lib/agents_config.yaml` | agent roles, system prompts, tools |
-| `lib/rag_config.yaml` | ChromaDB directory, document folder, reference sites |
-| `MAX_MESSAGES` | hard cap on team turns (default 300) |
+```mermaid
+flowchart TD
+    U[user] --> P[planning_agent<br/>orchestrator, task tracker]
+    P --> I[interviewer_agent<br/>budgeted Q&A]
+    I --> U
+    I --> S[summarizer_agent<br/>needs APPROVE SUMMARY]
+    S --> W[functional_spec_writer_agent]
+    W --> G[glossary_agent]
+    W --> C[use_case_agent]
+    W --> K[functional_spec_checker_agent]
+    K -->|NEEDS_INFO| I
+    K -->|READY| D[diagram_creator_agent]
+    D --> R[mermaid_code_reviewer_agent]
+    R --> T[terminate_agent<br/>render PNG + export PDF]
+    T -->|TERMINATE| END((end))
+```
+
+Eleven agents in one `SelectorGroupChat`. Hand-offs are driven by the planner's
+`[ASSIGNMENT]` markers and `READY` signals. The run is capped by `MAX_MESSAGES`
+(default 300) and ends when `terminate_agent` emits `TERMINATE`.
+
+## Model backends
+
+Set `MODEL_CLIENT` in `.env`:
+
+| Profile | Backend | Key env var |
+|---|---|---|
+| `openai` | OpenAI | `OPENAI_API_KEY` |
+| `openai_npt` | OpenAI with `parallel_tool_calls: false` | `OPENAI_API_KEY` |
+| `ollama` | local Ollama | none |
+| `lmstudio` | local LM Studio | none |
+| `onnx` | local ONNX server | none |
+| `azure` / `groq` / `hugging` / `github` | copy `src/model_config_template.yaml` | provider key |
+
+API keys are never stored in the YAML profiles - `src/model_loader.py` injects
+them from the environment or `.env`.
+
+## Two entry points
+
+- `app2.py` - agents defined inline; the recommended, self-contained app.
+- `app.py` - the same team loaded from `lib/agents_config.yaml`.
+
+Both use the same model loader, selector, RAG memory and tools.
 
 ## Tests
 
@@ -82,9 +107,14 @@ Choose the model profile with `MODEL_CLIENT` in `.env`
 python -m pytest -q tests
 ```
 
-`tests/test_pipeline.py` covers the file/JSONL tools, the selector routing and
-config hygiene; `tests/test_mcp_servers.py` starts the bundled Mermaid and PDF
-MCP servers and checks their tools.
+| Test | Covers | Needs |
+|---|---|---|
+| `tests/test_pipeline.py` | file/JSONL tools, selector routing, config hygiene | nothing |
+| `tests/test_mcp_servers.py` | boots both MCP servers, checks their tools | `mmdc` for one test (skipped otherwise) |
+| `tests/test_end_to_end.py` | the whole 11-agent team with a scripted model client | `mmdc` (skipped otherwise); **no API key, no network** |
+
+The end-to-end test asserts the interview log, the spec in `experience/<session>/`
+and the rendered PNG all exist.
 
 ## Project layout
 
@@ -93,15 +123,36 @@ app.py / app2.py          Chainlit entry points
 lib/                      agent factory, tools, selector, RAG indexer, MCP boot
 src/                      model client loader + model profiles
 mcp_servers/              Mermaid renderer + deliverable formatter (stdio MCP)
-data/                     reference documents indexed into ChromaDB (local)
-conversation/            live working files during a session
-experience/<session>/    final deliverables per session
-docs/                     thesis material, transcripts, examples
+scripts/smoke_check.py    release-readiness checker
+tests/                    offline pytest suite
+data/                     reference docs indexed into ChromaDB (local, gitignored)
+conversation/            working files during a session (gitignored)
+experience/<session>/    final deliverables (gitignored)
+docs/                     architecture, configuration, troubleshooting + thesis material
 ```
+
+## Requirements
+
+| Requirement | Needed for |
+|---|---|
+| Python 3.11+ (tested on 3.13) | the app |
+| Node.js + `mermaid-cli` | PNG/SVG diagram rendering |
+| `pandoc` + `xelatex` | `deliverable.pdf` (optional; Markdown still works without) |
+| An LLM (OpenAI / Ollama / LM Studio) | the agents |
 
 ## Known limitations
 
-- PDF export needs `pandoc` + `xelatex`; without them the pipeline stops at
-  `functional_specification.formatted.md` and reports it.
-- Mermaid rendering needs `mmdc` on PATH (Windows uses the `mmdc.cmd` shim).
 - The interview is interactive: a human must answer every `QUESTION:`.
+- `summarizer_agent` only accepts the exact phrase `APPROVE SUMMARY`.
+- PDF export degrades to Markdown if `pandoc`/`xelatex` are missing.
+- ChromaDB embeddings run locally via `all-MiniLM-L6-v2` (CPU by default).
+- `frontend/talk-wiz-chat` is a separate React app, not part of this release.
+
+## License
+
+MIT - see [LICENSE](LICENSE).
+
+## Citation
+
+This project is part of a Master's thesis (TFM) on multi-agent requirements
+elicitation. The design rationale is in [IDEA.md](IDEA.md).

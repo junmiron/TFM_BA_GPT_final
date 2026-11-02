@@ -10,6 +10,8 @@ import shutil
 import sys
 from pathlib import Path
 
+import pytest
+
 from autogen_ext.tools.mcp import StdioServerParams, mcp_server_tools
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -80,9 +82,8 @@ def test_spec_formatter_builds_requirements_table(tmp_path):
 
 def test_mermaid_rendering_when_mmdc_is_available(tmp_path):
     """Only runs if the mermaid-cli binary is installed."""
-    if shutil.which("mmdc") is None:
-        print("SKIP: mermaid-cli (mmdc) is not installed")
-        return
+    if shutil.which("mmdc") is None and shutil.which("mmdc.cmd") is None:
+        pytest.skip("mermaid-cli (mmdc) is not installed")
     mermaid = _load_module(SERVERS["mermaid"], "mermaid_mcp")
     src = tmp_path / "diagram.mmd"
     src.write_text("flowchart TD\n  A[Start]-->B[Review]\n", encoding="utf-8")

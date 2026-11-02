@@ -13,6 +13,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
 from autogen_agentchat.teams import SelectorGroupChat
 from autogen_ext.memory.canvas import TextCanvasMemory
@@ -253,6 +255,8 @@ async def run_pipeline():
 
 
 def test_end_to_end_produces_deliverables():
+    if not (shutil.which("mmdc") or shutil.which("mmdc.cmd")):
+        pytest.skip("mermaid-cli (mmdc) is not installed; PNG rendering cannot be verified")
     WORK_DIR.mkdir(exist_ok=True)
     result = asyncio.run(run_pipeline())
 
