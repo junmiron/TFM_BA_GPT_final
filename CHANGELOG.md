@@ -28,8 +28,9 @@ on Windows, Linux and macOS without any machine-specific assumptions.
 - Model and MCP paths were absolute Linux paths (`/run/media/...`); they are
   now resolved relative to the project root.
 - `MaxMessageTermination(100000000)` replaced with `MAX_MESSAGES` (default 300).
-- The planner no longer emits `TERMINATE` itself, which ended runs before the
-  deliverables were produced.
+- The **TERMINATE** termination token is now restricted to `terminate_agent` only
+  (`TextMentionTermination(..., sources=["terminate_agent"])`); any agent echoing
+  that word no longer ends a run mid-task (see `docs/troubleshooting.md`).
 - `terminate_agent` referenced a file tool from a vendored MCP server that is
   not part of this repo; it now uses the local helpers.
 - Mermaid MCP server: `mmdc` output was written to stdout and corrupted the MCP

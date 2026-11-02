@@ -243,7 +243,7 @@ async def run_pipeline():
         participants=[agents[n] for n in AGENT_NAMES if n != "user"] + [user],
         model_client=client,
         max_turns=60,
-        termination_condition=MaxMessageTermination(60) | TextMentionTermination("TERMINATE"),
+        termination_condition=MaxMessageTermination(60) | TextMentionTermination("TERMINATE", sources=["terminate_agent"]),
         selector_prompt=(
             "Select an agent to perform task.\n{roles}\n"
             "Current conversation context:\n{history}\n"

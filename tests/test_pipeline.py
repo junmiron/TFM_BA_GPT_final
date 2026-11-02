@@ -175,3 +175,48 @@ def test_rag_paths_resolve_to_project_root():
     for key in ("CHROMA_DIR", "DOCS_DIR", "STATE_FILE"):
         resolved = _project_relative(config[key])
         assert Path(resolved).parent == PROJECT_ROOT, f"{key} should resolve under the project root"
+
+
+def test_terminate_token_only_ends_run_from_terminate_agent():
+    """Regression: the first real conversation died on turn one because
+    TextMentionTermination('TERMINATE') scanned EVERY message and the planner's
+    own task-state wording ('terminate_agent: not started', 'Do NOT output
+    TERMINATE') tripped it. Only terminate_agent may end the run."""
+    import asyncio
+    from autogen_agentchat.conditions import TextMentionTermination
+    from autogen_agentchat.messages import TextMessage
+
+    # The planner's actual first-turn output (real run, task="hello").
+    planner_msg = (
+        "Task state:\ninterviewer_agent: pending\n"
+        "terminate_agent: not started\n"
+        "I will not output TERMINATE until every task is done.\n"
+        "[ASSIGNMENT] agent=interviewer_agent task=\"Greet user\" awaiting_user_reply=true"
+    )
+
+    termination = TextMentionTermination("TERMINATE", sources=["terminate_agent"])
+    result = asyncio.run(
+        termination([TextMessage(content=planner_msg, source="planning_agent")])
+    )
+    assert result is None, "planner chatter mentioning TERMINATE must not end the run"
+
+    result = asyncio.run(
+        termination(
+            [
+                TextMessage(content=planner_msg, source="planning_agent"),
+                TextMessage(content="Pipeline complete. TERMINATE", source="terminate_agent"),
+            ]
+        )
+    )
+    assert result is not None, "terminate_agent's TERMINATE must end the run"
+
+
+def test_apps_restrict_terminate_to_terminate_agent():
+    """app.py and app2.py must both build the termination condition with
+    sources=['terminate_agent'], otherwise any agent echoing the word kills
+    the whole conversation (see test_terminate_token_only_ends_run_from_terminate_agent)."""
+    for app_file in ("app.py", "app2.py"):
+        text = (PROJECT_ROOT / app_file).read_text(encoding="utf-8")
+        assert 'TextMentionTermination("TERMINATE", sources=["terminate_agent"])' in text, (
+            f"{app_file} must restrict TextMentionTermination to sources=['terminate_agent']"
+        )

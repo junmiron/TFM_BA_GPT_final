@@ -215,7 +215,7 @@ async def on_chat_start():
     )
 
     # 6) Termination condition (mirrors the notebook)
-    termination = MaxMessageTermination(int(os.getenv("MAX_MESSAGES", "300"))) | TextMentionTermination("TERMINATE")
+    termination = MaxMessageTermination(int(os.getenv("MAX_MESSAGES", "300"))) | TextMentionTermination("TERMINATE", sources=["terminate_agent"])
 
     # 7) Build the team with our custom selector
     team = SelectorGroupChat(

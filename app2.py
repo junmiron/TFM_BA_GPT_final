@@ -123,7 +123,7 @@ async def on_chat_start():
 
         When functional_spec_checker_agent sends **READY**, assign diagram_creator_agent.
         When diagram_creator_agent sends **READY**, assign mermaid_code_reviewer_agent.
-        When mermaid_code_reviewer_agent sends **READY**, mark it as **done**, summarize findings, and end with **TERMINATE**.
+        When mermaid_code_reviewer_agent sends **READY**, mark it as **done**, summarize findings, and assign **terminate_agent**.
 
     **COMPLETION CHECK**
     Do not accept **READY** from interviewer_agent unless:
@@ -616,7 +616,7 @@ async def on_chat_start():
     Make sure the planner agent has assigned tasks before other agents start working.
     Only select one agent."""
     )
-    termination = MaxMessageTermination(int(os.getenv("MAX_MESSAGES", "300"))) | TextMentionTermination("TERMINATE")
+    termination = MaxMessageTermination(int(os.getenv("MAX_MESSAGES", "300"))) | TextMentionTermination("TERMINATE", sources=["terminate_agent"])
 
     team = SelectorGroupChat(
         participants=agents,  # ✅ updated keyword

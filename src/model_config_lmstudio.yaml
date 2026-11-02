@@ -1,6 +1,6 @@
 provider: autogen_ext.models.openai.OpenAIChatCompletionClient
 config:
-  model: "openai/gpt-oss-20b"
+  model: "qwen3.8-27b"
   api_key: LMStudio_key
   model_info:
     vision: false
