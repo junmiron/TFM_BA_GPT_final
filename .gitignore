@@ -8,4 +8,38 @@
 /venv311
 /venv
 /.venv
+/.venv_win
 /mcp_servers/PyMCP-FS
+
+# secrets
+.env
+.env.local
+
+# caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# local virtual envs inside MCP servers
+mcp_servers/*/.venv
+mcp_servers/*/.venv_win
+
+# runtime / generated artifacts
+/chromadb_storage
+/.experiences
+/experiences
+/conversation
+index_state.json
+*.log
+docs/Screencasts
+docs/data.7z
+
+# frontend build artifacts
+frontend/talk-wiz-chat/node_modules
+frontend/talk-wiz-chat/dist
+*.lockb
+
+# editor / OS noise
+~$*
+.DS_Store

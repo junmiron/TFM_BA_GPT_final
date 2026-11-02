@@ -1,0 +1,1 @@
+A local-first, web-based AI business analyst that interviews stakeholders through a budgeted, deterministic pipeline to produce a complete, traceable functional specification — with human in the loop approving the requirements before a single section is written.
