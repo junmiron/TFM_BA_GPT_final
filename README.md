@@ -7,6 +7,20 @@ Document (FSD)**, a Mermaid process diagram, and a PDF deliverable.
 Built on **AutoGen 0.7** (selector group chat), **Chainlit** (web UI), and two
 stdio **MCP servers** for diagram rendering and document export.
 
+> ## ⚠️ Technical preview
+>
+> This is a **technical preview** release (v1.0.0). The agent team, pipeline
+> and deliverable formats are stable enough for evaluation, but the project
+> is still under active development and details may change.
+>
+> In particular, the **Chainlit web UI is a debug/operator view, not a
+> finished end-user product**: it exposes internal pipeline state —
+> per-category interview progress (`asked=N, status=done`), live agent
+> statuses (`done` / `pending` / `not started`), raw `[ASSIGNMENT]` task
+> dispatches and tool-call traces. That is exactly what you want while
+> developing or auditing the multi-agent workflow, and more noise than a
+> final product would show.
+
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue)
 ![AutoGen](https://img.shields.io/badge/autogen--agentchat-0.7.4-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -147,7 +161,6 @@ docs/                     architecture, configuration, troubleshooting + thesis 
 - `summarizer_agent` only accepts the exact phrase `APPROVE SUMMARY`.
 - PDF export degrades to Markdown if `pandoc`/`xelatex` are missing.
 - ChromaDB embeddings run locally via `all-MiniLM-L6-v2` (CPU by default).
-- `frontend/talk-wiz-chat` is a separate React app, not part of this release.
 
 ## License
 
