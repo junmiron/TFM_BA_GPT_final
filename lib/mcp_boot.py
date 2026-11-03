@@ -4,6 +4,7 @@ Each helper starts a stdio MCP server that lives in mcp_servers/ and is
 scoped to the project root, so no absolute machine paths are hard-coded.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import List
@@ -24,6 +25,21 @@ def _python_cmd(project_root: Path) -> str:
     return next(str(p) for p in candidates if Path(p).exists())
 
 
+def _server_env() -> dict:
+    """Environment for the MCP server child process.
+
+    The MCP stdio transport gives the child only a minimal default
+    environment (PATH, HOME, ...), so anything the servers need to detect
+    must be forwarded explicitly. CI tells the Mermaid server it is on a
+    GitHub-hosted runner (Ubuntu 24.04+ blocks Chrome's sandbox via
+    AppArmor), where mmdc must run with --no-sandbox.
+    """
+    env = {"PYTHONUNBUFFERED": "1"}
+    if os.environ.get("CI"):
+        env["CI"] = os.environ["CI"]
+    return env
+
+
 def _server_tools(server_script: Path, project_root: Path) -> StdioServerParams:
     if not server_script.exists():
         raise FileNotFoundError(f"MCP server not found: {server_script}")
@@ -37,7 +53,7 @@ def _server_tools(server_script: Path, project_root: Path) -> StdioServerParams:
         ],
         # Keep the server CWD at the project root so relative paths behave.
         cwd=str(project_root),
-        env={"PYTHONUNBUFFERED": "1"},
+        env=_server_env(),
         read_timeout_seconds=60.0,
     )
     return params
