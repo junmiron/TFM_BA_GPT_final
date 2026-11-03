@@ -140,6 +140,40 @@ the same content as a **UserMessage** instead. Both apps already use them; if yo
 add another memory-backed agent, give it one of these classes rather than the raw
 autogen ones when running against LM Studio / llama.cpp.
 
+## Workflow hangs after the interviewer's first question: `Input cannot be empty`
+
+Symptom: the interviewer asks its first question, you type an answer in the
+question box and submit it, then the app replies "Input cannot be empty" and
+asks again — forever. The console shows a `UserInputRequestedEvent` from the
+user proxy and nothing after it.
+
+Cause (fixed in v1.0.1): Chainlit's `AskUserMessage.send()` returns a StepDict
+whose text is under `"output"`, but `app2.py`'s user-proxy input loop only read
+`"content"` — a key that does not exist — so every valid answer looked empty and
+was re-asked. The fix reads `"content"`/`"output"`/`"text"` (same as `app.py`).
+
+Note: while a run is in progress, answers must go into the question box shown
+in the chat; text typed into the main input bar at the bottom does not reach the
+workflow (the app now tells you this explicitly).
+
+## LM Studio: `Engine protocol predict stream returned an error` (`speculative batch index ...`)
+
+Symptom: a run dies with "An error occurred in the group chat" and every agent's
+turn fails with:
+
+```
+openai.BadRequestError: Error code: 400 - {'error': 'Engine protocol predict stream returned an error: {"code":500,"message":"got exception: speculative batch index N is not inside the current sub-batch ..."}'}
+```
+
+Cause: this is a crash *inside LM Studio's inference engine* (its draft-model /
+speculative-decoding path), not in this project. Once it happens, every request
+fails until the server state resets.
+
+Fix: restart the local server — `lms server stop` then `lms server start`
+(the loaded model stays in VRAM and comes back within seconds). If it keeps
+happening, disable speculative decoding / the draft model for that model in
+LM Studio's settings.
+
 ## RAG memory errors on first run
 
 The embedding model `paraphrase-multilingual-mpnet-base-v2` downloads on first use.

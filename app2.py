@@ -61,8 +61,14 @@ async def on_chat_start():
             if cancellation_token is not None and getattr(cancellation_token, "is_canceled", False):
                 raise asyncio.CancelledError()
             resp = await cl.AskUserMessage(content=" ", timeout=3600).send()
-            if resp and (resp.get("content") or "").strip():
-                return resp.get("content").strip()
+            # Chainlit returns the answer under "output" (StepDict); accept legacy keys too.
+            # Reading only "content" made every valid answer look empty and re-asked forever.
+            text = None
+            if resp:
+                text = resp.get("content") or resp.get("output") or resp.get("text")
+            answer = (text or "").strip()
+            if answer:
+                return answer
             await cl.Message(content="Input cannot be empty. Please reply with some text.").send()
 
     user = UserProxyAgent(
@@ -665,7 +671,8 @@ async def on_message(msg: cl.Message):
         return
 
     if ctx.get("started"):
-        # Workflow already running, treat as interview reply
+        # Workflow already running; replies must go through the question box above.
+        await cl.Message(content="The workflow is running — please answer in the question box above.").send()
         return
 
     task_text = (msg.content or "").strip()
