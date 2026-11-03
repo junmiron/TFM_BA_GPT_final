@@ -93,11 +93,58 @@ Documents directory not found: .../data - skipping local document indexing.
 embeds them into `chromadb_storage/`. Delete `chromadb_storage/` and
 `index_state.json` to force a clean re-index.
 
+## Interviewer agent goes silent after the planner's assignment (ChromaDB store panic)
+
+Symptom: the UI shows `planning_agent`'s `[ASSIGNMENT] agent=interviewer_agent ...`
+message and then nothing — no question, no error bubble. The console ends with a
+traceback containing:
+
+```
+pyo3_runtime.PanicException: range start index 10 out of range for slice of length 9
+```
+
+Cause: `chromadb_storage/` was created by a different (older) version of chromadb
+than the one installed. The ChromaDB client is opened **lazily** on first query, so
+startup succeeds and only the first memory-bearing agent turn (the interviewer's)
+crashes — which kills the whole run mid-conversation.
+
+Fix: rebuild the store with the installed chromadb version:
+
+```bash
+rm -rf chromadb_storage index_state.json   # Windows: rmdir /s /q chromadb_storage && del index_state.json
+chainlit run app2.py -w                    # re-indexes data/ and the configured URLs on start
+```
+
+Since v1.0.1, `app.py`/`app2.py` also validate the store at startup (one warm-up
+query) and continue without RAG memory instead of dying mid-conversation if it is
+unopenable — you will see a `⚠️  RAG vector memory unavailable ...` line in the console.
+
+## Interviewer goes silent on LM Studio: `System message must be at the beginning`
+
+Symptom: same as above (planner's assignment, then silence), but the console ends
+with an OpenAI-style error from the local backend:
+
+```
+openai.BadRequestError: Error code: 400 - ... "Jinja Exception: System message must be at the beginning."
+```
+
+Cause: autogen's memory implementations (`ChromaDBVectorMemory`, `TextCanvasMemory`)
+inject retrieved context by appending a **SystemMessage at the end** of the model
+context. llama.cpp-based backends (LM Studio) enforce chat-template ordering and
+reject any request where a system message is not first — so every turn of an agent
+with non-empty memory crashes, killing the run mid-conversation.
+
+Fix: this project ships template-safe subclasses in `lib/rag_helpers.py`
+(`TemplateSafeChromaDBVectorMemory`, `TemplateSafeTextCanvasMemory`) that inject
+the same content as a **UserMessage** instead. Both apps already use them; if you
+add another memory-backed agent, give it one of these classes rather than the raw
+autogen ones when running against LM Studio / llama.cpp.
+
 ## RAG memory errors on first run
 
-The embedding model `all-MiniLM-L6-v2` downloads on first use. After that it is
-cached by `sentence-transformers`. If the download fails, the app falls back to
-CPU-only vector memory.
+The embedding model `paraphrase-multilingual-mpnet-base-v2` downloads on first use.
+After that it is cached by `sentence-transformers`. If the download fails, the app
+falls back to CPU-only vector memory (and, since v1.0.1, continues without RAG).
 
 ## Tests fail on the end-to-end suite
 

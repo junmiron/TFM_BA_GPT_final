@@ -12,9 +12,17 @@ import os
 import yaml  # Requires pyyaml
 import lxml.html
 from lxml.html.clean import Cleaner
-from autogen_core.memory import MemoryContent, MemoryMimeType
+from autogen_core.memory import (
+    MemoryContent,
+    MemoryMimeType,
+    MemoryQueryResult,
+    UpdateContextResult,
+)
+from autogen_core.model_context import ChatCompletionContext
+from autogen_core.models import UserMessage
 from autogen_ext.memory.chromadb import (ChromaDBVectorMemory,
     PersistentChromaDBVectorMemoryConfig)
+from autogen_ext.memory.canvas import TextCanvasMemory
 from chromadb.utils import embedding_functions
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
@@ -22,6 +30,45 @@ from langchain_community.document_loaders import (
 from readability import Document
 from pathlib import Path
 from typing import Union
+
+
+class TemplateSafeChromaDBVectorMemory(ChromaDBVectorMemory):
+    """ChromaDB memory that injects retrieved context as a UserMessage.
+
+    The base implementation appends a SystemMessage at the END of the model
+    context; llama.cpp-based backends (e.g. LM Studio) reject requests where a
+    system message is not first ("System message must be at the beginning"),
+    which would crash every memory-bearing agent turn on those backends.
+    """
+
+    async def update_context(self, model_context: ChatCompletionContext) -> UpdateContextResult:
+        messages = await model_context.get_messages()
+        if not messages:
+            return UpdateContextResult(memories=MemoryQueryResult(results=[]))
+
+        last_message = messages[-1]
+        query_text = last_message.content if isinstance(last_message.content, str) else str(last_message)
+        query_results = await self.query(query_text)
+
+        if query_results.results:
+            memory_strings = [f"{i}. {str(memory.content)}" for i, memory in enumerate(query_results.results, 1)]
+            memory_context = "\nRelevant reference material from the knowledge base:\n" + "\n".join(memory_strings)
+            await model_context.add_message(UserMessage(content=memory_context, source="memory"))
+
+        return UpdateContextResult(memories=query_results)
+
+
+class TemplateSafeTextCanvasMemory(TextCanvasMemory):
+    """Text canvas memory that injects snapshots as a UserMessage (see above)."""
+
+    async def update_context(self, model_context: ChatCompletionContext) -> UpdateContextResult:
+        snapshot = self.canvas.get_all_contents_for_context()
+        if snapshot.strip():
+            await model_context.add_message(UserMessage(content=snapshot, source="memory"))
+            memory_content = MemoryContent(content=snapshot, mime_type=MemoryMimeType.TEXT)
+            return UpdateContextResult(memories=MemoryQueryResult(results=[memory_content]))
+
+        return UpdateContextResult(memories=MemoryQueryResult(results=[]))
 
 
 async def create_chromadb_memory(
@@ -47,8 +94,10 @@ async def create_chromadb_memory(
     )
 
     # --- RAG-ENABLED AUTO-GEN SETUP WITH CHROMADB --- #
-    # Using a specific Sentence Transformer model
-    vector_memory = ChromaDBVectorMemory(
+    # Using a specific Sentence Transformer model. The template-safe subclass
+    # injects retrieved context as a UserMessage so llama.cpp backends (LM
+    # Studio) don't reject the request ("System message must be at the beginning").
+    vector_memory = TemplateSafeChromaDBVectorMemory(
         config=PersistentChromaDBVectorMemoryConfig(
             collection_name=collection_name,
             persistence_path=chroma_dir,

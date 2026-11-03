@@ -24,7 +24,7 @@ sys.path.append(SRC_PATH)
 
 import mcp_boot 
 from lib import agents_tools_helpers
-from rag_helpers import rag_indexer_runner
+from rag_helpers import rag_indexer_runner, TemplateSafeTextCanvasMemory
 from model_loader import load_model_client
 from agents_tools_helpers import (
     selector_func,
@@ -40,7 +40,16 @@ from agents_tools_helpers import (
 @cl.on_chat_start
 async def on_chat_start():
     rag_vector_memory = await rag_indexer_runner(os.path.join(PROJECT_ROOT, "lib", "rag_config.yaml"))
-    text_canvas_memory = TextCanvasMemory()
+    # Validate the vector store before wiring it into agents. A ChromaDB store created by a
+    # different chromadb version only fails on first query (the client is opened lazily), which
+    # would otherwise kill the workflow mid-conversation; degrade to no-RAG instead.
+    try:
+        await asyncio.wait_for(rag_vector_memory.query("requirements gathering"), timeout=300)
+    except Exception as e:  # any store/embedding failure must not take down the chat
+        print(f"⚠️  RAG vector memory unavailable ({type(e).__name__}: {e}); continuing without it.")
+        rag_vector_memory = None
+    rag_memories = [rag_vector_memory] if rag_vector_memory else []
+    text_canvas_memory = TemplateSafeTextCanvasMemory()
     update_file_tool = text_canvas_memory.get_update_file_tool()
     sys.modules["canvas"] = types.SimpleNamespace(update_file_tool=update_file_tool)
 
@@ -235,7 +244,7 @@ async def on_chat_start():
     """,
         tools=[save_conversation_to_jsonl],
         reflect_on_tool_use=True,
-        memory=[rag_vector_memory],
+        memory=rag_memories,
     )
 
     summarizer_agent = AssistantAgent(
@@ -258,7 +267,7 @@ async def on_chat_start():
     **IMPORTANT**
       NEVER assume approval unless the user types **APPROVE SUMMARY** exactly
 """,
-        memory=[rag_vector_memory],
+        memory=rag_memories,
     )
 
     use_case_agent = AssistantAgent(
@@ -293,7 +302,7 @@ async def on_chat_start():
       Once the Use Cases and User Stories are fully generated, respond with only:
     **READY**
     """,
-        memory=[rag_vector_memory],
+        memory=rag_memories,
     )
 
     glossary_agent = AssistantAgent(
@@ -319,7 +328,7 @@ async def on_chat_start():
       Once the Glossary is complete, respond with only:
     **READY**
     """,
-        memory=[rag_vector_memory],
+        memory=rag_memories,
     )
 
     functional_spec_writer_agent = AssistantAgent(
@@ -380,7 +389,7 @@ async def on_chat_start():
 """,
         tools=[write_md_file_tool, AgentTool(agent=use_case_agent), AgentTool(agent=glossary_agent)],
         reflect_on_tool_use=True,
-        memory=[rag_vector_memory],
+        memory=rag_memories,
     )
 
     functional_spec_checker_agent = AssistantAgent(
@@ -426,7 +435,7 @@ async def on_chat_start():
 """,
         tools=[read_md_file_tool],
         reflect_on_tool_use=True,
-        memory=[rag_vector_memory],
+        memory=rag_memories,
     )
 
     diagram_creator_agent = AssistantAgent(

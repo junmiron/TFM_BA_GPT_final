@@ -38,7 +38,7 @@ async def on_chat_start():
     from autogen_ext.memory.canvas import TextCanvasMemory
     from autogen_agentchat.agents import AssistantAgent
 
-    from rag_helpers import rag_indexer_runner
+    from rag_helpers import rag_indexer_runner, TemplateSafeTextCanvasMemory
     from model_loader import load_model_client
     from agents_creator import create_agents_from_config
     from agents_tools_helpers import selector_func
@@ -47,11 +47,19 @@ async def on_chat_start():
     # 1) Load RAG vector memory (same as the notebook)
     rag_config_path = os.path.join(LIB_PATH, "rag_config.yaml")
     rag_vector_memory = await rag_indexer_runner(rag_config_path)
+    # Validate the vector store before wiring it into agents. A ChromaDB store created by a
+    # different chromadb version only fails on first query (the client is opened lazily), which
+    # would otherwise kill the workflow mid-conversation; degrade to no-RAG instead.
+    try:
+        await asyncio.wait_for(rag_vector_memory.query("requirements gathering"), timeout=300)
+    except Exception as e:  # any store/embedding failure must not take down the chat
+        print(f"⚠️  RAG vector memory unavailable ({type(e).__name__}: {e}); continuing without it.")
+        rag_vector_memory = None
 
     # Note: suppress logger-based UI relay to avoid duplicate messages
 
     # 2) Create the canvas memory & expose update_file_tool under module name 'canvas'
-    text_canvas_memory = TextCanvasMemory()
+    text_canvas_memory = TemplateSafeTextCanvasMemory()
     update_file_tool = text_canvas_memory.get_update_file_tool()
     canvas = types.SimpleNamespace()
     canvas.update_file_tool = update_file_tool
