@@ -30,6 +30,7 @@ from agents_tools_helpers import (
     selector_func,
     save_conversation_to_jsonl,
     write_md_file_tool,
+    append_md_file_tool,
     read_md_file_tool,
     write_mermaid_to_file_tool,
     move_file_tool,
@@ -372,28 +373,41 @@ async def on_chat_start():
             Call 'glossary_agent' and wait for its **READY** response.
             Insert the generated Glossary into the Glossary section.
         **BEFORE you send READY**:
-            ALWAYS call 'write_md_file_tool' exactly once.
-            Pass the ENTIRE final Functional Specification as 'content'.
-            Wait for a confirmation message “Markdown spec successfully written”.
-            ONLY THEN send **READY**.
+            Save the document in CHUNKS (see SAVING THE DOCUMENT below), then verify it.
+
+    **SAVING THE DOCUMENT (MANDATORY, CHUNKED)**
+        The full document is too large for a single tool call - one giant argument makes local models emit broken calls that never execute and no file appears on disk. Build it in chunks, IN ORDER:
+          1 Call 'write_md_file_tool' ONCE with only sections 1-3 (Title Page, Introduction, Scope).
+            Do NOT pass file_path - the tool writes to its default location conversation/functional_specification.md.
+          2 Then call 'append_md_file_tool' once per chunk:
+             - Functional Requirements + Non-Functional Requirements
+             - User Roles & Personas + Assumptions & Constraints
+             - Use Cases (the full generated content)
+             - Glossary (the full generated content)
+            Keep every tool call under ~4000 words. Never put the whole document in one call.
+        Wait for each confirmation ("Markdown spec successfully written" / "Markdown chunk appended") before continuing.
+
+    **VERIFICATION STEP**
+        After all chunks are saved, call 'read_md_file_tool' (no file_path - default location) and confirm ALL 9 sections are present on disk.
+        If the read fails or a section is missing, re-issue the failed chunk until verification passes.
+        DO NOT send **READY** until verification confirms the complete document exists at conversation/functional_specification.md.
 
     **COMPLETION RULE**
         If functional_spec_checker_agent finds missing sections that require USER input:
-            Wait for interviewer_agent to gather those answers, then update the Markdown and save again.
+            Wait for interviewer_agent to gather those answers, then update the Markdown and save again (append or rewrite chunks as needed).
         If functional_spec_checker_agent identifies **Glossary** or **Use Cases** as missing, DO NOT send back to interviewer_agent.
             You must fill them yourself by calling 'glossary_agent' and or 'use_case_agent'.
-        **DO NOT send READY until you have saved the Markdown file with 'write_md_file_tool'.**
+        **DO NOT send READY until the document is saved on disk AND verified with read_md_file_tool.**
 
     **IMPORTANT**
         Do NOT start until summarizer_agent has emitted **READY** (or planning_agent explicitly assigns your task).
         Always use professional, clear business language.
         Never skip any section of the template.
-        Always overwrite the entire Markdown file no partial updates.
         Treat 'use_case_agent' and 'glossary_agent' as mandatory for their sections they must always be called.
         Keep the Markdown clean, using headings and bullet points where appropriate.
-        Calling 'write_md_file_tool' is mandatory.
+        Calling 'write_md_file_tool' + 'append_md_file_tool' is mandatory.
 """,
-        tools=[write_md_file_tool, AgentTool(agent=use_case_agent), AgentTool(agent=glossary_agent)],
+        tools=[write_md_file_tool, append_md_file_tool, read_md_file_tool, AgentTool(agent=use_case_agent), AgentTool(agent=glossary_agent)],
         reflect_on_tool_use=True,
         memory=rag_memories,
     )
@@ -423,6 +437,10 @@ async def on_chat_start():
     **TOOL USAGE RULES**
       Use 'read_md_file_tool' to load and inspect the functional specification document.
       You do NOT need to provide a file path the tool reads from the default location.
+      If read_md_file_tool reports the file is missing or empty, the writer's save FAILED:
+        Say "The functional specification document is not complete. NEEDS_INFO"
+        and list exactly one item: "- The entire document (file not found on disk - write failed)".
+        NEVER mark READY based on conversation memory; only the file on disk counts.
 
     **OUTPUT RULES**
       If ALL required sections are present and complete:
@@ -547,9 +565,9 @@ async def on_chat_start():
           deliverable.pdf
 
     **STEPS STRICT ORDER**
-      1 Read project_root/conversation/interview.jsonl and extract the first available "session_id".
+      1 Call 'read_md_file_tool' with file_path="conversation/interview.jsonl" and extract the first available "session_id" from its content.
         If multiple lines: pick the first non-empty "session_id".
-        If not found: set SESSION_ID = "sess-unknown".
+        If not found or the read fails: set SESSION_ID = "sess-unknown".
 
       2 Create folder project_root/experience/<SESSION_ID>/
 
@@ -598,7 +616,7 @@ async def on_chat_start():
       Be explicit about each steps success or failure.
       If a tool call fails, retry up to 1 times with the same arguments.
     """,
-        tools=[move_file_tool, ensure_dir_tool,
+        tools=[read_md_file_tool, move_file_tool, ensure_dir_tool,
           *(await mcp_boot.mermaid_tools(PROJECT_ROOT)),
           *(await mcp_boot.pdf_format_tools(PROJECT_ROOT))],
         reflect_on_tool_use=True,
@@ -692,30 +710,68 @@ async def start_workflow(team, user, task_text: str):
 
     current_source = None
     current_msg = None
+    cancellation_token = CancellationToken()
+    # No-progress guard: after a malformed tool call some models emit empty messages
+    # forever (the selector keeps re-selecting the same agent until it says TERMINATE).
+    # Stop with a clear error instead of looping until MaxMessageTermination.
+    EMPTY_STREAK_LIMIT = 3
+    empty_streak = {}
 
-    async for event in team.run_stream(task=task_text, cancellation_token=CancellationToken()):
-        if isinstance(event, ModelClientStreamingChunkEvent):
-            if current_source != event.source:
-                if current_msg:
-                    await current_msg.send()
-                current_source = event.source
-                current_msg = cl.Message(content="", author=current_source or "agent")
-            if event.content:
-                await current_msg.stream_token(event.content)
+    async def _finish_stream():
+        nonlocal current_msg, current_source
+        if current_msg:
+            await current_msg.send()
+            current_msg = None
+            current_source = None
 
-        elif isinstance(event, TextMessage):
-            if current_msg:
-                await current_msg.send()
-                current_msg = None
-                current_source = None
-            await cl.Message(content=str(event.content).strip(), author=event.source or "agent").send()
+    try:
+        async for event in team.run_stream(task=task_text, cancellation_token=cancellation_token):
+            if isinstance(event, ModelClientStreamingChunkEvent):
+                if current_source != event.source or current_msg is None:
+                    await _finish_stream()
+                    current_source = event.source
+                    current_msg = cl.Message(content="", author=current_source or "agent")
+                if event.content and current_msg:
+                    await current_msg.stream_token(event.content)
 
-        elif isinstance(event, TaskResult):
-            if current_msg:
-                await current_msg.send()
-                current_msg = None
-                current_source = None
-            await cl.Message(content=f"Workflow complete: {event.stop_reason}").send()
+            elif isinstance(event, TextMessage):
+                text = str(event.content).strip() if event.content is not None else ""
+                src = event.source or "agent"
+                if not text:
+                    empty_streak[src] = empty_streak.get(src, 0) + 1
+                    if empty_streak[src] >= EMPTY_STREAK_LIMIT:
+                        await _finish_stream()
+                        await cl.Message(
+                            content=(f"⚠️ {src} produced no output {EMPTY_STREAK_LIMIT} times in a row — "
+                                     "stopping to avoid an infinite loop. This usually means the model emitted a "
+                                     "malformed tool call it can no longer recover from (common with very large "
+                                     "tool arguments on local models). Restart the chat and try again; if it keeps "
+                                     "happening, check that LM Studio is serving the expected model.")
+                        ).send()
+                        cancellation_token.cancel()
+                        break
+                else:
+                    empty_streak[src] = 0
+                await _finish_stream()
+                if text:
+                    await cl.Message(content=text, author=src).send()
+
+            elif isinstance(event, TaskResult):
+                await _finish_stream()
+                await cl.Message(content=f"Workflow complete: {event.stop_reason}").send()
+    except Exception as e:
+        err = str(e)
+        if "Model unloaded" in err or "400 Bad Request" in err:
+            hint = ("⚠️ The local model was unloaded from LM Studio mid-run (or the request was rejected). "
+                    "Reload qwen3.8-27b in LM Studio, make sure nothing else is using its VRAM, then restart this chat.")
+        elif "speculative batch index" in err:
+            hint = ("⚠️ LM Studio's speculative decoding crashed (llama.cpp engine bug). Restart the LM Studio "
+                    "server (`lms server stop && lms server start`) and retry; disable speculative decoding for "
+                    "the model if it recurs.")
+        else:
+            hint = f"⚠️ Workflow stopped with an error: {type(e).__name__}: {err}"
+        await _finish_stream()
+        await cl.Message(content=hint).send()
 
     if current_msg:
         await current_msg.send()

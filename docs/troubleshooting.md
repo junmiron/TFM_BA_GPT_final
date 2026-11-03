@@ -174,6 +174,62 @@ Fix: restart the local server — `lms server stop` then `lms server start`
 happening, disable speculative decoding / the draft model for that model in
 LM Studio's settings.
 
+## The spec file never appears: writer says READY but `conversation/functional_specification.md` is missing
+
+Symptom: `functional_spec_writer_agent` sends **READY** (and later the checker
+complains about "missing sections"), yet there is no `functional_specification.md`
+anywhere under `conversation/`. The console shows the writer's turn ending with a
+huge block of text that *looks like* a tool call but was never executed.
+
+Cause: the original prompt told the writer to pass the ENTIRE document (~10k words)
+as one `write_md_file_tool` argument. On local models, arguments that large degrade
+into malformed text-form "tool calls" — the model prints them instead of emitting a
+valid function call, so nothing is written while the agent believes it saved.
+
+Fix (in place since v1.0.1): the writer now saves in chunks — sections 1-3 with
+`write_md_file_tool`, then section groups appended via `append_md_file_tool`
+(each chunk < ~4000 words), always at the tool's default path, and must verify all
+9 sections on disk with `read_md_file_tool` before sending READY. The checker also
+treats a missing/empty file as NEEDS_INFO ("the entire document") instead of judging
+from conversation memory, so the planner routes back to the writer for a real re-save.
+
+If you still see it: the model is too weak for tool calling — use a stronger one
+for `MODEL_CLIENT_TOOLS`.
+
+## The workflow loops forever with empty messages from one agent (often `terminate_agent`)
+
+Symptom: after some stage, the UI shows repeated empty bubbles from the same agent
+and nothing else happens. In the console the selector keeps picking that agent turn
+after turn until you kill it (`MAX_MESSAGES`, default 300, is the only backstop).
+
+Cause: after an unrecoverable malformed tool call (see previous section), some models
+emit empty messages forever; the custom `selector_func` re-selects `terminate_agent`
+until it says TERMINATE, which never comes.
+
+Fix (in place since v1.0.1): `app2.py` cancels the run after **3 consecutive empty
+messages from one agent** and posts an explanation in the chat. Restart the chat to
+continue; if a specific stage keeps doing this, check that LM Studio is serving the
+expected model and consider a stronger tool-calling model for `MODEL_CLIENT_TOOLS`.
+
+## Run dies mid-way: `400 Bad Request - Model unloaded by user or API request`
+
+Symptom: a run works for a while, then every LLM call fails with:
+
+```
+openai.BadRequestError: Error code: 400 - {'error': 'Model unloaded by user or API request'}
+```
+
+Cause: LM Studio unloaded the model from VRAM (manually, via its UI/API, or because
+another app took the GPU memory). The OpenAI-compatible endpoint then rejects every
+request until the model is loaded again.
+
+Fix: reload `qwen3.8-27b` in LM Studio and restart the chat. To make this less likely,
+disable "unload on idle" for the model in LM Studio's settings if you run long
+multi-agent sessions (a full pipeline can take 10+ minutes of wall time).
+
+Since v1.0.1 `app2.py` also catches this error and posts an actionable hint in the UI
+instead of only printing a traceback to the console.
+
 ## RAG memory errors on first run
 
 The embedding model `paraphrase-multilingual-mpnet-base-v2` downloads on first use.

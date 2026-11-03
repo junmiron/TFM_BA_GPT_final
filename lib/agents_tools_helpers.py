@@ -273,6 +273,24 @@ def write_md_file_tool(content: str, file_path: str = DEFAULT_MD_SPEC_PATH) -> s
         return f"Error writing Markdown spec: {e}"
 
 
+def append_md_file_tool(content: str, file_path: str = DEFAULT_MD_SPEC_PATH) -> str:
+    """
+    Appends a chunk of Markdown to the functional specification file.
+
+    Used together with write_md_file_tool to build large documents in chunks:
+    one giant tool argument makes local models emit malformed calls that never
+    execute, so the writer saves section groups one at a time instead.
+    """
+    try:
+        abs_path = _normalize_project_relative(file_path)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "a", encoding="utf-8") as f:
+            f.write(content)
+        return f"Markdown chunk appended to {abs_path}"
+    except Exception as e:
+        return f"Error appending Markdown spec: {e}"
+
+
 def read_md_file_tool(file_path: str = DEFAULT_MD_SPEC_PATH) -> str:
     """
     Reads the entire content of a Markdown file and returns it as a string.
