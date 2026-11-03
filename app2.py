@@ -701,6 +701,95 @@ async def on_message(msg: cl.Message):
     await start_workflow(ctx["team"], ctx["user"], task_text)
 
 
+def _find_latest_session_dir():
+    """Return the most recent experience/<SESSION_ID>/ dir containing functional_specification.md."""
+    exp_root = os.path.join(PROJECT_ROOT, "experience")
+    if not os.path.isdir(exp_root):
+        return None
+    best_mtime, best_dir = 0.0, None
+    for name in os.listdir(exp_root):
+        d = os.path.join(exp_root, name)
+        spec = os.path.join(d, "functional_specification.md")
+        if os.path.isdir(d) and os.path.isfile(spec):
+            mtime = os.path.getmtime(spec)
+            if mtime > best_mtime:
+                best_mtime, best_dir = mtime, d
+    return best_dir
+
+
+def _render_diagram_fallback(session_dir):
+    """If process_diagram.png is missing but the .mmd source exists, render it with mmdc."""
+    import shutil
+    import subprocess
+    png = os.path.join(session_dir, "process_diagram.png")
+    mmd = os.path.join(session_dir, "process_diagram.mmd")
+    if os.path.isfile(png) or not os.path.isfile(mmd):
+        return None
+    exe = shutil.which("mmdc")  # resolves to mmdc.cmd on Windows; bare name fails in subprocess there
+    if not exe:
+        print("⚠️  mmdc not found on PATH - skipping diagram render fallback.")
+        return None
+    try:
+        raw = open(mmd, encoding="utf-8").read().strip()
+        # mmdc cannot parse ```mermaid fences - unwrap them (same rule as the Mermaid MCP server)
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+            if raw.rstrip().endswith("```"):
+                raw = raw.rstrip()[:-3]
+        clean_path = os.path.join(session_dir, "process_diagram.clean.mmd")
+        with open(clean_path, "w", encoding="utf-8") as f:
+            f.write(raw.strip() + "\n")
+        subprocess.run([exe, "-i", clean_path, "-o", png], check=True, timeout=120, capture_output=True)
+        return png if os.path.isfile(png) else None
+    except Exception as e:
+        print(f"⚠️  Diagram render fallback failed ({type(e).__name__}: {e})")
+        return None
+
+
+async def _present_final_artifacts():
+    """After a completed run, present the full specification + diagrams in the chat."""
+    from chainlit.element import File as ClFile, Image as ClImage, Pdf as ClPdf
+
+    session_dir = _find_latest_session_dir()
+    if session_dir:
+        spec_path = os.path.join(session_dir, "functional_specification.md")
+    else:
+        # terminate_agent may not have moved the files (or failed to) - fall back to conversation/
+        fallback = os.path.join(PROJECT_ROOT, "conversation", "functional_specification.md")
+        if os.path.isfile(fallback):
+            spec_path, session_dir = fallback, os.path.dirname(fallback)
+        else:
+            await cl.Message(
+                content="⚠️ The workflow finished but no functional specification file was found on disk."
+            ).send()
+            return
+
+    try:
+        with open(spec_path, encoding="utf-8") as f:
+            spec_md = f.read()
+    except OSError as e:
+        await cl.Message(content=f"⚠️ The workflow finished but the specification could not be read ({e}).").send()
+        return
+
+    elements = []
+    diagram_png = os.path.join(session_dir, "process_diagram.png")
+    if not os.path.isfile(diagram_png):
+        _render_diagram_fallback(session_dir)  # terminate_agent may have skipped the render step
+    if os.path.isfile(diagram_png):
+        elements.append(ClImage(path=diagram_png, name="process_diagram.png", display="inline"))
+    deliverable_pdf = os.path.join(session_dir, "deliverable.pdf")
+    if os.path.isfile(deliverable_pdf):
+        elements.append(ClPdf(path=deliverable_pdf, name="deliverable.pdf"))
+    elements.append(ClFile(path=spec_path, name="functional_specification.md"))
+
+    await cl.Message(
+        content=(f"## ✅ Final deliverables\n\nFull functional specification "
+                 f"(saved in `{os.path.relpath(session_dir, PROJECT_ROOT)}/`):\n\n---\n\n{spec_md}"),
+        author="Final Deliverables",
+        elements=elements,
+    ).send()
+
+
 async def start_workflow(team, user, task_text: str):
     ctx = cl.user_session.get("team_ctx")
     ctx["started"] = True
@@ -759,6 +848,10 @@ async def start_workflow(team, user, task_text: str):
             elif isinstance(event, TaskResult):
                 await _finish_stream()
                 await cl.Message(content=f"Workflow complete: {event.stop_reason}").send()
+                try:
+                    await _present_final_artifacts()
+                except Exception as e:  # presentation must never break run completion
+                    print(f"⚠️  Could not present final artifacts ({type(e).__name__}: {e})")
     except Exception as e:
         err = str(e)
         if "Model unloaded" in err or "400 Bad Request" in err:

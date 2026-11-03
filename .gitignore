@@ -29,6 +29,7 @@ mcp_servers/*/.venv_win
 /chromadb_storage
 /.experiences
 /experiences
+/experience
 /conversation
 index_state.json
 *.log
