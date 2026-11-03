@@ -71,6 +71,23 @@ def _strip_mermaid_fences(text: str) -> str:
     return stripped.strip()
 
 
+def _puppeteer_flags(puppeteer_config: Optional[str]) -> list[str]:
+    """Build the mmdc '-p' flag arguments.
+
+    An explicit config always wins. Otherwise, in CI (GitHub-hosted runners
+    on Ubuntu 24.04+ block unprivileged user namespaces, so Chrome's
+    sandbox cannot start), fall back to the bundled config that disables
+    the sandbox. Local (non-CI) runs keep mmdc's default behavior.
+    """
+    if puppeteer_config:
+        return ["-p", puppeteer_config]
+    if os.environ.get("CI"):
+        bundled = Path(__file__).with_name("puppeteer-ci.json")
+        if bundled.exists():
+            return ["-p", str(bundled)]
+    return []
+
+
 def run_mmdc(input_path: Path, output_path: Path, fmt: str,
              theme: Optional[str] = None,
              width: Optional[int] = None,
@@ -93,8 +110,7 @@ def run_mmdc(input_path: Path, output_path: Path, fmt: str,
         cmd += ["-H", str(height)]
     if background:
         cmd += ["-b", background]
-    if puppeteer_config:
-        cmd += ["-p", puppeteer_config]
+    cmd += _puppeteer_flags(puppeteer_config)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -390,8 +406,7 @@ def create_server(allowed_dirs: List[Path], project_root: Path | None = None) ->
                     cmd = _mmdc_command() + ["-i", str(tin), "-o", str(tout)]
                     if theme:
                         cmd += ["-t", theme]
-                    if puppeteer_config:
-                        cmd += ["-p", puppeteer_config]
+                    cmd += _puppeteer_flags(puppeteer_config)
                     proc = subprocess.run(cmd, capture_output=True, text=True)
                     if proc.returncode != 0:
                         report["mmdc_error"] = {
