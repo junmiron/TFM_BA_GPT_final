@@ -551,6 +551,18 @@ def ensure_diagram_source(session_dir: Path) -> Optional[Path]:
     return mmd
 
 
+def _mmdc_puppeteer_flags() -> List[str]:
+    """mmdc needs '-p <config>' on GitHub runners: Ubuntu 24.04+ blocks
+    Chrome's sandbox via AppArmor, so rendering fails without --no-sandbox.
+    Local runs keep mmdc's defaults.
+    """
+    if os.environ.get("CI"):
+        cfg = _PROJECT_ROOT / "mcp_servers" / "Mermaid-MCP" / "puppeteer-ci.json"
+        if cfg.exists():
+            return ["-p", str(cfg)]
+    return []
+
+
 def render_diagram_png(session_dir: Path) -> Optional[Path]:
     """Render process_diagram.mmd to PNG with mmdc (no model involved).
 
@@ -579,8 +591,8 @@ def render_diagram_png(session_dir: Path) -> Optional[Path]:
         clean = session_dir / "process_diagram.clean.mmd"
         clean.write_text(raw.strip() + "\n", encoding="utf-8")
         try:
-            subprocess.run([exe, "-i", str(clean), "-o", str(png)], check=True, timeout=120,
-                           capture_output=True, stdin=subprocess.DEVNULL)
+            subprocess.run([exe, "-i", str(clean), "-o", str(png)] + _mmdc_puppeteer_flags(),
+                           check=True, timeout=120, capture_output=True, stdin=subprocess.DEVNULL)
         except Exception:
             return False
         return png.is_file()

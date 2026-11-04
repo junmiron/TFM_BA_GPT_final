@@ -9,6 +9,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "lib"))
 
+import shutil
 import pytest
 
 import agents_tools_helpers as helpers
@@ -126,3 +127,47 @@ def test_finalize_regenerates_a_pdf_that_has_no_outline(session):
     doc.close()
     assert toc, "finalize_deliverables left a PDF with no bookmarks"
     assert any("1. Overview" in title for _, title, _ in toc), toc
+
+def test_render_diagram_png_uses_the_ci_puppeteer_config(monkeypatch, tmp_path):
+    """The helper that writes process_diagram.png must hand mmdc the bundled
+    no-sandbox config in CI, otherwise Chrome fails on GitHub runners and the
+    deliverable silently loses its diagram.
+
+    CI skips the real render test (mmdc cannot run there), so this pins the
+    command instead.
+    """
+    import subprocess
+
+    if not (helpers._PROJECT_ROOT / "mcp_servers" / "Mermaid-MCP" / "puppeteer-ci.json").exists():
+        pytest.skip("bundled puppeteer-ci.json is missing")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        out = Path(cmd[cmd.index("-o") + 1])
+        out.write_bytes(b"\x89PNG")
+        class _R:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return _R()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/local/bin/mmdc")
+    monkeypatch.setenv("CI", "true")
+
+    session = tmp_path
+    (session / "process_diagram.mmd").write_text("flowchart TD\n  A[Start]-->B[End]\n", encoding="utf-8")
+
+    png = helpers.render_diagram_png(session)
+    assert png and png.is_file()
+    assert "-p" in calls[0], calls[0]
+    assert calls[0][calls[0].index("-p") + 1].endswith("puppeteer-ci.json")
+
+    # Locally (no CI env) mmdc keeps its default sandbox behaviour.
+    monkeypatch.delenv("CI")
+    calls.clear()
+    png.unlink()
+    helpers.render_diagram_png(session)
+    assert "-p" not in calls[0], calls[0]

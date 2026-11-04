@@ -76,6 +76,11 @@ pandoc or LaTeX.
   files so it cannot accidentally read a functional specification containing fenced blocks.
 - **Mermaid reviewer `FileNotFoundError`** (8 occurrences in one roleplay run) caused by canvas
   diagram text living only in memory; resolved by the disk mirror plus the source fallback.
+- **Diagram rendering silently failed in CI.** `render_diagram_png()` called `mmdc` without
+  the bundled `puppeteer-ci.json`, so Chrome's sandbox could not start on GitHub runners
+  (Ubuntu 24.04+ blocks unprivileged user namespaces via AppArmor) and the PNG test skipped
+  even though `mmdc` was installed. The helper now applies the same CI detection as the
+  Mermaid MCP server, and a test asserts the `-p` flag is present in CI and absent locally.
 - **Duplicate module import in `app2.py`.** `from lib import agents_tools_helpers` alongside
   `from agents_tools_helpers import ...` created two distinct module objects with separate
   `_ACTIVE_SESSION` globals, so artifacts landed flat in `conversation/` instead of the session
