@@ -30,8 +30,8 @@ REQUIRED_MODULES = {
 
 OPTIONAL_TOOLS = {
     "mmdc": "mermaid-cli (npm i -g @mermaid-js/mermaid-cli) - required for the PNG diagram",
-    "pandoc": "pandoc - required for deliverable.pdf (falls back to Markdown only)",
-    "xelatex": "a LaTeX engine - required for deliverable.pdf",
+    "pandoc": "pandoc - optional for deliverable.pdf; without it the export uses PyMuPDF Story",
+    "xelatex": "a LaTeX engine - only used when pandoc is available",
 }
 
 

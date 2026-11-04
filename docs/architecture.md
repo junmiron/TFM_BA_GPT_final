@@ -65,7 +65,7 @@ Two invariants matter:
 `terminate_agent` runs a fixed sequence:
 
 1. read `conversation/interview.jsonl` and take the first `session_id`
-2. `ensure_dir_tool(experience/<SESSION_ID>)`
+2. `ensure_dir_tool(conversation/<SESSION_ID>)`
 3. `move_file_tool` the interview, spec and Mermaid file into that folder
 4. `clean_mermaid(...)` on the `.mmd` file
 5. `render_mermaid_png(...)`
@@ -89,8 +89,8 @@ corrupt the JSON-RPC stream.
 
 **`mcp_servers/Final_deliverable_MCP_server/PDF_format_mcp_server.py`** -
 `format_spec`, `export_pdf`, `format_and_export`, `save_experience_chroma`,
-`recall_experience_chroma`. Formatting is pure Python; the PDF step shells out
-to `pandoc` with `xelatex`. Embeddings use `all-MiniLM-L6-v2`, GPU if available,
+`recall_experience_chroma`. Formatting is pure Python; the PDF step uses `pandoc` + `xelatex` when
+present, otherwise PyMuPDF Story. Embeddings use `paraphrase-multilingual-mpnet-base-v2`, GPU if available,
 otherwise CPU.
 
 ## RAG memory
@@ -112,7 +112,7 @@ Two memory types are exposed to agents:
 data/            reference documents (local, gitignored)
 chromadb_storage/  ChromaDB persistence (local, gitignored)
 conversation/     working files while a session runs (gitignored)
-experience/<id>/  final deliverables per session (gitignored)
+conversation/<id>/  final deliverables per session (gitignored)
 ```
 
 `docs/Conversation/` contains archived examples of finished sessions so you can

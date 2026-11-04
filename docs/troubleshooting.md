@@ -47,7 +47,7 @@ On Windows, npm installs both `mmdc` and `mmdc.cmd`. The MCP server looks for
 both. If the agent still fails, render the file by hand to confirm the pipeline:
 
 ```bash
-mmdc -i experience/<SESSION_ID>/process_diagram.mmd -o test.png
+mmdc -i conversation/<SESSION_ID>/process_diagram.mmd -o test.png
 ```
 
 If the `.mmd` file contains ``` fences, the server strips them automatically
@@ -65,18 +65,19 @@ print("debug", file=sys.stderr)
 
 ## `deliverable.pdf` is missing
 
-PDF export needs `pandoc` **and** a LaTeX engine:
+The export prefers `pandoc` + a LaTeX engine and falls back to PyMuPDF Story:
 
 ```bash
 pandoc --version
 xelatex --version
 ```
 
-Without them the pipeline still produces `functional_specification.formatted.md`
-and reports the missing dependency. The diagram and the interview log are
-unaffected.
+Neither is required - without them `deliverable.pdf` is still produced by PyMuPDF,
+with the diagram embedded and a real bookmark outline. If the PDF is present but has
+no outline in your viewer, it predates v1.1.0; re-run `finalize_deliverables` on the
+session directory and it will be regenerated.
 
-## Diagram never appears in `experience/<SESSION_ID>/`
+## Diagram never appears in `conversation/<SESSION_ID>/`
 
 `terminate_agent` moves the source files from `conversation/` into
 `experience/<SESSION_ID>/`, so after a completed session `conversation/` is

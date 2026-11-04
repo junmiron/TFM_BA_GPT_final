@@ -9,7 +9,7 @@ stdio **MCP servers** for diagram rendering and document export.
 
 > ## ⚠️ Technical preview
 >
-> This is a **technical preview** release (v1.0.0). The agent team, pipeline
+> This is a **technical preview** release (v1.1.0). The agent team, pipeline
 > and deliverable formats are stable enough for evaluation, but the project
 > is still under active development and details may change.
 >
@@ -30,7 +30,7 @@ stdio **MCP servers** for diagram rendering and document export.
 
 ## What you get
 
-After one session, `experience/<SESSION_ID>/` contains:
+After one session, `conversation/<SESSION_ID>/` contains:
 
 | File | What it is |
 |---|---|
@@ -39,7 +39,7 @@ After one session, `experience/<SESSION_ID>/` contains:
 | `process_diagram.mmd` | Mermaid source of the process flow |
 | `process_diagram.png` | rendered diagram |
 | `functional_specification.formatted.md` | FSD with requirements tables and page breaks |
-| `deliverable.pdf` | PDF export (needs `pandoc` + `xelatex`) |
+| `deliverable.pdf` | PDF export with a real bookmark outline (`pandoc` + `xelatex` optional; PyMuPDF fallback when they are absent) |
 
 ## Quick start
 
@@ -128,7 +128,7 @@ python -m pytest -q tests
 | `tests/test_mcp_servers.py` | boots both MCP servers, checks their tools | `mmdc` for one test (skipped otherwise) |
 | `tests/test_end_to_end.py` | the whole 11-agent team with a scripted model client | `mmdc` (skipped otherwise); **no API key, no network** |
 
-The end-to-end test asserts the interview log, the spec in `experience/<session>/`
+The end-to-end test asserts the interview log, the spec in `conversation/<session>/`
 and the rendered PNG all exist.
 
 ## Project layout
@@ -142,7 +142,7 @@ scripts/smoke_check.py    release-readiness checker
 tests/                    offline pytest suite
 data/                     reference docs indexed into ChromaDB (local, gitignored)
 conversation/            working files during a session (gitignored)
-experience/<session>/    final deliverables (gitignored)
+conversation/<session>/  final deliverables (gitignored)
 docs/                     architecture, configuration, troubleshooting + thesis material
 ```
 
@@ -152,15 +152,15 @@ docs/                     architecture, configuration, troubleshooting + thesis 
 |---|---|
 | Python 3.11+ (tested on 3.13) | the app |
 | Node.js + `mermaid-cli` | PNG/SVG diagram rendering |
-| `pandoc` + `xelatex` | `deliverable.pdf` (optional; Markdown still works without) |
+| `pandoc` + `xelatex` | nicer PDF export; **optional** - without them the PDF is built with PyMuPDF Story |
 | An LLM (OpenAI / Ollama / LM Studio) | the agents |
 
 ## Known limitations
 
 - The interview is interactive: a human must answer every `QUESTION:`.
 - `summarizer_agent` only accepts the exact phrase `APPROVE SUMMARY`.
-- PDF export degrades to Markdown if `pandoc`/`xelatex` are missing.
-- ChromaDB embeddings run locally via `all-MiniLM-L6-v2` (CPU by default).
+- PDF export uses `pandoc`/`xelatex` when available, otherwise PyMuPDF Story.
+- ChromaDB embeddings run locally via `paraphrase-multilingual-mpnet-base-v2` (CPU by default).
 
 ## License
 

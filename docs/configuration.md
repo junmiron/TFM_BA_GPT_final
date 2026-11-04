@@ -110,11 +110,12 @@ allowed_executables = ["npx", "uvx"]
 | Tool | Needed for | Install |
 |---|---|---|
 | `mmdc` | PNG/SVG/PDF diagram rendering | `npm i -g @mermaid-js/mermaid-cli` |
-| `pandoc` | PDF export | `winget install pandoc` / `apt install pandoc` |
+| `pandoc` | PDF export via pandoc+LaTeX (optional) | `winget install pandoc` / `apt install pandoc` |
 | `xelatex` | PDF export | TeX Live / MiKTeX |
 
-Check with `python scripts/smoke_check.py`. Missing `pandoc` or `xelatex` costs
-you only `deliverable.pdf`; `mmdc` costs you `process_diagram.png`.
+Check with `python scripts/smoke_check.py`. Missing `pandoc` or `xelatex` only
+changes how `deliverable.pdf` is built (PyMuPDF Story is used instead); `mmdc` costs you
+`process_diagram.png`.
 
 ## What is never committed
 
