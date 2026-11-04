@@ -1,4 +1,4 @@
-Requirements Elicitation: Most Valuable Questions | Practical Analyst
+Requirements Elicitation: Most Valuable Questions - Practical Analyst
 
 
 
@@ -32,6 +32,7 @@ Requirements Elicitation: Most Valuable Questions | Practical Analyst
 
 
 
+Requirements Elicitation: Most Valuable Questions - Practical Analyst
 
 
 
@@ -44,17 +45,13 @@ Requirements Elicitation: Most Valuable Questions | Practical Analyst
 
 
 
-									TRENDING:								
 
 
 
-Business Analyst Job Description
 
 
-What Does the Future Hold for the Business Analyst Role...
 
 
-Good Requirements Are More Than Just Accurate
 
 
 
@@ -78,73 +75,69 @@ Good Requirements Are More Than Just Accurate
 
 
 
- 
 
 
 
 
 
+Skip to content
 
 
 
 
 
 
+PracticalAnalyst
 
 
 
 
-Resources
 
-Articles
-Quotes
-Books
-Blog
-Downloads
 
 
-About
-Contact
-Sitemap
- 
+ArticlesQuotesBooksResourcesAbout
 
 
 
 
 
+Subscribe
 
-Select Page
 
 
 
-  
 
 
 
-
-
-
-
-
-
-
+Requirements
 Requirements Elicitation: Most Valuable Questions
 
-Posted by JB | May 28, 2009 | Requirements | 6  | 
+ByJB
+·
+May 28, 2009
+
+
+Share
+
+
+				LinkedIn
+			
+
+
+				X
+			
+
+
+				Copy link
+			
+
+
+				Email
+			
+Copied!
 
 
 
-
-
-
-
-
- 
-
-
-
-
- 
 
 
 I actually have an ongoing collection of elicitation interview questions that I like to refer to as I prepare for stakeholder interviews. In this post, I’ll discuss why I think that is a good idea, and then share some of my favorite, “go-to” questions that are characteristic of those I might ask of a business owner or stakeholder representative during an initial interview.
@@ -196,330 +189,126 @@ As always, I’ll be interested in hearing from you!
 Here’s a link to some more good elicitation questions from Joy Matthews @ Pierson Requirements Group.
 
 
+Found this useful? Share it.
 
 
-Share:
+			LinkedIn
+		
 
 
+			X
+		
 
 
+			Copy link
+		
 
 
+			Email
+		
+Copied!
 
 
+Elicitation objectives problem
 
 
+Written byJBJonathan Babcock is a management and IT consultant with expertise in business analysis, process optimization and solution delivery methodology. Practical Analyst is his outlet for sharing what he’s learned, and for interacting with solution delivery professionals across the globe.
 
 
- 
 
-Rate: 
+				LinkedIn
+			
 
 
+				X
+			
 
 
+				About
+			
 
 
- 
 
+Keep reading
 
 
 
-PreviousAre "Project Teams" Really Teams? 
 
-NextGoogle Wave for Business Analysis 
+Business Analysis, Management, Professional Development
+Seven Signals I Screen For  in Solution Delivery Candidates
+Jul 3, 2026
 
 
 
 
-About The Author
 
+Commentary
+Why I’ve been quiet for a while (and what’s next)
+Jun 17, 2026
 
 
- 
 
-JB
-Jonathan Babcock is a management and IT consultant with expertise in business analysis, process optimization and solution delivery methodology. Practical Analyst is his outlet for sharing what he's learned, and for interacting with solution delivery professionals across the globe.
 
 
-
-
-
-
-
-
-
-
-
-Related Posts
-
-
-
-
-
-
-Begin with what you HAVE to do
-March 18, 2010
-
-
-
-
-
-Good Requirements Are More Than Just Accurate
-December 18, 2007
-
-
-
-
-
-Use Case Basics: Keeping it Simple
-July 28, 2009
-
-
-
-
-
-Use Case Basics: Distinguishing Between Exception and Alternative Paths
-December 16, 2008
-
-
-
-
-
-6 Comments
-
-
-
-
- 
-
-Self Esteem 
-					on January 17, 2010 at 12:18 AM				
-
-
-
-Thank you so much, Great information… You keep writing and I’ll keep reading.
-Reply 
-
-
-
-
-
-
- 
-
-Nkele 
-					on June 17, 2010 at 12:49 PM				
-
-
-
-Hi Jonathan,
-Elicitation is my most challenging area as I do not have good questioning skills and I am poor at probing.  I am looking at decveloping the skill, sample questions like yours can set me on the right track.  Would you mind sharing your templates with me please.
-Many Thanks!
-Novice BA
-Nkele
-Reply 
-
-
-
-
-
-
- 
-
-dougieb5000 
-					on May 1, 2012 at 7:21 AM				
-
-
-
-I have been an analyst for a little while now and I have to say this is a perfectly succinct starting point for requirements gathering! Well done
-Reply 
-
-
-
-
-
-
- 
-
-Toni 
-					on June 13, 2014 at 1:52 PM				
-
-
-
-It’s always interesting to see how others approach requirements gathering. Thanks for the information.
-Reply 
-
-
-
-
-
-
- 
-
-Angelo the BA 
-					on September 9, 2014 at 10:55 PM				
-
-
-
-The beginning stages of elicitation are the most difficult for me cause that’s when I’m really getting my feet wet, but I think after you go through a couple of cycles, especially when things get slowed down because of misses in the requirements, it helps you ask better questions in the future.
-I don’t have a list of go to questions as of yet (perhaps I should consider it), I typically choose a work-product that I know I’ll need/want to create (like a diagram, data model, etc) and use that to guide my initial questions. Its important to keep an open mind and change directions on a work-product type if its starting to not make sense or not get results in the arena your in.
-Reply 
-
-
-
-
-
-
- 
-
-More 
-					on August 24, 2015 at 4:22 AM				
-
-
-
-what is meant by a use case during the elicitation of requirements.
-Reply 
-
-
-
-
-
-Trackbacks/Pingbacks
-
-Jonathan Babcock - New blog post: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o	
-doug goldberg - RT RT @jonbab1New blog post: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o Always thought provoking.	
-Rob - Pondering sharing reqs interview questions thx to @jonbab1: Requirements Elicitation: "Most Valuable" Questions http://bit.ly/DkM0o #baot	
-Gundega Lazdane - RT @jonbab1 Requirements Elicitation: “Most Valuable” Questions : Practical Analyst http://bit.ly/DkM0o (via @tweetmeme)	
-Escalation and Infinite Regression : Practical Analyst - […] and define the business problem (or point of pain) to be addressed. If done properly, this will include some…	
-Requirements Elicitation: Are You the Artist, or the Order-Taker? : Practical Analyst - […] serious thought to the types of questions you might ask before the interviews take place I’ve touched on that…	
-Four Key Knowledge Areas for Business Analysts : Practical Analyst - […] well do I understand the principles and techniques of requirements elicitation, analysis, specification, validation and management? How well do…	
-Patterns and the Evolving Business Analyst | Practical Analyst - […] dealings with the similar item? In the case of requirements, I might review specific requirements, questions I asked to…	
-
-
-
-Leave a reply Cancel replyYour email address will not be published. Required fields are marked *COMMENTName * 
-Email * 
-Website 
- 
-
-Δ 
-
-
-
- 
-
-Search for:
-
-
-
-  
-
-
- 
-
-Recent Posts
-
-
-Tweets of the Week – 20180713
-
-
-The Real Value of Visuals in Solution Delivery – A Reprise
-
-
-Hippocrates on Clarity of Language
-
-
-The Book, The Movie, and the Business Document
-
-
-Interview with Ryland Leyton, author of “The Agile Business Analyst”
-
-
-John Dewey on Starting with a Problem to be Solved
-
-
-Business analyst, these are the reasons your project will succeed
-
-
-Four Critical Components of a Meeting Invitation
-
-
-Benjamin L. Kovitz on Requirements
-
-
-Business Analysts and Grammar Police
-
-
-Visionary Leadership and You
-
-
-Alistair Cockburn – Agile is an Attitude
-
-
-Business Analysis Success is . . .
-
-
-Harold Evans on Creating Understanding
-
-
-The “Obviousness” Danger that Kills Projects
-
-
-Jabian Journal and Visual Communication
-
-
-Distinguishing between Business Rules and Software Requirements
-
-
-Roughly Right, or Precisely Wrong?
-
-
-6 Guidelines for Building a Reputation with Your New Employer
-
-
-Why Stakeholders Don’t Tell You Everything
-
-
- Categories
-
-Books & Literature
 
 Business Analysis
+On the Essence of Business Analysis
+May 10, 2016
 
-Communication
 
-Link Share
 
-Management
 
-Methodology
 
-Miscellanea
 
-Module Library
 
-Performance
 
-Professional Development
 
-Professionalism
 
+PracticalAnalyst
+Practical insights for business problem solvers — straight talk on requirements, communication, and actually shipping solutions.
+
+
+Explore
+
+Articles
 Quotes
-
-Requirements
-
-Video
-
-Weekly Digest
-
-
- 
- 
- 
- 
+Books
+Resources
 
 
 
+Connect
 
-Designed by Elegant Themes | Powered by WordPress
+About
+Contact
+LinkedIn
+X / Twitter
+
+
+
+Newsletter
+
+Subscribe
+Archive
+
+
+
+
+© 2026 Practical Analyst. All rights reserved.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
