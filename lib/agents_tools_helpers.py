@@ -15,32 +15,102 @@ from autogen_agentchat.messages import BaseAgentEvent, BaseChatMessage
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# --- session-scoped outputs ---------------------------------------------------
+# Every run writes its deliverables into conversation/<SESSION_ID>/ so runs
+# never clobber or read each other's files. The session id is set once at
+# workflow start (set_session) and every tool default resolves through it.
+_ACTIVE_SESSION: Optional[str] = None
+
+
+def set_session(session_id: str) -> str:
+    """Set the active session id (used by all tool default paths)."""
+    global _ACTIVE_SESSION
+    _ACTIVE_SESSION = session_id
+    _ensure_parent_dir(_PROJECT_ROOT / "conversation" / session_id)
+    return session_id
+
+
+def get_session() -> Optional[str]:
+    return _ACTIVE_SESSION
+
+
+def _session_dir() -> Path:
+    if _ACTIVE_SESSION:
+        return (_PROJECT_ROOT / "conversation" / _ACTIVE_SESSION).resolve()
+    return (_PROJECT_ROOT / "conversation").resolve()
+
+
 def _normalize_project_relative(p: str | Path) -> Path:
     """Resolve conversation files relative to the project root, not CWD.
-    - If absolute: return as-is.
-    - If starts with '../conversation' or './conversation': map to 'conversation'.
-    - Otherwise: treat as project-root relative.
+
+    Robust to the Linux/Windows host mismatch that caused the "writes land
+    somewhere the reader never looks" bug: an agent may pass an absolute path
+    copied from another OS (e.g. ``D:\\Code\\...\\conversation\\spec.md``) or a
+    ``project_root/...`` prefix. Whenever the path contains a ``conversation``
+    segment we re-anchor it to this project's ``conversation/`` folder, then
+    redirect flat files into the active session subfolder so per-run outputs
+    never collide with a previous run's files.
     """
+    # Convert any Windows-style separators to POSIX so the tail-split works
+    # regardless of host OS.
     if isinstance(p, Path):
         if p.is_absolute():
-            return p
-        p_str = str(p)
+            p_str = str(p)
+        else:
+            p_str = str(p)
     else:
-        p_str = p
-    # Normalize common prefixes used in YAML/notebook
-    if p_str.startswith("../conversation/"):
-        p_str = p_str[3:]  # drop '../'
-    elif p_str == "../conversation":
-        p_str = "conversation"
-    elif p_str.startswith("./conversation/"):
-        p_str = p_str[2:]
-    # Join to project root (safe even if already 'conversation/...')
-    return (_PROJECT_ROOT / p_str).resolve()
+        p_str = str(p)
+    p_str = p_str.replace("\\", "/")
 
-DEFAULT_JSONL_PATH = str((_PROJECT_ROOT / "conversation/interview.jsonl").resolve())
-DEFAULT_MD_PATH = str((_PROJECT_ROOT / "conversation/final_summary.md").resolve())
-DEFAULT_MD_SPEC_PATH = str((_PROJECT_ROOT / "conversation/functional_specification.md").resolve())
-DEFAULT_MERMAID_PATH = str((_PROJECT_ROOT / "conversation/process_diagram.mmd").resolve())
+    # Re-anchor any path that references the conversation folder.
+    if "conversation" in p_str:
+        tail = p_str.split("conversation", 1)[1].lstrip("/")
+        conv_root = (_PROJECT_ROOT / "conversation").resolve()
+        resolved = (conv_root / tail).resolve() if tail else conv_root
+    else:
+        # Normalize common relative prefixes used in YAML/notebook.
+        if p_str.startswith("../"):
+            p_str = p_str[3:]
+        elif p_str.startswith("./"):
+            p_str = p_str[2:]
+        if isinstance(p, Path) and p.is_absolute():
+            resolved = p.resolve()
+        else:
+            resolved = (_PROJECT_ROOT / p_str).resolve()
+
+    # Redirect flat conversation files into the active session folder.
+    if _ACTIVE_SESSION:
+        conv_root = (_PROJECT_ROOT / "conversation").resolve()
+        try:
+            rel = resolved.relative_to(conv_root)
+        except ValueError:
+            return resolved
+        # Already session-scoped: the agent passed a path such as
+        # conversation/<SESSION_ID> or conversation/<SESSION_ID>/foo.mmd from
+        # get_session_dir_tool. Redirecting that onto _session_dir() would
+        # create conversation/<SESSION_ID>/<SESSION_ID>/ and orphan the file.
+        if rel.parts and rel.parts[0] == _ACTIVE_SESSION:
+            return resolved
+        # rel is like 'functional_specification.md' (not already session-scoped)
+        if len(rel.parts) == 1:
+            return (_session_dir() / rel.parts[0]).resolve()
+    return resolved
+
+
+def default_jsonl_path() -> str:
+    return str((_session_dir() / "interview.jsonl").resolve())
+
+
+def default_spec_path() -> str:
+    return str((_session_dir() / "functional_specification.md").resolve())
+
+
+def default_mermaid_path() -> str:
+    return str((_session_dir() / "process_diagram.mmd").resolve())
+
+
+def default_summary_path() -> str:
+    return str((_session_dir() / "final_summary.md").resolve())
 
 ISO8601 = "%Y-%m-%dT%H:%M:%S.%fZ"
 
@@ -130,8 +200,9 @@ def save_records(
     stamped = _with_timestamps(records)
 
     lines = []
-    if session_id:
-        meta = {"_meta": {"session_id": session_id, "ts": _now_iso(), "n_records": len(stamped)}}
+    effective_session = _ACTIVE_SESSION or session_id
+    if effective_session:
+        meta = {"_meta": {"session_id": effective_session, "ts": _now_iso(), "n_records": len(stamped)}}
         lines.append(json.dumps(meta, ensure_ascii=False))
 
     for rec in stamped:
@@ -196,7 +267,7 @@ def save_conversation_pair(
 def save_conversation_to_jsonl(
     speaker_or_records: Union[List[Dict[str, Any]], str],  # ✅ add type
     message: Optional[str] = None,                         # ✅ make Optional[str]
-    file_path: str = DEFAULT_JSONL_PATH,
+    file_path: Optional[str] = None,
     *,
     subject: Optional[str] = None,                         # ✅ add Optional
     q_index: Optional[int] = None,                         # ✅ add Optional
@@ -208,7 +279,7 @@ def save_conversation_to_jsonl(
     2) A generic list of records.
     """
     try:
-        path = _normalize_project_relative(file_path)
+        path = _normalize_project_relative(file_path or default_jsonl_path())
 
         # Case 1: Already a list of records
         if isinstance(speaker_or_records, list):
@@ -259,12 +330,12 @@ def save_conversation_to_jsonl(
 
 
 
-def write_md_file_tool(content: str, file_path: str = DEFAULT_MD_SPEC_PATH) -> str:
+def write_md_file_tool(content: str, file_path: Optional[str] = None) -> str:
     """
-    Writes the functional specification to a Markdown file.
+    Writes the functional specification to a Markdown file (truncates first).
     """
     try:
-        abs_path = _normalize_project_relative(file_path)
+        abs_path = _normalize_project_relative(file_path or default_spec_path())
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         with open(abs_path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -273,17 +344,34 @@ def write_md_file_tool(content: str, file_path: str = DEFAULT_MD_SPEC_PATH) -> s
         return f"Error writing Markdown spec: {e}"
 
 
-def append_md_file_tool(content: str, file_path: str = DEFAULT_MD_SPEC_PATH) -> str:
+def append_md_file_tool(content: str, file_path: Optional[str] = None) -> str:
     """
     Appends a chunk of Markdown to the functional specification file.
 
     Used together with write_md_file_tool to build large documents in chunks:
     one giant tool argument makes local models emit malformed calls that never
     execute, so the writer saves section groups one at a time instead.
+
+    Dedup guard: if every top-level (##) heading in the chunk is already present
+    in the file, the append is skipped. This prevents the duplicated-section
+    corruption seen when a model re-sends the same chunk after a retry.
     """
     try:
-        abs_path = _normalize_project_relative(file_path)
+        abs_path = _normalize_project_relative(file_path or default_spec_path())
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+        existing = ""
+        if os.path.exists(abs_path):
+            with open(abs_path, "r", encoding="utf-8") as f:
+                existing = f.read()
+
+        new_headers = re.findall(r"^##\s+.+$", content, flags=re.MULTILINE)
+        if new_headers and all(h in existing for h in new_headers):
+            return (
+                f"Skipped duplicate append to {abs_path}: section(s) "
+                f"{', '.join(new_headers)} already present."
+            )
+
         with open(abs_path, "a", encoding="utf-8") as f:
             f.write(content)
         return f"Markdown chunk appended to {abs_path}"
@@ -291,19 +379,20 @@ def append_md_file_tool(content: str, file_path: str = DEFAULT_MD_SPEC_PATH) -> 
         return f"Error appending Markdown spec: {e}"
 
 
-def read_md_file_tool(file_path: str = DEFAULT_MD_SPEC_PATH) -> str:
+def read_md_file_tool(file_path: Optional[str] = None) -> str:
     """
     Reads the entire content of a Markdown file and returns it as a string.
 
     Args:
-        file_path (str): Optional path to the Markdown spec (defaults to DEFAULT_MD_SPEC_PATH).
+        file_path (str): Optional path to the Markdown spec (defaults to the
+            active session's functional_specification.md).
 
     Returns:
         str: The full text content of the Markdown file, or an error message.
     """
     import os
     try:
-        abs_path = _normalize_project_relative(file_path)
+        abs_path = _normalize_project_relative(file_path or default_spec_path())
         if not os.path.exists(abs_path):
             return f"Error: Markdown file not found at {abs_path}"
 
@@ -315,20 +404,21 @@ def read_md_file_tool(file_path: str = DEFAULT_MD_SPEC_PATH) -> str:
         return f"Error reading Markdown file: {e}"
 
 
-def write_mermaid_to_file_tool(mermaid_code: str, file_path: str = DEFAULT_MERMAID_PATH) -> str:
+def write_mermaid_to_file_tool(mermaid_code: str, file_path: Optional[str] = None) -> str:
     """
     Writes Mermaid diagram code to a .mmd file with proper formatting.
 
     Args:
         mermaid_code (str): The Mermaid syntax/code to write.
-        file_path (str): Optional path for saving. Defaults to DEFAULT_MERMAID_PATH.
+        file_path (str): Optional path for saving. Defaults to the active session's
+            process_diagram.mmd.
 
     Returns:
         str: Confirmation or error message.
     """
 
     try:
-        abs_path = _normalize_project_relative(file_path)
+        abs_path = _normalize_project_relative(file_path or default_mermaid_path())
         # Ensure the folder exists
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
 
@@ -372,6 +462,222 @@ def ensure_dir_tool(dir_path: str) -> str:
         return f"Directory ready: {target}"
     except Exception as e:
         return f"Error creating directory: {e}"
+
+
+def get_session_dir_tool() -> str:
+    """Return the absolute path of the current run's session folder.
+
+    The terminate agent must not guess the folder: every deliverable of this
+    run lives in conversation/<SESSION_ID>/, and this tool is the single
+    source of truth for that path.
+    """
+    session_dir = _session_dir()
+    session_dir.mkdir(parents=True, exist_ok=True)
+    return str(session_dir)
+
+
+def mirror_canvas_to_disk(update_file_tool):
+    """Make every canvas write land in the session folder as a real file.
+
+    TextCanvasMemory is in-memory only, so a diagram "saved as
+    canvas_diagram.md" never exists on disk. The Mermaid MCP tools read from
+    disk, so `check_mermaid`/`clean_mermaid` on that path raise
+    FileNotFoundError and the terminate stage stumbles. Wrapping the tool
+    mirrors each revision into conversation/<SESSION_ID>/.
+    """
+    original_run = update_file_tool.run
+
+    async def run(args, cancellation_token=None):
+        result = await original_run(args, cancellation_token)
+        try:
+            filename = getattr(args, "filename", None)
+            content = getattr(args, "new_content", None)
+            if filename and isinstance(content, str):
+                target = _session_dir() / Path(str(filename)).name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content, encoding="utf-8")
+        except Exception as exc:
+            print(f"⚠️  Canvas mirror failed: {type(exc).__name__}: {exc}")
+        return result
+
+    update_file_tool.run = run
+    return update_file_tool
+
+
+# ---- deterministic deliverable completion -----------------------------------
+# Local models can stop the terminate stage early (or answer "READY" without
+# ever calling the write tool). These functions finish the artifacts without a
+# model, so the run always ends with a rendered diagram and a PDF.
+_LIFECYCLE_STATUSES = ["Check-In", "Received", "In Cleaning", "Quality Check",
+                       "Ready for Pickup", "Picked Up", "Check-Out"]
+
+
+def _pdf_server_module():
+    """Load the PDF MCP server module as a plain library (no MCP transport)."""
+    import importlib.util
+    path = _PROJECT_ROOT / "mcp_servers" / "Final_deliverable_MCP_server" / "PDF_format_mcp_server.py"
+    spec = importlib.util.spec_from_file_location("pdf_format_mcp_server", path)
+    if not spec or not spec.loader:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def ensure_diagram_source(session_dir: Path) -> Optional[Path]:
+    """Write a Mermaid source for the lifecycle if the diagram agents produced none."""
+    session_dir = Path(session_dir)
+    mmd = session_dir / "process_diagram.mmd"
+    if mmd.is_file():
+        return mmd
+    spec = session_dir / "functional_specification.md"
+    if not spec.is_file():
+        return None
+    try:
+        text = spec.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    statuses = [s for s in _LIFECYCLE_STATUSES if re.search(rf"\b{s}\b", text, re.IGNORECASE)]
+    if len(statuses) < 2:
+        return None
+    lines = ["%% Auto-derived from the status lifecycle in functional_specification.md",
+             "flowchart TD"]
+    for i, name in enumerate(statuses):
+        node = chr(65 + i)
+        lines.append(f"    {node}[{name}]")
+        if i:
+            lines.append(f"    {chr(65 + i - 1)} --> {node}")
+    mmd.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return mmd
+
+
+def render_diagram_png(session_dir: Path) -> Optional[Path]:
+    """Render process_diagram.mmd to PNG with mmdc (no model involved).
+
+    If the agent-written diagram is syntactically broken (mmdc exits with a
+    parser error), it is replaced with the status-lifecycle diagram derived
+    from the spec so the deliverable still contains a diagram.
+    """
+    import subprocess
+    session_dir = Path(session_dir)
+    png = session_dir / "process_diagram.png"
+    if png.is_file():
+        return png
+    mmd = ensure_diagram_source(session_dir)
+    if not mmd:
+        return None
+    exe = shutil.which("mmdc")  # resolves to mmdc.cmd on Windows; bare name fails there
+    if not exe:
+        return None
+
+    def _try(source: Path) -> bool:
+        raw = source.read_text(encoding="utf-8").strip()
+        if raw.startswith("```"):  # mmdc cannot parse ```mermaid fences
+            raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+            if raw.rstrip().endswith("```"):
+                raw = raw.rstrip()[:-3]
+        clean = session_dir / "process_diagram.clean.mmd"
+        clean.write_text(raw.strip() + "\n", encoding="utf-8")
+        try:
+            subprocess.run([exe, "-i", str(clean), "-o", str(png)], check=True, timeout=120,
+                           capture_output=True, stdin=subprocess.DEVNULL)
+        except Exception:
+            return False
+        return png.is_file()
+
+    if _try(mmd):
+        return png
+    # The diagram the model wrote does not parse - derive one from the spec.
+    derived = session_dir / "process_diagram.derived.mmd"
+    statuses = []
+    spec = session_dir / "functional_specification.md"
+    if spec.is_file():
+        try:
+            text = spec.read_text(encoding="utf-8")
+            statuses = [s for s in _LIFECYCLE_STATUSES if re.search(rf"\b{s}\b", text, re.IGNORECASE)]
+        except OSError:
+            statuses = []
+    if len(statuses) < 2:
+        statuses = list(_LIFECYCLE_STATUSES)
+    lines = ["flowchart TD"]
+    for i, name in enumerate(statuses):
+        node = chr(65 + i)
+        lines.append(f"    {node}[{name}]")
+        if i:
+            lines.append(f"    {chr(65 + i - 1)} --> {node}")
+    derived.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if _try(derived):
+        mmd.write_text(derived.read_text(encoding="utf-8"), encoding="utf-8")
+        return png
+    return None
+
+
+def export_deliverable_pdf(session_dir: Path) -> Optional[Path]:
+    """Build deliverable.pdf with the PyMuPDF exporter if it is absent or has no diagram."""
+    session_dir = Path(session_dir)
+    pdf = session_dir / "deliverable.pdf"
+    diagram = session_dir / "process_diagram.png"
+    spec = session_dir / "functional_specification.md"
+    if not spec.is_file():
+        return pdf if pdf.is_file() else None
+    if pdf.is_file():
+        complete = not diagram.is_file() or (_pdf_has_image(pdf) and _pdf_has_outline(pdf))
+        # A PDF not newer than the spec is stale: the terminate agent can report
+        # PASS against a deliverable from a previous run. Equality counts as
+        # stale because filesystem clock resolution can make both writes land
+        # in the same tick.
+        stale = spec.stat().st_mtime >= pdf.stat().st_mtime
+        if complete and not stale:
+            return pdf
+    module = _pdf_server_module()
+    if module is None:
+        return pdf if pdf.is_file() else None
+    try:
+        module.format_document(spec.parent, "functional_specification.md", "process_diagram.png",
+                               "functional_specification.formatted.md")
+        module._pymupdf_export(spec.parent / "functional_specification.formatted.md",
+                               diagram if diagram.is_file() else None,
+                               pdf,
+                               title=module._extract_title(spec))
+        return pdf if pdf.is_file() else None
+    except Exception:
+        return pdf if pdf.is_file() else None
+
+
+def _pdf_has_outline(pdf_path: Path) -> bool:
+    """True when the PDF has PDF bookmarks, not just a rendered Contents block."""
+    try:
+        import fitz
+        doc = fitz.open(str(pdf_path))
+        has = bool(doc.get_toc())
+        doc.close()
+        return has
+    except Exception:
+        return True  # can't inspect it - leave the existing PDF alone
+
+
+def _pdf_has_image(pdf_path: Path) -> bool:
+    """True when the PDF already embeds at least one image (the diagram)."""
+    try:
+        import fitz
+        doc = fitz.open(str(pdf_path))
+        count = sum(len(page.get_images()) for page in doc)
+        doc.close()
+        return count > 0
+    except Exception:
+        return True  # can't inspect it - leave the existing PDF alone
+
+
+def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Ensure the diagram PNG and deliverable.pdf exist for this run."""
+    sd = Path(session_dir) if session_dir else _session_dir()
+    png = render_diagram_png(sd)
+    pdf = export_deliverable_pdf(sd)
+    return {
+        "session_dir": str(sd),
+        "diagram_png": str(png) if png else None,
+        "pdf": str(pdf) if pdf else None,
+    }
 
 
 # ---- Constants (ensure defined once) ----

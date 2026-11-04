@@ -4,6 +4,7 @@ import os
 import sys
 import asyncio
 import types
+from datetime import datetime, timezone
 import chainlit as cl
 from autogen_core import SingleThreadedAgentRuntime, CancellationToken
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
@@ -24,9 +25,14 @@ sys.path.append(SRC_PATH)
 
 import mcp_boot 
 from lib import agents_tools_helpers
-from rag_helpers import rag_indexer_runner, TemplateSafeTextCanvasMemory
-from model_loader import load_model_client
-from agents_tools_helpers import (
+from lib.rag_helpers import rag_indexer_runner, TemplateSafeTextCanvasMemory
+from src.model_loader import load_model_client
+# Import the helpers from the SAME module object that `set_session()` is called
+# on. `from agents_tools_helpers import ...` re-executes the file as a separate
+# top-level module, so the tools bound to the agents carry their own
+# `_ACTIVE_SESSION` (always None) and every deliverable lands flat in
+# conversation/ instead of conversation/<SESSION_ID>/.
+from lib.agents_tools_helpers import (
     selector_func,
     save_conversation_to_jsonl,
     write_md_file_tool,
@@ -35,6 +41,7 @@ from agents_tools_helpers import (
     write_mermaid_to_file_tool,
     move_file_tool,
     ensure_dir_tool,
+    get_session_dir_tool,
 )
 
 
@@ -51,16 +58,41 @@ async def on_chat_start():
         rag_vector_memory = None
     rag_memories = [rag_vector_memory] if rag_vector_memory else []
     text_canvas_memory = TemplateSafeTextCanvasMemory()
-    update_file_tool = text_canvas_memory.get_update_file_tool()
+    update_file_tool = agents_tools_helpers.mirror_canvas_to_disk(
+        text_canvas_memory.get_update_file_tool()
+    )
     sys.modules["canvas"] = types.SimpleNamespace(update_file_tool=update_file_tool)
 
     model_client = load_model_client(os.getenv("MODEL_CLIENT", "openai"))
     model_client_tools = load_model_client(os.getenv("MODEL_CLIENT_TOOLS", "openai_npt"))
 
+    # Optional simulated stakeholder: agents stay on the local lane while the
+    # interview answers go to a remote one, so a provider's tokens/min ceiling
+    # (e.g. Groq's 8000) never throttles the whole run.
+    simulate_human = os.getenv("SIMULATE_HUMAN", "").strip().lower() in ("1", "true", "yes")
+    human_sim = None
+    if simulate_human:
+        try:
+            from lib.human_simulator import build_human_simulator
+            human_sim = build_human_simulator(os.getenv("HUMAN_MODEL", "opencode"))
+            await cl.Message(
+                content=f"🤖 Simulated stakeholder active on the `{os.getenv('HUMAN_MODEL', 'opencode')}` lane "
+                        f"(agents run on `{os.getenv('MODEL_CLIENT', 'openai')}`). "
+                        "Set SIMULATE_HUMAN=false to answer yourself."
+            ).send()
+        except Exception as e:
+            print(f"⚠️  Human simulator unavailable ({type(e).__name__}: {e}); falling back to real user input.")
+            human_sim = None
+
     async def chainlit_user_input(prompt=None, cancellation_token=None):
         while True:
             if cancellation_token is not None and getattr(cancellation_token, "is_canceled", False):
                 raise asyncio.CancelledError()
+            if human_sim is not None:
+                question = (prompt or "").strip() or "Please describe how this should work."
+                answer = await human_sim.ask(question)
+                await cl.Message(content=f"🗣️ Stakeholder: {answer}", author="user").send()
+                return answer
             resp = await cl.AskUserMessage(content=" ", timeout=3600).send()
             # Chainlit returns the answer under "output" (StepDict); accept legacy keys too.
             # Reading only "content" made every valid answer look empty and re-asked forever.
@@ -250,7 +282,12 @@ async def on_chat_start():
       SESSION_ID: use the one provided by the planner in its first assignment; if missing, set once per interview to 'sess-<yyyyMMddHHmmss>' and keep using it.
     """,
         tools=[save_conversation_to_jsonl],
-        reflect_on_tool_use=True,
+        # reflect_on_tool_use=True makes AutoGen issue a final "answer" call with
+        # tool_choice="none". Local Qwen then imitates the next tool call as plain
+        # text, and the recovery wrapper cannot help: no tools are declared on
+        # that request, so the spec never gets written. Keep the tool loop open.
+        reflect_on_tool_use=False,
+        max_tool_iterations=10,
         memory=rag_memories,
     )
 
@@ -408,7 +445,12 @@ async def on_chat_start():
         Calling 'write_md_file_tool' + 'append_md_file_tool' is mandatory.
 """,
         tools=[write_md_file_tool, append_md_file_tool, read_md_file_tool, AgentTool(agent=use_case_agent), AgentTool(agent=glossary_agent)],
-        reflect_on_tool_use=True,
+        # reflect_on_tool_use=True makes AutoGen issue a final "answer" call with
+        # tool_choice="none". Local Qwen then imitates the next tool call as plain
+        # text, and the recovery wrapper cannot help: no tools are declared on
+        # that request, so the spec never gets written. Keep the tool loop open.
+        reflect_on_tool_use=False,
+        max_tool_iterations=10,
         memory=rag_memories,
     )
 
@@ -458,7 +500,12 @@ async def on_chat_start():
       If a section exists but is empty or vague, treat it as incomplete and list it.
 """,
         tools=[read_md_file_tool],
-        reflect_on_tool_use=True,
+        # reflect_on_tool_use=True makes AutoGen issue a final "answer" call with
+        # tool_choice="none". Local Qwen then imitates the next tool call as plain
+        # text, and the recovery wrapper cannot help: no tools are declared on
+        # that request, so the spec never gets written. Keep the tool loop open.
+        reflect_on_tool_use=False,
+        max_tool_iterations=10,
         memory=rag_memories,
     )
 
@@ -500,7 +547,12 @@ async def on_chat_start():
       Always wait for feedback from mermaid_code_reviewer_agent before finalizing.
     """,
         tools=[read_md_file_tool, update_file_tool],
-        reflect_on_tool_use=True,
+        # reflect_on_tool_use=True makes AutoGen issue a final "answer" call with
+        # tool_choice="none". Local Qwen then imitates the next tool call as plain
+        # text, and the recovery wrapper cannot help: no tools are declared on
+        # that request, so the spec never gets written. Keep the tool loop open.
+        reflect_on_tool_use=False,
+        max_tool_iterations=10,
         memory=[text_canvas_memory],
     )
 
@@ -540,7 +592,12 @@ async def on_chat_start():
       Only say **"Diagram code complete"** and **READY** when you're confident the code is correct and complete.
     """,
         tools=[update_file_tool, write_mermaid_to_file_tool],
-        reflect_on_tool_use=True,
+        # reflect_on_tool_use=True makes AutoGen issue a final "answer" call with
+        # tool_choice="none". Local Qwen then imitates the next tool call as plain
+        # text, and the recovery wrapper cannot help: no tools are declared on
+        # that request, so the spec never gets written. Keep the tool loop open.
+        reflect_on_tool_use=False,
+        max_tool_iterations=10,
         memory=[text_canvas_memory],
     )
 
@@ -550,76 +607,71 @@ async def on_chat_start():
         model_client=model_client_tools,
         system_message="""You are the TERMINATE_AGENT. Perform the final export pipeline and then end with **TERMINATE**.
 
-    **INPUTS**
-      conversation log: project_root/conversation/interview.jsonl
-      spec:             project_root/conversation/functional_specification.md
-      mermaid:          project_root/conversation/process_diagram.mmd
+    **INPUTS** (already saved under conversation/<SESSION_ID>/ by the writer/diagram agents)
+      interview.jsonl, functional_specification.md, process_diagram.mmd
 
     **GOAL**
-      Create: project_root/experience/<SESSION_ID>/
+      Produce, inside project_root/conversation/<SESSION_ID>/:
           interview.jsonl
           functional_specification.md
           process_diagram.mmd
-          process_diagram.png  
+          process_diagram.png
           functional_specification.formatted.md
           deliverable.pdf
 
     **STEPS STRICT ORDER**
-      1 Call 'read_md_file_tool' with file_path="conversation/interview.jsonl" and extract the first available "session_id" from its content.
-        If multiple lines: pick the first non-empty "session_id".
-        If not found or the read fails: set SESSION_ID = "sess-unknown".
+      1 Call 'get_session_dir_tool' (no arguments). It returns the absolute path of
+        THIS run's session folder, e.g. D:\\...\\conversation\\sess-20261104093522.
+        Use that exact path for every file below - never invent a folder name and
+        never use "project_root/conversation" without the session subfolder.
 
-      2 Create folder project_root/experience/<SESSION_ID>/
-
-      3 MOVE the three source files into that folder using 'move_file':
-          project_root/conversation/interview.jsonl             -> project_root/experience/<SESSION_ID>/interview.jsonl
-          project_root/conversation/functional_specification.md -> project_root/experience/<SESSION_ID>/functional_specification.md
-          project_root/conversation/process_diagram.mmd         -> project_root/experience/<SESSION_ID>/process_diagram.mmd
-
-      4 Clean the Mermaid file **in place** and report issues (severity/code/message/recommendation):
+      2 Clean the Mermaid file **in place** and report issues (severity/code/message/recommendation):
           clean_mermaid(
-            input_path="project_root/experience/<SESSION_ID>/process_diagram.mmd",
-            output_path="project_root/experience/<SESSION_ID>/process_diagram.mmd",
+            input_path="<SESSION_DIR>/process_diagram.mmd",
+            output_path="<SESSION_DIR>/process_diagram.mmd",
             overwrite=True
           )
 
-      5 Render Mermaid **PNG**:
+      3 Render Mermaid **PNG**:
           render_mermaid_png(
-            input_path="project_root/experience/<SESSION_ID>/process_diagram.mmd",
-            output_path="project_root/experience/<SESSION_ID>/process_diagram.png",
+            input_path="<SESSION_DIR>/process_diagram.mmd",
+            output_path="<SESSION_DIR>/process_diagram.png",
             theme="forest"
           )
 
-      6 Run **format_and_export** ONLY:
+      4 Run **format_and_export** ONLY:
           format_and_export(
-            session_dir="project_root/experience/<SESSION_ID>",
+            session_dir="<SESSION_DIR>",
             md="functional_specification.md",
             diagram="process_diagram.png",
             md_out="functional_specification.formatted.md",
             pdf_out="deliverable.pdf",
-            engine="xelatex",
-            toc=True, toc_depth=2, margin="1in",
-            mainfont="DejaVu Serif", monofont="DejaVu Sans Mono"
+            toc=True, toc_depth=2, margin="1in"
           )
 
-      7 Confirm project_root/experience/<SESSION_ID>/deliverable.pdf exists.
+      5 Confirm <SESSION_DIR>/deliverable.pdf exists.
 
-      8 Save experience metadata:
+      6 Save experience metadata:
           save_experience_chroma(
-            session_dir="project_root/experience/<SESSION_ID>",
+            session_dir="<SESSION_DIR>",
             session_id="<SESSION_ID>"
           )
 
-      9 Output exactly: **TERMINATE**
+      7 Output exactly: **TERMINATE**
 
     **RULES**
       Be explicit about each steps success or failure.
       If a tool call fails, retry up to 1 times with the same arguments.
     """,
-        tools=[read_md_file_tool, move_file_tool, ensure_dir_tool,
+        tools=[get_session_dir_tool, read_md_file_tool, move_file_tool, ensure_dir_tool,
           *(await mcp_boot.mermaid_tools(PROJECT_ROOT)),
           *(await mcp_boot.pdf_format_tools(PROJECT_ROOT))],
-        reflect_on_tool_use=True,
+        # reflect_on_tool_use=True makes AutoGen issue a final "answer" call with
+        # tool_choice="none". Local Qwen then imitates the next tool call as plain
+        # text, and the recovery wrapper cannot help: no tools are declared on
+        # that request, so the spec never gets written. Keep the tool loop open.
+        reflect_on_tool_use=False,
+        max_tool_iterations=10,
     )
 
     agents = [
@@ -662,7 +714,8 @@ async def on_chat_start():
     )
 
     # Store in session (not started yet)
-    cl.user_session.set("team_ctx", {"team": team, "user": user, "initialized": True, "started": False})
+    cl.user_session.set("team_ctx", {"team": team, "user": user, "initialized": True, "started": False,
+                                     "human_sim": human_sim})
 
     # Prompt for initial task
     resp = await cl.AskUserMessage(content="Enter the task for the multi-agent workflow:", timeout=600).send()
@@ -702,48 +755,19 @@ async def on_message(msg: cl.Message):
 
 
 def _find_latest_session_dir():
-    """Return the most recent experience/<SESSION_ID>/ dir containing functional_specification.md."""
-    exp_root = os.path.join(PROJECT_ROOT, "experience")
-    if not os.path.isdir(exp_root):
+    """Return the most recent conversation/<SESSION_ID>/ dir containing functional_specification.md."""
+    conv_root = os.path.join(PROJECT_ROOT, "conversation")
+    if not os.path.isdir(conv_root):
         return None
     best_mtime, best_dir = 0.0, None
-    for name in os.listdir(exp_root):
-        d = os.path.join(exp_root, name)
+    for name in os.listdir(conv_root):
+        d = os.path.join(conv_root, name)
         spec = os.path.join(d, "functional_specification.md")
         if os.path.isdir(d) and os.path.isfile(spec):
             mtime = os.path.getmtime(spec)
             if mtime > best_mtime:
                 best_mtime, best_dir = mtime, d
     return best_dir
-
-
-def _render_diagram_fallback(session_dir):
-    """If process_diagram.png is missing but the .mmd source exists, render it with mmdc."""
-    import shutil
-    import subprocess
-    png = os.path.join(session_dir, "process_diagram.png")
-    mmd = os.path.join(session_dir, "process_diagram.mmd")
-    if os.path.isfile(png) or not os.path.isfile(mmd):
-        return None
-    exe = shutil.which("mmdc")  # resolves to mmdc.cmd on Windows; bare name fails in subprocess there
-    if not exe:
-        print("⚠️  mmdc not found on PATH - skipping diagram render fallback.")
-        return None
-    try:
-        raw = open(mmd, encoding="utf-8").read().strip()
-        # mmdc cannot parse ```mermaid fences - unwrap them (same rule as the Mermaid MCP server)
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else ""
-            if raw.rstrip().endswith("```"):
-                raw = raw.rstrip()[:-3]
-        clean_path = os.path.join(session_dir, "process_diagram.clean.mmd")
-        with open(clean_path, "w", encoding="utf-8") as f:
-            f.write(raw.strip() + "\n")
-        subprocess.run([exe, "-i", clean_path, "-o", png], check=True, timeout=120, capture_output=True)
-        return png if os.path.isfile(png) else None
-    except Exception as e:
-        print(f"⚠️  Diagram render fallback failed ({type(e).__name__}: {e})")
-        return None
 
 
 async def _present_final_artifacts():
@@ -772,14 +796,17 @@ async def _present_final_artifacts():
         return
 
     elements = []
+    artifacts = agents_tools_helpers.finalize_deliverables(session_dir)
     diagram_png = os.path.join(session_dir, "process_diagram.png")
-    if not os.path.isfile(diagram_png):
-        _render_diagram_fallback(session_dir)  # terminate_agent may have skipped the render step
     if os.path.isfile(diagram_png):
         elements.append(ClImage(path=diagram_png, name="process_diagram.png", display="inline"))
     deliverable_pdf = os.path.join(session_dir, "deliverable.pdf")
     if os.path.isfile(deliverable_pdf):
         elements.append(ClPdf(path=deliverable_pdf, name="deliverable.pdf"))
+    if not artifacts["diagram_png"] or not artifacts["pdf"]:
+        missing = [n for n, v in (("process_diagram.png", artifacts["diagram_png"]),
+                                 ("deliverable.pdf", artifacts["pdf"])) if not v]
+        await cl.Message(content=f"⚠️ Could not produce: {', '.join(missing)}").send()
     elements.append(ClFile(path=spec_path, name="functional_specification.md"))
 
     await cl.Message(
@@ -792,7 +819,34 @@ async def _present_final_artifacts():
 
 async def start_workflow(team, user, task_text: str):
     ctx = cl.user_session.get("team_ctx")
+    # Create a deterministic session folder for this run so all deliverables
+    # (interview.jsonl, functional_specification.md, diagram, deliverable.pdf)
+    # land under conversation/<SESSION_ID>/ instead of the flat conversation/ dir.
+    session_id = ctx.get("session_id")
+    if not session_id:
+        session_id = "sess-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        ctx["session_id"] = session_id
+    try:
+        agents_tools_helpers.set_session(session_id)
+    except Exception as e:
+        print(f"⚠️  Could not set session folder ({type(e).__name__}: {e})")
+    # Clear state from any previous run in this chat: without a reset the agents'
+    # model contexts and the group-chat message thread accumulate across runs,
+    # which makes the planner degenerate (greetings / self-assignments) on restart.
+    try:
+        await team.reset()
+    except Exception as e:  # a failed reset must never block starting a run
+        print(f"⚠️  Could not reset team state ({type(e).__name__}: {e})")
     ctx["started"] = True
+
+    # Ground the simulated stakeholder in the task actually entered, instead of
+    # a canned brief, so its answers match this run.
+    human_sim = ctx.get("human_sim")
+    if human_sim is not None:
+        try:
+            human_sim.set_brief(task_text)
+        except Exception as e:
+            print(f"⚠️  Could not set simulator brief ({type(e).__name__}: {e})")
     cl.user_session.set("team_ctx", ctx)
 
     await cl.Message(content=f"Starting multi-agent workflow for: {task_text}").send()
@@ -832,10 +886,7 @@ async def start_workflow(team, user, task_text: str):
                         await _finish_stream()
                         await cl.Message(
                             content=(f"⚠️ {src} produced no output {EMPTY_STREAK_LIMIT} times in a row — "
-                                     "stopping to avoid an infinite loop. This usually means the model emitted a "
-                                     "malformed tool call it can no longer recover from (common with very large "
-                                     "tool arguments on local models). Restart the chat and try again; if it keeps "
-                                     "happening, check that LM Studio is serving the expected model.")
+                                     "stopping to avoid an infinite loop. This usually means the model emitted empty responses (common with very large tool arguments or context overflow on local models). Type your task again to retry — each new run starts from cleared agent state; if it keeps happening, check that LM Studio is serving the expected model.")
                         ).send()
                         cancellation_token.cancel()
                         break
@@ -868,3 +919,7 @@ async def start_workflow(team, user, task_text: str):
 
     if current_msg:
         await current_msg.send()
+
+    # The run is over; allow a new task in this chat (the flag must not stay True).
+    ctx["started"] = False
+    cl.user_session.set("team_ctx", ctx)

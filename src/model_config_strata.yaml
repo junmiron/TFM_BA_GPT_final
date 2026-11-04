@@ -1,0 +1,17 @@
+provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+config:
+  model: "q2_0"
+  # Local Strata server: no real key required, this placeholder is never sent.
+  api_key: "REPLACE_WITH_STRATA_KEY"
+  base_url: "http://127.0.0.1:47831/v1"
+  # Local Qwen spends a large part of the budget on reasoning before emitting a
+  # tool call; a low cap truncates the payload mid-call and the tool never runs.
+  max_tokens: 16000
+  parallel_tool_calls: false
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: true
+    family: "unknown"
+    structured_output: false
+    multiple_system_messages: true

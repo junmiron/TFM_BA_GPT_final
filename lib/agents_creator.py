@@ -94,6 +94,7 @@ def _rebuild_agent_with_tools(old: AssistantAgent, extra_tools: List[Any]) -> As
         memory=old._memory,
         tools=combined_tools or None,
         reflect_on_tool_use=old._reflect_on_tool_use,
+        max_tool_iterations=getattr(old, "_max_tool_iterations", 1),
         system_message=system_message_text,
         model_client_stream=old._model_client_stream,
     )
@@ -157,6 +158,9 @@ async def create_agents_from_config(
             memory=agent_memory,
             tools=base_tools or None,
             reflect_on_tool_use=cfg.get("reflect_on_tool_use", False),
+            # AutoGen defaults to 1 tool round, so an agent that must write
+            # several chunks (spec writer) silently stops after the first call.
+            max_tool_iterations=cfg.get("max_tool_iterations", 10),
             system_message=system_message,
             model_client_stream=cfg.get("stream", False),
         )

@@ -18,6 +18,7 @@ import pytest
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
 from autogen_agentchat.teams import SelectorGroupChat
 from autogen_ext.memory.canvas import TextCanvasMemory
+from autogen_agentchat.messages import ToolCallRequestEvent
 from autogen_core import FunctionCall
 from autogen_core.models import CreateResult, ModelFamily, ModelInfo, RequestUsage
 
@@ -251,16 +252,21 @@ async def run_pipeline():
             "to perform the next task. Only select one agent."
         ),
     )
-    return await team.run(task="Start the business analyst interview.")
+    # Collect every event the stream emits: TaskResult.messages only contains
+    # chat messages, so tool-call events would be invisible to the assertions.
+    events = []
+    async for event in team.run_stream(task="Start the business analyst interview."):
+        events.append(event)
+    return events
 
 
 def test_end_to_end_produces_deliverables():
     if not (shutil.which("mmdc") or shutil.which("mmdc.cmd")):
         pytest.skip("mermaid-cli (mmdc) is not installed; PNG rendering cannot be verified")
     WORK_DIR.mkdir(exist_ok=True)
-    result = asyncio.run(run_pipeline())
+    events = asyncio.run(run_pipeline())
 
-    tool_calls = [m for m in result.messages if getattr(m, "tool_calls", None)]
+    tool_calls = [e for e in events if isinstance(e, ToolCallRequestEvent)]
     assert tool_calls, "no tool calls were executed"
 
     interview = WORK_DIR / SESSION_ID / "interview.jsonl"
@@ -274,7 +280,7 @@ def test_end_to_end_produces_deliverables():
 
     diagram_png = PROJECT_ROOT / "experience" / SESSION_ID / "process_diagram.png"
     formatted = PROJECT_ROOT / "conversation" / "functional_specification.formatted.md"
-    print(f"messages: {len(result.messages)}  tool calls: {len(tool_calls)}")
+    print(f"events: {len(events)}  tool calls: {len(tool_calls)}")
     print(f"diagram PNG: {diagram_png.exists()}")
     print(f"formatted spec: {formatted.exists()}")
     assert diagram_png.exists(), "the diagram was never rendered to PNG"

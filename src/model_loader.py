@@ -11,6 +11,13 @@ from pathlib import Path
 import yaml
 from autogen_core.models import ChatCompletionClient
 
+try:  # imported as part of a package (tests) or top-level (app2.py adds src/ to sys.path)
+    from .tool_call_recovery import ToolCallRecoveryClient
+    from .rate_limit_retry import RateLimitRetryClient
+except ImportError:
+    from tool_call_recovery import ToolCallRecoveryClient
+    from rate_limit_retry import RateLimitRetryClient
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 
@@ -22,19 +29,29 @@ API_KEY_ENV = {
     "groq": "GROQ_API_KEY",
     "hugging": "HF_TOKEN",
     "github": "GITHUB_TOKEN",
-    # ollama / lmstudio / onnx are local servers and need no real key
+    "opencode": "OPENCODE_GO_API_KEY",
+    # ollama / lmstudio / strata / onnx are local servers and need no real key
 }
 
 CONFIG_FILES = {
     "azure": "model_config_azure.yaml",
     "ollama": "model_config_ollama.yaml",
     "lmstudio": "model_config_lmstudio.yaml",
+    "strata": "model_config_strata.yaml",
     "groq": "model_config_groq.yaml",
+    "opencode": "model_config_opencode.yaml",
     "hugging": "model_config_hugging.yaml",
     "github": "model_config_github.yaml",
     "onnx": "model_config_onnx.yaml",
     "openai": "model_config_openai.yaml",
     "openai_npt": "model_config_openai_npt.yaml",
+}
+
+# Profiles whose base_url / model can be redirected from the environment,
+# so a different host or model can be used without editing the YAML.
+LOCAL_ENDPOINT_ENV = {
+    "lmstudio": ("LMSTUDIO_BASE_URL", "LMSTUDIO_MODEL"),
+    "strata": ("STRATA_BASE_URL", "STRATA_MODEL"),
 }
 
 
@@ -47,6 +64,36 @@ def _load_dotenv() -> None:
     env_file = PROJECT_ROOT / ".env"
     if env_file.exists():
         load_dotenv(env_file)
+
+
+# Load .env at import: callers read MODEL_CLIENT / MODEL_CLIENT_TOOLS from the
+# environment *before* calling load_model_client(), so a lazy load inside the
+# function means the profile in .env is silently ignored.
+_load_dotenv()
+
+
+def resolve_api_key(model_name: str, config: dict) -> dict:
+    """Fill `api_key` from the environment, never from a hard-coded YAML value.
+
+    The env var wins over the YAML key. Previously the YAML key was used
+    verbatim whenever present, so a stale key in the config silently beat the
+    valid key in .env.
+    """
+    key_env = API_KEY_ENV.get(model_name)
+    if not key_env or "api_key" not in config:
+        return config
+
+    env_key = os.getenv(key_env)
+    yaml_key = config.get("api_key")
+    if env_key:
+        config["api_key"] = env_key
+    elif not yaml_key or "REPLACE" in str(yaml_key):
+        raise RuntimeError(
+            f"No API key for profile '{model_name}'. "
+            f"Set {key_env} (environment or .env) "
+            "or use src/model_config_template.yaml."
+        )
+    return config
 
 
 def load_model_client(model_name: str | None = None) -> ChatCompletionClient:
@@ -75,18 +122,30 @@ def load_model_client(model_name: str | None = None) -> ChatCompletionClient:
     config = component.get("config", {})
     provider = component.get("provider", "")
 
-    # Inject the API key from the environment rather than hard-coding it.
-    key_env = API_KEY_ENV.get(model_name)
-    if key_env and "api_key" in provider:
-        api_key = config.get("api_key")
-        if not api_key or "REPLACE" in str(api_key):
-            api_key = os.getenv(key_env)
-            if not api_key:
-                raise RuntimeError(
-                    f"No API key for profile '{model_name}'. "
-                    f"Set {key_env} (environment or .env) "
-                    "or use src/model_config_template.yaml."
-                )
-            config["api_key"] = api_key
+    # Allow local servers (LM Studio / Strata / llama.cpp) to be redirected via
+    # env so tests and alternate hosts can point at a different endpoint without
+    # editing the YAML. Example: STRATA_BASE_URL=http://127.0.0.1:47831/v1
+    env_names = LOCAL_ENDPOINT_ENV.get(model_name)
+    if env_names:
+        base_url_env, model_env = env_names
+        base_url = os.getenv(base_url_env)
+        if base_url:
+            config["base_url"] = base_url
+        model = os.getenv(model_env)
+        if model:
+            config["model"] = model
 
-    return ChatCompletionClient.load_component(component)
+    # Inject the API key from the environment rather than hard-coding it.
+    resolve_api_key(model_name, config)
+
+    client = ChatCompletionClient.load_component(component)
+    # Local servers (LM Studio / llama.cpp + Qwen3) sometimes return tool calls
+    # as plain text; the wrapper recovers them into structured FunctionCalls.
+    client = ToolCallRecoveryClient(client)
+
+    # Remote providers are rate-limited (Groq free tier: 8000 tokens/min for
+    # every model). A 429 inside a group chat aborts the whole run, so retry
+    # with backoff instead of letting it bubble up.
+    if model_name in API_KEY_ENV:
+        client = RateLimitRetryClient(client)
+    return client

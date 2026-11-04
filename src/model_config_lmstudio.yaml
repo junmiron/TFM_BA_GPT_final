@@ -10,4 +10,7 @@ config:
     structured_output: true
     multiple_system_messages: true
   base_url: "http://127.0.0.1:1234/v1"
+  # Local Qwen3 runs spend a large part of the budget on reasoning before the
+  # tool call; a low cap truncates the call mid-payload and the tool never runs.
+  max_tokens: 16000
   parallel_tool_calls: False

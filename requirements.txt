@@ -18,6 +18,8 @@ langchain-community>=0.3,<0.4
 lxml>=5.0
 readability-lxml>=0.8
 PyMuPDF>=1.24
+# Markdown -> HTML for the pure-Python PDF export fallback (PyMuPDF Story).
+markdown>=3.5
 
 # Utilities
 python-dotenv>=1.0

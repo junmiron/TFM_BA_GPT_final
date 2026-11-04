@@ -54,7 +54,10 @@ def _server_tools(server_script: Path, project_root: Path) -> StdioServerParams:
         # Keep the server CWD at the project root so relative paths behave.
         cwd=str(project_root),
         env=_server_env(),
-        read_timeout_seconds=60.0,
+        # PDF export with a stabilised TOC re-renders the document several
+        # times; a 60 s cap made the terminate step fail with
+        # "Timed out while waiting for response to ClientRequest".
+        read_timeout_seconds=180.0,
     )
     return params
 

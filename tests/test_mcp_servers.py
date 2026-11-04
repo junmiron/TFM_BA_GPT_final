@@ -80,6 +80,52 @@ def test_spec_formatter_builds_requirements_table(tmp_path):
     assert isinstance(result, dict)
 
 
+def test_mermaid_check_falls_back_when_agent_invents_a_path(tmp_path):
+    """The diagram text lives in TextCanvasMemory, so the reviewer often calls
+    check_mermaid on a path that does not exist (e.g. canvas_diagram.md). It
+    must recover from the real diagram file instead of crashing the tool call."""
+    mermaid = _load_module(SERVERS["mermaid"], "mermaid_mcp")
+    session = tmp_path / "sess-fallback"
+    session.mkdir()
+    (session / "process_diagram.mmd").write_text(
+        "flowchart TD\n  A[Check in]-->B[Print QR]\n", encoding="utf-8"
+    )
+    raw = mermaid.read_mermaid_source(session / "canvas_diagram.md")
+    report = mermaid.check_mermaid_text(raw)
+    assert report["detected_type"] == "flowchart", report
+
+
+def test_mermaid_check_reports_available_files_when_no_diagram_exists(tmp_path):
+    mermaid = _load_module(SERVERS["mermaid"], "mermaid_mcp")
+    session = tmp_path / "sess-empty"
+    session.mkdir()
+    (session / "notes.txt").write_text("no diagram here", encoding="utf-8")
+    with pytest.raises(FileNotFoundError) as exc:
+        mermaid.read_mermaid_source(session / "nope.mmd")
+    msg = str(exc.value)
+    assert "canvas" in msg.lower(), msg
+    assert "notes.txt" in msg, msg
+
+
+def test_mmdc_extracts_one_diagram_from_a_multi_diagram_markdown(tmp_path):
+    """The diagram creator writes a Markdown doc with several fenced blocks, but
+    mmdc renders one diagram per call; passing the whole file fails with
+    UnknownDiagramError and the terminate stage loses the PNG."""
+    if shutil.which("mmdc") is None and shutil.which("mmdc.cmd") is None:
+        pytest.skip("mermaid-cli (mmdc) is not installed")
+    mermaid = _load_module(SERVERS["mermaid"], "mermaid_mcp")
+    src = tmp_path / "multi.mmd"
+    src.write_text(
+        "%% Diagrams: 1) lifecycle 2) state machine\n\n"
+        "## 1. Lifecycle\n\n```mermaid\nflowchart TD\n  A[Check in]-->B[Print QR]\n```\n\n"
+        "## 2. State machine\n\n```mermaid\nstateDiagram-v2\n  a --> b\n```\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "multi.png"
+    mermaid.run_mmdc(src, out, "png", theme="forest")
+    assert out.exists() and out.stat().st_size > 1000
+
+
 def test_mermaid_rendering_when_mmdc_is_available(tmp_path):
     """Only runs if the mermaid-cli binary is installed."""
     if shutil.which("mmdc") is None and shutil.which("mmdc.cmd") is None:
@@ -90,3 +136,9 @@ def test_mermaid_rendering_when_mmdc_is_available(tmp_path):
     out = tmp_path / "diagram.png"
     mermaid.run_mmdc(src, out, "png", theme="forest")
     assert out.exists() and out.stat().st_size > 1000
+
+    # mermaid-cli 12 removed -w/-H; passing width/height must still render
+    # (it used to fail with "error: unknown option '-w'").
+    out_sized = tmp_path / "diagram_sized.png"
+    mermaid.run_mmdc(src, out_sized, "png", theme="forest", width=1400, height=1000)
+    assert out_sized.exists() and out_sized.stat().st_size > 1000

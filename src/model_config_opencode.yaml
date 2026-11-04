@@ -1,0 +1,22 @@
+provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+config:
+  model: "gpt-6-luna"
+  # Real key comes from OPENCODE_GO_API_KEY in .env; load_model_client injects it.
+  api_key: "REPLACE_WITH_OPENCODE_GO_API_KEY"
+  base_url: "https://opencode.ai/zen/go/v1"
+  # OpenCode Go rejects requests (HTTP 400 MissingSessionID) without an
+  # x-opencode-session affinity header.
+  default_headers:
+    x-opencode-session: "ba-roleplay-human"
+  max_tokens: 2000
+  parallel_tool_calls: false
+  # OpenCode Go's Responses backend rejects named participants; AutoGen sends a
+  # `name` per message by default, which produces HTTP 400 invalid_request_error.
+  include_name_in_message: false
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: true
+    family: "unknown"
+    structured_output: false
+    multiple_system_messages: true

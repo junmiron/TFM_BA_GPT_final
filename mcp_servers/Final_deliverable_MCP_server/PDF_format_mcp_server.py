@@ -23,6 +23,8 @@ import json
 import datetime
 
 import argparse
+import io
+from html import escape as _html_escape
 import re
 import shlex
 import subprocess
@@ -80,13 +82,25 @@ def find_section(md: str, heading_regex: str, stop_at_level: int = 3) -> tuple[i
     """Find a section by heading regex. Return (start_idx, end_idx) in chars.
     stop_at_level controls the next heading level (##/###) that ends the section.
     If not found, return (-1, -1).
+
+    Real specs number their headings ("### 3.1 In Scope") and sometimes bold
+    them ("### **In-Scope Functionality:**"), so the optional number/bold prefix
+    is part of the match - without it the section is never found and the BR/FR
+    tables are silently skipped.
     """
-    m = re.search(rf"(?im)^(?P<hashes>#+)\s*(?:{heading_regex})\s*$", md)
+    m = re.search(
+        rf"(?im)^(?P<hashes>#+)\s*(?:\d+[.)]?\s+)?\**\s*(?:{heading_regex})\s*\**\s*$",
+        md,
+    )
     if not m:
         return -1, -1
     start = m.end()
     level = len(m.group("hashes"))
-    pat = rf"(?im)^#{{1,{max(level, stop_at_level)}}}\s+"
+    # A section runs to the next heading of the SAME level or higher. Using
+    # stop_at_level alone made a "## 3. Functional Requirements" section end at
+    # its first "### 3.1" subsection, so the tables below it were never seen.
+    stop = max(1, min(level, stop_at_level))
+    pat = rf"(?im)^#{{1,{stop}}}\s+"
     n = re.search(pat, md[start:])
     end = start + n.start() if n else len(md)
     return start, end
@@ -133,6 +147,90 @@ def build_requirements_table(items: list[dict], id_prefix: str = "BR") -> str:
         rows.append(f"| {br_id} | {desc} |")
     return "\n".join(rows) + "\n"
 
+
+_ID_CELL_RE = re.compile(r"^[A-Za-z]{1,4}[-_. ]?\d+(?:[-.]\d+)*$")
+
+
+def parse_markdown_table(block: str) -> list[dict]:
+    """Extract requirement rows from Markdown tables in *block*.
+
+    Specs written as tables ("| FR-1.1 | Staff must create an order |") are as
+    common as numbered lists; without this the BR/FR tables come out empty.
+    Each table's header row is dropped (it is the line just above the
+    separator), and a leading ID cell is dropped so the description is not
+    duplicated.
+    """
+    rows: list[dict] = []
+    prev_was_row = False
+    for line in block.splitlines():
+        line = line.strip()
+        if not line.startswith("|"):
+            prev_was_row = False
+            continue
+        if re.match(r"^\|[\s\-:|]+\|$", line):  # separator: the row above is a header
+            if prev_was_row:
+                rows.pop()
+            prev_was_row = False
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|") if c.strip()]
+        if not cells:
+            prev_was_row = False
+            continue
+        if len(cells) > 1 and _ID_CELL_RE.match(cells[0]):
+            title, extra = cells[1], cells[2:]
+        else:
+            title, extra = cells[0], cells[1:]
+        rows.append({"title": title, "bullets": extra})
+        prev_was_row = True
+    return rows
+
+
+def parse_subsection_list(block: str) -> list[dict]:
+    """Parse `### Heading` subsections, or a plain bullet list, into items.
+
+    Specs that use numbered lists or tables are handled by the other parsers.
+    A writer that structures a section as `### 4.1 Order Registration` with
+    bullet details, or simply as a flat list of bullets, yields nothing to those
+    parsers, so the BR/FR tables silently come out empty. Each `###` heading
+    becomes one item with its bullets as details; a bullet at the top level with
+    no heading becomes an item of its own.
+    """
+    lines = block.splitlines()
+    items: list[dict] = []
+    current: dict | None = None
+    for line in lines:
+        if re.match(r"^\s*#{3,6}\s+", line):
+            if current and (current["title"] or current["bullets"]):
+                items.append(current)
+            title = re.sub(r"^\s*#+\s*(?:\d+(?:\.\d+)*[.)]?\s+)?", "", line).strip().strip("*").strip()
+            current = {"title": title, "bullets": []}
+            continue
+        bullet = re.match(r"^(\s*)[-*+]\s+(.*)$", line)
+        if bullet:
+            text = bullet.group(2).strip()
+            if current is not None:
+                current["bullets"].append(text)
+            else:
+                items.append({"title": text, "bullets": []})
+        elif current is not None and line.strip() and not re.match(r"^\s*\|", line):
+            if current["bullets"]:
+                current["bullets"][-1] += " " + line.strip()
+            else:
+                current["title"] += " " + line.strip()
+    if current and (current["title"] or current["bullets"]):
+        items.append(current)
+    return items
+
+
+def parse_requirements(block: str) -> list[dict]:
+    """Numbered list first, Markdown table as fallback, then `###` subsections."""
+    items = parse_numbered_list(block)
+    if not items:
+        items = parse_markdown_table(block)
+    if not items:
+        items = parse_subsection_list(block)
+    return items
+
 def ensure_diagram_section(md: str, diagram_name: str) -> str:
     rel = diagram_name
     image_md = f"![Process Diagram]({rel}){{ width=95% }}\n"
@@ -146,11 +244,13 @@ def ensure_diagram_section(md: str, diagram_name: str) -> str:
     return md.rstrip() + tail
 
 def ensure_in_scope_requirements_table(md: str) -> tuple[str, int]:
-    start, end = find_section(md, r"In-?Scope\b.*", stop_at_level=3)
+    # Specs name this section "In-Scope", "Scope", or "Purpose & Scope" — the
+    # old regex only matched the first, so business requirements came out empty.
+    start, end = find_section(md, r".*\b(?:In-?Scope|Purpose and Scope|Scope)\b.*", stop_at_level=3)
     if start == -1:
         return md, 0
     block = md[start:end]
-    items = parse_numbered_list(block)
+    items = parse_requirements(block)
     if not items:
         return md, 0
     table = "\n### Business Requirements\n\n" + build_requirements_table(items) + "\n"
@@ -291,10 +391,13 @@ def _session_header(session_id: str, name: str, path: Path, kind: str) -> str:
 # -------- Functional Requirements mapping (FR -> BR) --------
 
 def _extract_br_ids_from_in_scope(md: str) -> list[str]:
-    start, end = find_section(md, r"In-?Scope\b.*", stop_at_level=3)
+    # Same broad heading match as ensure_in_scope_requirements_table: without
+    # it, a "Purpose and Scope" section yields no BR ids and the FR mapping
+    # table's Business Requirement column comes out blank.
+    start, end = find_section(md, r".*\b(?:In-?Scope|Purpose and Scope|Scope)\b.*", stop_at_level=3)
     if start == -1:
         return []
-    items = parse_numbered_list(md[start:end])
+    items = parse_requirements(md[start:end])
     return [f"BR{i}" for i in range(1, len(items) + 1)]
 
 def _strip_inline_br_tags(text: str) -> tuple[str, str | None]:
@@ -343,7 +446,7 @@ def ensure_functional_requirements_table(md: str) -> tuple[str, int]:
     section = md[start:end]
     if "| Business Requirement ID | Functional Requirement ID | Description |" in section:
         return md, 0
-    fr_items = parse_numbered_list(section)
+    fr_items = parse_requirements(section)
     if not fr_items:
         return md, 0
     table, n = build_fr_table(md, fr_items)
@@ -351,6 +454,90 @@ def ensure_functional_requirements_table(md: str) -> tuple[str, int]:
     return updated, n
 
 # ------------------------------ formatting core ------------------------------
+
+def ensure_blank_line_before_headings(md: str) -> str:
+    """Separate blocks that Markdown's table extension would otherwise merge.
+
+    The `tables` extension keeps consuming lines while they are non-blank, so:
+    - a heading written directly after a table row becomes another cell: `## 4.
+      Non-Functional Requirements` renders as `<td>## 4. ...</td>` and the section
+      disappears from the document and the outline;
+    - a paragraph after a table gets folded into the last row, which is how
+      `FR-31`..`FR-36` ended up stuffed inside one mapping-table cell.
+
+    Insert a blank line before a heading, and after a table block when the next
+    line is not itself a table row. Lines inside fenced code blocks are untouched.
+    """
+    out: list[str] = []
+    in_fence = False
+    prev_is_table = False
+    for line in md.splitlines():
+        if line.lstrip().startswith("```") or line.lstrip().startswith("~~~"):
+            in_fence = not in_fence
+        is_table = (not in_fence) and line.lstrip().startswith("|")
+        if out and out[-1].strip():
+            if not in_fence and re.match(r"^#{1,6}\s", line):
+                out.append("")
+            elif prev_is_table and not is_table:
+                out.append("")
+        out.append(line)
+        prev_is_table = is_table
+    return "\n".join(out) + ("\n" if md.endswith("\n") else "")
+
+
+def normalize_heading_numbering(md: str) -> tuple[str, list[str]]:
+    """Fix duplicated heading numbers without renumbering the whole document.
+
+    The spec writer appends sections out of order and reuses a stale subsection
+    number - e.g. emitting `### 8.4 End-to-End Lifecycle Sequence` as the 14th
+    item of section 8 - which leaks into the TOC and the rendered PDF. Only a
+    heading whose number has already been used in that section is renumbered, to
+    the next free number. Deliberate gaps are left alone so cross-references in
+    the body ("see Section 4.2") stay valid.
+    """
+    out: list[str] = []
+    fixes: list[str] = []
+    top = 0
+    seen_subs: dict[int, set[int]] = {}
+
+    for line in md.splitlines():
+        m2 = re.match(r"^##\s+(\d+)(\.)?\s+(.*)$", line)
+        m3 = re.match(r"^###\s+(\d+)\.(\d+)\s+(.*)$", line)
+        if m2:
+            number = int(m2.group(1))
+            if number in seen_subs and number == top:
+                # Duplicate top-level section heading: give it the next number.
+                top = max(seen_subs) + 1
+                seen_subs.setdefault(top, set())
+                fixes.append(f"## {number}. -> ## {top}.")
+                line = f"## {top}. {m2.group(3)}"
+            else:
+                top = number
+                seen_subs.setdefault(top, set())
+            out.append(line)
+        elif m3:
+            parent, number = int(m3.group(1)), int(m3.group(2))
+            if parent != top:
+                # Subsection attached to a section it is not under: re-parent it.
+                seen_subs.setdefault(top, set())
+                next_num = max(seen_subs[top], default=0) + 1
+                seen_subs[top].add(next_num)
+                fixes.append(f"### {parent}.{number} -> ### {top}.{next_num}")
+                line = f"### {top}.{next_num} {m3.group(3)}"
+            elif number in seen_subs[parent]:
+                next_num = max(seen_subs[parent], default=0) + 1
+                seen_subs[parent].add(next_num)
+                fixes.append(f"### {parent}.{number} -> ### {parent}.{next_num}")
+                line = f"### {parent}.{next_num} {m3.group(3)}"
+            else:
+                seen_subs[parent].add(number)
+            out.append(line)
+        else:
+            out.append(line)
+
+    text = "\n".join(out) + ("\n" if md.endswith("\n") else "")
+    return text, fixes
+
 
 def format_document(session_dir: Path, md_file: str, diagram_file: str, out_file: str) -> dict:
     md_path = (session_dir / md_file).resolve()
@@ -363,6 +550,10 @@ def format_document(session_dir: Path, md_file: str, diagram_file: str, out_file
     md, n_br = ensure_in_scope_requirements_table(md)
     md, n_fr = ensure_functional_requirements_table(md)
 
+    # The writer can emit stale/duplicated subsection numbers, which leak into
+    # the TOC and the rendered PDF.
+    md, numbering_fixes = normalize_heading_numbering(md)
+
     # Ensure diagram section
     md = ensure_diagram_section(md, diagram_file)
 
@@ -373,6 +564,7 @@ def format_document(session_dir: Path, md_file: str, diagram_file: str, out_file
         "business_requirements": n_br,
         "functional_requirements": n_fr,
         "diagram": diagram_file,
+        "numbering_fixes": numbering_fixes,
     }
 
 # ------------------------------ Preprocess for PDF ------------------------------
@@ -407,10 +599,240 @@ def _pagebreak_before_heading(md_text: str, heading_regex: str) -> str:
 
 def have_pandoc() -> bool:
     try:
-        subprocess.run(["pandoc", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(["pandoc", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       stdin=subprocess.DEVNULL, check=True)
         return True
     except Exception:
         return False
+
+
+def _extract_title(md_path: Path) -> str:
+    """Return the first Markdown heading (or the filename stem) as a PDF title."""
+    try:
+        for line in md_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if line.startswith("#"):
+                return line.lstrip("#").strip()
+    except Exception:
+        pass
+    return md_path.stem
+
+
+# Pandoc-style image syntax emitted by ensure_diagram_section:
+#   ![Process Diagram](process_diagram.png){ width=95% }
+# MuPDF's Story has no notion of pandoc attributes, so the "{ width=95% }" tail
+# would otherwise be printed as literal text next to an unrendered [image].
+_IMG_MD_RE = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<src>[^)\s]+)\)(?:\s*\{[^}]*\})?")
+
+_PAGE_W, _PAGE_H = 595, 842          # A4 in points
+_MARGIN = 36
+_CONTENT_W = _PAGE_W - 2 * _MARGIN
+_CONTENT_H = _PAGE_H - 2 * _MARGIN
+
+
+def _resolve_image_src(src: str, session_dir: Path) -> Optional[str]:
+    """Return a Story-resolvable image name (relative to the archive dir).
+
+    PyMuPDF Story only embeds images that the supplied Archive can find, and an
+    absolute Windows path is not resolvable there, so every image is rewritten
+    to a path relative to `session_dir`.
+    """
+    for candidate in (session_dir / src, Path(src)):
+        p = candidate.resolve()
+        if p.is_file():
+            try:
+                return p.relative_to(session_dir.resolve()).as_posix()
+            except ValueError:
+                return p.as_posix()
+    return None
+
+
+def _img_tag(src: str, alt: str, session_dir: Path) -> str:
+    """Build an <img> tag with real pixel dimensions (Story scales poorly).
+
+    PyMuPDF's Story hangs when an image is taller than the page content area,
+    so the image is scaled to fit within the page box.
+    """
+    name = _resolve_image_src(src, session_dir)
+    if not name:
+        return f"<p>[missing image: {src}]</p>"
+    try:
+        import fitz
+        pix = fitz.Pixmap(str(session_dir / name) if not Path(name).is_absolute() else name)
+        w, h = pix.width, pix.height
+        pix = None
+        scale = min(_CONTENT_W / w, _CONTENT_H / h, 1.0)
+        w = max(1, int(w * scale))
+        h = max(1, int(h * scale))
+        return f'<img src="{name}" width="{w}" height="{h}" alt="{alt}"/>'
+    except Exception:
+        return f'<img src="{name}" width="{_CONTENT_W}" height="{_CONTENT_H}" alt="{alt}"/>'
+
+
+def _markdown_to_html(md_text: str, session_dir: Path) -> str:
+    """Markdown -> HTML, with pandoc image attributes turned into real tags."""
+    md_text = ensure_blank_line_before_headings(md_text)
+    md_text = _IMG_MD_RE.sub(lambda m: _img_tag(m.group("src"), m.group("alt"), session_dir), md_text)
+    try:
+        import markdown as mdlib
+        try:
+            return mdlib.markdown(md_text, extensions=["tables", "fenced_code"])
+        except Exception:
+            return mdlib.markdown(md_text)
+    except Exception:
+        import html as htmlmod
+        return "<pre>" + htmlmod.escape(md_text) + "</pre>"
+
+
+def _pymupdf_export(md_path: Path, diagram_path: Optional[Path], pdf_path: Path,
+                    title: str, toc: bool = True, toc_depth: int = 2) -> dict:
+    """
+    Pure-Python PDF generation via PyMuPDF (no pandoc/LaTeX required).
+
+    Markdown is converted to HTML and laid out with PyMuPDF's Story engine,
+    which paginates automatically and renders tables and embedded images. The
+    diagram is embedded through an Archive rooted at the session folder; when
+    `toc` is set the page numbers are stabilised with write_stabilized().
+    """
+    try:
+        import fitz  # PyMuPDF
+    except Exception as e:
+        return {"status": "error", "engine": "pymupdf", "message": f"PyMuPDF not available: {e}"}
+
+    session_dir = md_path.parent
+    try:
+        md_text = md_path.read_text(encoding="utf-8", errors="ignore")
+        body_html = _markdown_to_html(md_text, session_dir)
+    except Exception as e:
+        return {"status": "error", "engine": "pymupdf", "message": f"Markdown read failed: {e}"}
+
+    if not re.search(r"^\s*#", md_text, re.M):
+        body_html = f"<h1>{title}</h1>\n" + body_html
+
+    css = (
+        "body{font-family:Helvetica,Arial,sans-serif;font-size:11px;}"
+        "table{border-collapse:collapse;width:100%;}"
+        "th,td{border:1px solid #888;padding:4px;vertical-align:top;}"
+        "h1{font-size:20px;}h2{font-size:16px;}h3{font-size:13px;}"
+    )
+    head = f'<head><meta charset="utf-8"><style>{css}</style></head>'
+
+    def wrap(body: str) -> str:
+        return f'<!DOCTYPE html><html>{head}<body>{body}</body></html>'
+
+    html = wrap(body_html)
+
+    def rectfn(rect_num, filled):
+        return (0, 0, _PAGE_W, _PAGE_H), (_MARGIN, _MARGIN, _PAGE_W - _MARGIN, _PAGE_H - _MARGIN), None
+
+    try:
+        buf = io.BytesIO()
+        writer = fitz.DocumentWriter(buf)
+        outline: list[list] = []
+        if toc:
+            def toc_body(positions):
+                entries = [
+                    p for p in positions
+                    if p.heading and 1 <= p.heading <= toc_depth and (p.open_close & 1)
+                    and p.text and p.text.strip().lower() != "contents"
+                ]
+                if not entries:
+                    return body_html
+                items = "".join(
+                    f'<li style="margin-left:{(p.heading - 1) * 12}px">'
+                    f"{_html_escape(p.text)} — p.{p.page_num}</li>"
+                    for p in entries
+                )
+                return f"<h2>Contents</h2><ul>{items}</ul>" + body_html
+
+            # Bounded stabilisation loop. fitz.Story.write_stabilized iterates
+            # until the content stops changing, with no cap: when the TOC
+            # itself shifts page counts the loop can re-render a 15-page
+            # document for minutes and the MCP call times out. Each pass is a
+            # layout-only write (null writer), then the final content renders
+            # once.
+            content = body_html
+            for _ in range(4):
+                positions = []
+                story = fitz.Story(wrap(content), archive=str(session_dir))
+                story.write(None, rectfn, positionfn=lambda p: positions.append(p))
+                new_content = toc_body(positions)
+                if new_content == content:
+                    break
+                content = new_content
+            # The final render also collects heading positions, so the bookmark
+            # page numbers match the pages the reader actually sees - the TOC
+            # block itself adds pages and shifts everything after it.
+            final_positions = []
+            fitz.Story(wrap(content), archive=str(session_dir)).write(
+                writer, rectfn, positionfn=lambda p: final_positions.append(p)
+            )
+            for p in final_positions:
+                # `p.heading` is the h-level (1 for <h1>, 2 for <h2>, ...), not a
+                # boolean; `p.depth` is DOM nesting depth and is always 1 for a
+                # flat body, so it cannot be used for the outline level.
+                level = p.heading or 0
+                # p.text is None for non-heading layout items.
+                if not (1 <= level <= toc_depth and (p.open_close & 1)):
+                    continue
+                text = " ".join((p.text or "").split())
+                if text and text.lower() != "contents":
+                    outline.append([level, text, p.page_num])
+
+            # doc.set_toc rejects a level that jumps more than one below the
+            # previous entry, so shift the shallowest used level to 1 and clamp
+            # any skip.
+            if outline:
+                # Story can return a wrapped h1 with the line break swallowed
+                # ("FunctionalSpecification"). Take the top-level heading from
+                # the markdown source instead, with whitespace normalised.
+                h1 = next(
+                    (" ".join(m.group(1).split())
+                     for m in (re.match(r"^#\s+(.*)$", ln) for ln in md_text.splitlines())
+                     if m),
+                    None,
+                )
+                if outline[0][0] == 1 and h1:
+                    outline[0][1] = h1
+                shift = min(entry[0] for entry in outline) - 1
+                prev = 0
+                for entry in outline:
+                    entry[0] = max(1, entry[0] - shift)
+                    if entry[0] > prev + 1:
+                        entry[0] = prev + 1
+                    prev = entry[0]
+        else:
+            story = fitz.Story(html=html, archive=str(session_dir))
+            story.write(writer, rectfn)
+        writer.close()
+    except Exception as e:
+        return {"status": "error", "engine": "pymupdf", "message": f"PDF export failed: {e}"}
+
+    try:
+        doc = fitz.open("pdf", buf)
+        pages = doc.page_count
+        images = sum(len(p.get_images()) for p in doc)
+        doc.set_metadata({"title": title, "creator": "TFM_BA_GPT deliverable pipeline"})
+        # A visible "Contents" list is not a PDF outline: without set_toc the
+        # file has no bookmarks, so the sidebar/reader navigation is empty.
+        if outline:
+            try:
+                doc.set_toc(outline)
+            except Exception:
+                pass
+        doc.save(str(pdf_path), garbage=4, deflate=True)
+        doc.close()
+    except Exception as e:
+        return {"status": "error", "engine": "pymupdf", "message": f"PDF metadata step failed: {e}"}
+
+    return {
+        "status": "ok",
+        "engine": "pymupdf",
+        "pdf": str(pdf_path),
+        "pages": pages,
+        "images": images,
+        "toc_entries": len(outline),
+    }
 
 def export_to_pdf(session_dir: Path, md_file: str, pdf_out: str, engine: str = "xelatex",
                   toc: bool = True, toc_depth: int = 2, margin: str = "1in",
@@ -443,7 +865,8 @@ def export_to_pdf(session_dir: Path, md_file: str, pdf_out: str, engine: str = "
     if monofont:
         cmd += ["-V", f"monofont={monofont}"]
 
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(session_dir))
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(session_dir),
+                          stdin=subprocess.DEVNULL)
     if proc.returncode != 0:
         raise RuntimeError(
             "Pandoc failed (exit %d): %s\nSTDOUT:\n%s\nSTDERR:\n%s" % (
@@ -482,9 +905,18 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
         monofont: Optional[str] = None,
     ) -> dict:
         """Export a (formatted) Markdown file to PDF using Pandoc with robust preprocessing."""
-        if not have_pandoc():
-            raise RuntimeError("pandoc not found. Install pandoc and a LaTeX engine (e.g., TeX Live).")
         sd = resolve_under_allowed(session_dir, allowed_dirs, project_root)
+        if not have_pandoc():
+            # No pandoc/LaTeX on this machine: use the pure-Python PyMuPDF path
+            # instead of failing the whole terminate step.
+            md_path = (sd / md).resolve()
+            if not md_path.exists():
+                raise RuntimeError(f"Missing: {md_path}")
+            diagram = next((p for p in (sd / "process_diagram.png", sd / "process_diagram.svg",
+                                        sd / "process_diagram.jpg") if p.exists()), None)
+            pdf = _pymupdf_export(md_path, diagram, (sd / pdf_out).resolve(),
+                                  title=_extract_title(md_path), toc=toc, toc_depth=toc_depth)
+            return {**pdf, "note": "pandoc not found; used PyMuPDF fallback."}
         return export_to_pdf(sd, md, pdf_out, engine, toc, toc_depth, margin, mainfont, monofont)
 
     @mcp.tool()
@@ -505,8 +937,13 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
         sd = resolve_under_allowed(session_dir, allowed_dirs, project_root)
         fmt = format_document(sd, md, diagram, md_out)
         if not have_pandoc():
-            fmt["note"] = "pandoc not found; skipping export."
-            return fmt
+            # No pandoc/LaTeX on this machine: use the pure-Python PyMuPDF path.
+            md_out_path = (sd / md_out).resolve()
+            pdf = _pymupdf_export(md_out_path, (sd / diagram).resolve() if diagram else None,
+                                  (sd / pdf_out).resolve(),
+                                  title=_extract_title(md_out_path),
+                                  toc=toc, toc_depth=toc_depth)
+            return {**fmt, "pdf": pdf, "note": "pandoc not found; used PyMuPDF fallback."}
         pdf = export_to_pdf(sd, md_out, pdf_out, engine, toc, toc_depth, margin, mainfont, monofont)
         return {**fmt, **{"pdf": pdf}}
 

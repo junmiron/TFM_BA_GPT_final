@@ -61,14 +61,32 @@ def _mmdc_command() -> list[str]:
 
 
 def _strip_mermaid_fences(text: str) -> str:
-    """Mermaid files written by other tools are fenced with ```mermaid ... ```;
-    mmdc cannot parse fences, so unwrap them before rendering."""
+    """Return one renderable Mermaid diagram from a source file.
+
+    Mermaid files written by other tools are fenced with ```mermaid ... ```;
+    mmdc cannot parse fences, so unwrap them. The diagram creator also
+    frequently writes a *multi-diagram* Markdown document (headings plus several
+    fenced blocks), and mmdc renders exactly one diagram per invocation —
+    feeding it the whole document fails with UnknownDiagramError. Take the
+    first fenced block, or the first block that starts with a diagram keyword.
+    """
     stripped = text.strip()
-    if stripped.startswith("```"):
-        stripped = stripped.split("\n", 1)[1] if "\n" in stripped else ""
-        if stripped.rstrip().endswith("```"):
-            stripped = stripped.rstrip()[:-3]
-    return stripped.strip()
+
+    blocks = re.findall(r"```(?:mermaid|Mermaid)?\s*\n(.+?)```", stripped, flags=re.S)
+    if blocks:
+        for block in blocks:
+            body = block.strip()
+            if re.match(r"(?im)^\s*(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|"
+                       r"erDiagram|journey|gantt|pie|mindmap|sankey-beta|xychart-beta|block-beta)\b",
+                       body):
+                return body
+        return blocks[0].strip()
+
+    # No fences: drop comment/heading noise so a stray leading `%%` or `##`
+    # does not hide the diagram type from mmdc.
+    lines = [l for l in stripped.splitlines()
+             if not re.match(r"^\s*%%", l) and not re.match(r"^\s*#{1,6}\s", l)]
+    return "\n".join(lines).strip()
 
 
 def _puppeteer_flags(puppeteer_config: Optional[str]) -> list[str]:
@@ -104,10 +122,9 @@ def run_mmdc(input_path: Path, output_path: Path, fmt: str,
     cmd = _mmdc_command() + ["-i", str(input_path), "-o", str(output_path)]
     if theme:
         cmd += ["-t", theme]
-    if width:
-        cmd += ["-w", str(width)]
-    if height:
-        cmd += ["-H", str(height)]
+    # mermaid-cli >= 11 dropped -w/-H in favour of --size (max width or height).
+    if width or height:
+        cmd += ["--size", str(max(width or 0, height or 0))]
     if background:
         cmd += ["-b", background]
     cmd += _puppeteer_flags(puppeteer_config)
@@ -117,10 +134,29 @@ def run_mmdc(input_path: Path, output_path: Path, fmt: str,
     try:
         # Capture output: mmdc's stdout would otherwise corrupt the MCP
         # JSON-RPC stream (it shares the server's stdout).
-        proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        # stdin must be DEVNULL: a child that inherits the server's stdin pipe
+        # never exits cleanly on Windows, so the tool call hangs until the MCP
+        # client's read timeout kills the session.
+        proc = subprocess.run(cmd, check=True, capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL)
     except FileNotFoundError:
         raise RuntimeError("mmdc not found. Install with: npm i -g @mermaid-js/mermaid-cli")
     except subprocess.CalledProcessError as e:
+        # Older/newer mmdc flag incompatibility (e.g. an old CLI without
+        # --size): retry once without any size flags so the diagram still
+        # renders.
+        if "--size" in cmd:
+            retry = [c for c in cmd if c not in ("--size", str(max(width or 0, height or 0)))]
+            try:
+                proc = subprocess.run(retry, check=True, capture_output=True, text=True,
+                                      stdin=subprocess.DEVNULL)
+            except subprocess.CalledProcessError as e2:
+                raise RuntimeError(
+                    f"mmdc failed (exit {e2.returncode}): "
+                    f"{' '.join(shlex.quote(c) for c in retry)}\n"
+                    f"{(e2.stderr or '')[:1200]}"
+                )
+            return
         raise RuntimeError(
             f"mmdc failed (exit {e.returncode}): {' '.join(shlex.quote(c) for c in cmd)}\n"
             f"{e.stderr or e.stdout or ''}"
@@ -234,6 +270,39 @@ def check_mermaid_text(raw: str) -> dict:
                             "No Mermaid diagram type found at start of file.",
                             "Begin the file with e.g. 'flowchart TD' or 'sequenceDiagram'.", line))
     return {"detected_type": dtype, "issues": [asdict(i) for i in issues]}
+
+
+def read_mermaid_source(src_p: Path) -> str:
+    """Read a Mermaid source, falling back to the run's real diagram file.
+
+    The diagram agents keep the Mermaid text in TextCanvasMemory, so a path like
+    `conversation/<session>/canvas_diagram.md` never exists on disk. A bare
+    FileNotFoundError crashes the tool call and the reviewer then retries with
+    another invented path. Try the canonical file in the same directory and, if
+    nothing is there, report what actually exists.
+    """
+    if src_p.exists():
+        return src_p.read_text(encoding="utf-8", errors="replace")
+    # Prefer any .mmd in the folder, then Markdown files that are clearly
+    # diagram sources. Limiting the .md scan avoids silently returning the
+    # functional spec because it happens to contain a fenced `flowchart` block.
+    candidates = sorted(src_p.parent.glob("*.mmd")) + [
+        p for p in sorted(src_p.parent.glob("*.md"))
+        if "diagram" in p.name.lower() or "mermaid" in p.name.lower()
+    ]
+    for cand in candidates:
+        try:
+            text = cand.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if re.search(r"(?im)^\s*(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram)\b", text):
+            return text
+    available = ", ".join(p.name for p in sorted(src_p.parent.iterdir())) or "(empty)"
+    raise FileNotFoundError(
+        f"No Mermaid source at {src_p}. Mermaid text lives in the canvas, not a file. "
+        f"Use {src_p.parent / 'process_diagram.mmd'}, or call check_mermaid_text/clean_mermaid_text "
+        f"with the Mermaid string directly. Files in that folder: {available}"
+    )
 
 def clean_mermaid_text(raw: str):
     report = check_mermaid_text(raw)
@@ -391,7 +460,7 @@ def create_server(allowed_dirs: List[Path], project_root: Path | None = None) ->
     ) -> dict:
         """Analyze a Mermaid file; return detected_type, issues[], and optional mmdc_error."""
         src_p = resolve_under_allowed(input_path, allowed_dirs, project_root)
-        raw = src_p.read_text(encoding="utf-8", errors="replace")
+        raw = read_mermaid_source(src_p)
         report = check_mermaid_text(raw)
 
         if try_compile:
@@ -407,7 +476,8 @@ def create_server(allowed_dirs: List[Path], project_root: Path | None = None) ->
                     if theme:
                         cmd += ["-t", theme]
                     cmd += _puppeteer_flags(puppeteer_config)
-                    proc = subprocess.run(cmd, capture_output=True, text=True)
+                    proc = subprocess.run(cmd, capture_output=True, text=True,
+                                          stdin=subprocess.DEVNULL)
                     if proc.returncode != 0:
                         report["mmdc_error"] = {
                             "returncode": proc.returncode,
@@ -429,7 +499,7 @@ def create_server(allowed_dirs: List[Path], project_root: Path | None = None) ->
         dst_p = resolve_under_allowed(output_path, allowed_dirs, project_root)
         if dst_p.exists() and not overwrite:
             raise FileExistsError(f"Refusing to overwrite existing: {dst_p}")
-        raw = src_p.read_text(encoding="utf-8", errors="replace")
+        raw = read_mermaid_source(src_p)
         cleaned, report = clean_mermaid_text(raw)
         dst_p.parent.mkdir(parents=True, exist_ok=True)
         dst_p.write_text(cleaned, encoding="utf-8")

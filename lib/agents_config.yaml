@@ -175,7 +175,8 @@ interviewer_agent:
 
   tools:
     - agents_tools_helpers.save_conversation_to_jsonl
-  reflect_on_tool_use: true
+  reflect_on_tool_use: false
+  max_tool_iterations: 10
   use_memory: vector_memory
   stream: true
 
@@ -274,7 +275,8 @@ functional_spec_writer_agent:
   agent_tools:
     - use_case_agent
     - glossary_agent
-  reflect_on_tool_use: True
+  reflect_on_tool_use: False
+  max_tool_iterations: 10
   use_memory: vector_memory
   stream: true
 
@@ -332,7 +334,8 @@ functional_spec_checker_agent:
 
   tools:
     - agents_tools_helpers.read_md_file_tool
-  reflect_on_tool_use: True
+  reflect_on_tool_use: False
+  max_tool_iterations: 10
   use_memory: vector_memory
   stream: true
 
@@ -375,7 +378,8 @@ diagram_creator_agent:
   tools:
     - agents_tools_helpers.read_md_file_tool
     - canvas.update_file_tool
-  reflect_on_tool_use: True
+  reflect_on_tool_use: False
+  max_tool_iterations: 10
   use_memory: canvas_memory
   stream: true
 
@@ -416,7 +420,8 @@ mermaid_code_reviewer_agent:
   tools:
     - canvas.update_file_tool
     - agents_tools_helpers.write_mermaid_to_file_tool
-  reflect_on_tool_use: True
+  reflect_on_tool_use: False
+  max_tool_iterations: 10
   use_memory: canvas_memory
   stream: true
 
@@ -493,7 +498,7 @@ terminate_agent:
       mermaid:          project_root/conversation/process_diagram.mmd
 
     **GOAL**
-      Create: project_root/experience/<SESSION_ID>/
+      Create: project_root/conversation/<SESSION_ID>/
           interview.jsonl
           functional_specification.md
           process_diagram.mmd
@@ -502,62 +507,56 @@ terminate_agent:
           deliverable.pdf
 
     **STEPS STRICT ORDER**
-      1 Read project_root/conversation/interview.jsonl and extract the first available "session_id".
-        If multiple lines: pick the first non-empty "session_id".
-        If not found: set SESSION_ID = "sess-unknown".
+      1 Call 'get_session_dir_tool' (no arguments). It returns the absolute path of
+        THIS run's session folder (project_root/conversation/<SESSION_ID>/). Use that
+        exact path for every file below; never invent a folder name. Files written by
+        the writer/diagram agents are already inside it.
 
-      2 Create folder project_root/experience/<SESSION_ID>/ using 'ensure_dir_tool'
-
-      3 MOVE the three source files into that folder using 'move_file_tool':
-          project_root/conversation/interview.jsonl             -> project_root/experience/<SESSION_ID>/interview.jsonl
-          project_root/conversation/functional_specification.md -> project_root/experience/<SESSION_ID>/functional_specification.md
-          project_root/conversation/process_diagram.mmd         -> project_root/experience/<SESSION_ID>/process_diagram.mmd
-
-      4 Clean the Mermaid file **in place** and report issues (severity/code/message/recommendation):
+      2 Clean the Mermaid file **in place** and report issues (severity/code/message/recommendation):
           clean_mermaid(
-            input_path="project_root/experience/<SESSION_ID>/process_diagram.mmd",
-            output_path="project_root/experience/<SESSION_ID>/process_diagram.mmd",
+            input_path="<SESSION_DIR>/process_diagram.mmd",
+            output_path="<SESSION_DIR>/process_diagram.mmd",
             overwrite=True
           )
 
-      5 Render Mermaid **PNG**:
+      3 Render Mermaid **PNG**:
           render_mermaid_png(
-            input_path="project_root/experience/<SESSION_ID>/process_diagram.mmd",
-            output_path="project_root/experience/<SESSION_ID>/process_diagram.png",
+            input_path="<SESSION_DIR>/process_diagram.mmd",
+            output_path="<SESSION_DIR>/process_diagram.png",
             theme="forest"
           )
 
-      6 Run **format_and_export** ONLY:
+      4 Run **format_and_export** ONLY:
           format_and_export(
-            session_dir="project_root/experience/<SESSION_ID>",
+            session_dir="<SESSION_DIR>",
             md="functional_specification.md",
             diagram="process_diagram.png",
             md_out="functional_specification.formatted.md",
             pdf_out="deliverable.pdf",
-            engine="xelatex",
-            toc=True, toc_depth=2, margin="1in",
-            mainfont="DejaVu Serif", monofont="DejaVu Sans Mono"
+            toc=True, toc_depth=2, margin="1in"
           )
 
-      7 Confirm project_root/experience/<SESSION_ID>/deliverable.pdf exists.
+      5 Confirm <SESSION_DIR>/deliverable.pdf exists.
 
-      8 Save experience metadata:
+      6 Save experience metadata:
           save_experience_chroma(
-            session_dir="project_root/experience/<SESSION_ID>",
+            session_dir="<SESSION_DIR>",
             session_id="<SESSION_ID>"
           )
 
-      9 Output exactly: **TERMINATE**
+      7 Output exactly: **TERMINATE**
 
     **RULES**
       Be explicit about each steps success or failure.
       If a tool call fails, retry up to 1 times with the same arguments.
 
   tools:
+    - agents_tools_helpers.get_session_dir_tool
     - agents_tools_helpers.move_file_tool
     - agents_tools_helpers.ensure_dir_tool
   mcp_tools:
       - mcp_boot.mermaid_tools
       - mcp_boot.pdf_format_tools
   reflect_on_tool_use: False
+  max_tool_iterations: 10
   stream: true
