@@ -106,6 +106,15 @@ pandoc or LaTeX.
 - **LM Studio mid-run failures are explained in the UI.** A model being unloaded (`400 Bad Request - Model unloaded by user or API request`) or a speculative-decoding engine crash previously only showed up as a console traceback; `app2.py` now catches these and posts an actionable hint (reload the model / restart the LM Studio server).
 
 ### Changed
+- **One standard for model configuration.** No profile YAML holds a secret: every
+  `api_key` line was removed from `src/model_config_*.yaml`, and `src/model_loader.py`
+  injects the key from the environment (`OPENAI_API_KEY`, `GROQ_API_KEY`,
+  `OPENCODE_GO_API_KEY`, `AZURE_OPENAI_API_KEY`, `HF_TOKEN`, `GITHUB_TOKEN`). Local
+  profiles (strata, lmstudio, ollama, onnx) need no key at all. Host and model name
+  now come from the YAML instead of `.env` - `.env` carries only the lane selection
+  (`MODEL_CLIENT`, `MODEL_CLIENT_TOOLS`, `HUMAN_MODEL`) and the keys.
+  `<PROFILE>_BASE_URL` / `<PROFILE>_MODEL` remain available as per-run overrides for
+  the test harnesses.
 - **No more deprecation noise.** Every `import fitz` became `import pymupdf as fitz`
   (`fitz` is the deprecated PyMuPDF alias) - seven sites. The two warnings we cannot fix
   upstream, traceloop's class-based Pydantic config and fastmcp's `authlib.jose` import,

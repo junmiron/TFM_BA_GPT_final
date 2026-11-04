@@ -1,8 +1,8 @@
 provider: autogen_ext.models.openai.OpenAIChatCompletionClient
 config:
+  # api_key is injected from OPENCODE_GO_API_KEY (environment or .env)
   model: "gpt-6-luna"
   # Real key comes from OPENCODE_GO_API_KEY in .env; load_model_client injects it.
-  api_key: "REPLACE_WITH_OPENCODE_GO_API_KEY"
   base_url: "https://opencode.ai/zen/go/v1"
   # OpenCode Go rejects requests (HTTP 400 MissingSessionID) without an
   # x-opencode-session affinity header.

@@ -95,19 +95,27 @@ Eleven agents in one `SelectorGroupChat`. Hand-offs are driven by the planner's
 
 ## Model backends
 
-Set `MODEL_CLIENT` in `.env`:
+Three lanes are selectable in `.env`: `MODEL_CLIENT` (reasoning agents),
+`MODEL_CLIENT_TOOLS` (tool-calling agents) and `HUMAN_MODEL` (simulated
+stakeholder). Any profile below can fill any lane.
 
 | Profile | Backend | Key env var |
 |---|---|---|
 | `openai` | OpenAI | `OPENAI_API_KEY` |
 | `openai_npt` | OpenAI with `parallel_tool_calls: false` | `OPENAI_API_KEY` |
-| `ollama` | local Ollama | none |
+| `azure` | Azure OpenAI | `AZURE_OPENAI_API_KEY` |
+| `groq` | Groq (`openai/gpt-oss-120b`) | `GROQ_API_KEY` |
+| `hugging` | Hugging Face router | `HF_TOKEN` |
+| `github` | GitHub Copilot models | `GITHUB_TOKEN` |
+| `opencode` | OpenCode Go (`gpt-6-luna`) | `OPENCODE_GO_API_KEY` |
+| `strata` | local Strata / llama.cpp server | none |
 | `lmstudio` | local LM Studio | none |
+| `ollama` | local Ollama | none |
 | `onnx` | local ONNX server | none |
-| `azure` / `groq` / `hugging` / `github` | copy `src/model_config_template.yaml` | provider key |
 
 API keys are never stored in the YAML profiles - `src/model_loader.py` injects
-them from the environment or `.env`.
+them from the environment or `.env`. Set `SIMULATE_HUMAN=true` to run the
+stakeholder interview on the `HUMAN_MODEL` lane instead of typing answers.
 
 ## Two entry points
 

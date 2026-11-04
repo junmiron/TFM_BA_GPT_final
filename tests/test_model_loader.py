@@ -6,7 +6,8 @@ import yaml
 import pytest
 
 import src.model_loader
-from src.model_loader import CONFIG_FILES, load_model_client, resolve_api_key
+from src.model_loader import (CONFIG_FILES, available_profiles, load_model_client,
+                       resolve_api_key, resolve_profile_name)
 
 _SRC_DIR = os.path.dirname(os.path.abspath(src.model_loader.__file__))
 
@@ -20,10 +21,16 @@ def test_groq_profile_exists():
     assert "groq" in CONFIG_FILES
 
 
-def test_groq_config_has_no_hardcoded_secret():
-    key = str(_groq_config().get("api_key", ""))
-    assert not key.startswith("gsk_"), "groq profile must not hard-code an API key"
-    assert "REPLACE" in key
+def test_no_profile_yaml_carries_a_secret():
+    # Every key lives in .env; the YAML profiles describe provider/host/model only.
+    for name, (filename, key_env) in src.model_loader.PROFILES.items():
+        with open(os.path.join(_SRC_DIR, filename), encoding="utf-8") as f:
+            config = yaml.safe_load(f)["config"]
+        assert "api_key" not in config, f"{name} profile must not contain api_key"
+        if key_env:
+            assert key_env in open(os.path.join(_SRC_DIR, filename), encoding="utf-8").read(), (
+                f"{name} profile should name its key env var ({key_env})"
+            )
 
 
 def test_groq_model_is_not_decommissioned():
@@ -36,19 +43,20 @@ def test_env_key_overrides_yaml_key(monkeypatch):
     assert resolve_api_key("groq", {"api_key": "stale-yaml-key"})["api_key"] == "env-key-123"
 
 
-def test_placeholder_without_env_raises(monkeypatch):
+def test_missing_env_key_raises(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
-        resolve_api_key("groq", {"api_key": "REPLACE_WITH_GROQ_API_KEY"})
+        resolve_api_key("groq", {})
 
 
-def test_profile_without_key_mapping_is_untouched(monkeypatch):
-    config = resolve_api_key("lmstudio", {"api_key": "not-needed"})
+def test_local_profiles_need_no_key(monkeypatch):
+    monkeypatch.delenv("LMSTUDIO_API_KEY", raising=False)
+    config = resolve_api_key("lmstudio", {})
     assert config["api_key"] == "not-needed"
 
 
 def test_unknown_profile_raises():
-    with pytest.raises(ValueError, match="Unknown model_name"):
+    with pytest.raises(ValueError, match="Unknown model profile"):
         load_model_client("does-not-exist")
 
 
@@ -62,23 +70,31 @@ def test_strata_is_local_and_keyless():
     with open(os.path.join(_SRC_DIR, CONFIG_FILES["strata"]), encoding="utf-8") as f:
         config = yaml.safe_load(f)["config"]
     assert "127.0.0.1" in config["base_url"]
-    assert "REPLACE" in str(config.get("api_key", ""))
+    assert "api_key" not in config
     # Local Qwen needs a large completion budget or tool calls get truncated.
     assert config.get("max_tokens", 0) >= 8000
 
 
-def test_opencode_config_has_no_hardcoded_secret():
+def test_opencode_config_is_remote_and_keyless_in_yaml():
     with open(os.path.join(_SRC_DIR, CONFIG_FILES["opencode"]), encoding="utf-8") as f:
         config = yaml.safe_load(f)["config"]
-    assert "REPLACE" in str(config.get("api_key", ""))
+    assert "api_key" not in config
+    assert "opencode.ai" in config["base_url"]
     # OpenCode Go 400s without the session affinity header.
     assert "x-opencode-session" in config.get("default_headers", {})
 
 
 def test_opencode_key_comes_from_env(monkeypatch):
     monkeypatch.setenv("OPENCODE_GO_API_KEY", "env-opencode-key")
-    resolved = resolve_api_key("opencode", {"api_key": "REPLACE_WITH_OPENCODE_GO_API_KEY"})
-    assert resolved["api_key"] == "env-opencode-key"
+    assert resolve_api_key("opencode", {})["api_key"] == "env-opencode-key"
+
+
+def test_selector_accepts_strata_and_opencode_go():
+    assert resolve_profile_name("strata") == "strata"
+    assert resolve_profile_name("opencode-go") == "opencode"
+    assert resolve_profile_name("OpenCode Go") == "opencode"
+    profiles = available_profiles()
+    assert "strata" in profiles and "opencode" in profiles
 
 
 def test_local_endpoint_env_redirect(monkeypatch, tmp_path):

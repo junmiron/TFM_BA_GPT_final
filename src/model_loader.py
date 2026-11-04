@@ -1,8 +1,13 @@
 """Model client loader.
 
-Model configs live in src/model_config_<name>.yaml and carry no secrets:
-the API key is injected from the environment (or a local .env file) by
-load_model_client().
+Every profile is configured in src/model_config_<name>.yaml: provider, model,
+host and generation limits. No profile YAML carries a secret - the API key is
+always read from the environment (or the project .env) by load_model_client().
+
+Pick the lanes in .env:
+  MODEL_CLIENT        - profile used by the reasoning agents
+  MODEL_CLIENT_TOOLS  - profile used by the tool-calling agents
+  HUMAN_MODEL         - profile used by the simulated stakeholder lane
 """
 
 import os
@@ -21,38 +26,57 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 
-# Env var that supplies the key for each provider profile.
-API_KEY_ENV = {
-    "openai": "OPENAI_API_KEY",
-    "openai_npt": "OPENAI_API_KEY",
-    "azure": "AZURE_OPENAI_API_KEY",
-    "groq": "GROQ_API_KEY",
-    "hugging": "HF_TOKEN",
-    "github": "GITHUB_TOKEN",
-    "opencode": "OPENCODE_GO_API_KEY",
-    # ollama / lmstudio / strata / onnx are local servers and need no real key
+# profile name -> (yaml file, env var holding its key). A key env var of None
+# means the backend is a local server that needs no credential.
+PROFILES = {
+    "openai": ("model_config_openai.yaml", "OPENAI_API_KEY"),
+    "openai_npt": ("model_config_openai_npt.yaml", "OPENAI_API_KEY"),
+    "azure": ("model_config_azure.yaml", "AZURE_OPENAI_API_KEY"),
+    "groq": ("model_config_groq.yaml", "GROQ_API_KEY"),
+    "hugging": ("model_config_hugging.yaml", "HF_TOKEN"),
+    "github": ("model_config_github.yaml", "GITHUB_TOKEN"),
+    "opencode": ("model_config_opencode.yaml", "OPENCODE_GO_API_KEY"),
+    "ollama": ("model_config_ollama.yaml", None),
+    "lmstudio": ("model_config_lmstudio.yaml", None),
+    "strata": ("model_config_strata.yaml", None),
+    "onnx": ("model_config_onnx.yaml", None),
 }
 
-CONFIG_FILES = {
-    "azure": "model_config_azure.yaml",
-    "ollama": "model_config_ollama.yaml",
-    "lmstudio": "model_config_lmstudio.yaml",
-    "strata": "model_config_strata.yaml",
-    "groq": "model_config_groq.yaml",
-    "opencode": "model_config_opencode.yaml",
-    "hugging": "model_config_hugging.yaml",
-    "github": "model_config_github.yaml",
-    "onnx": "model_config_onnx.yaml",
-    "openai": "model_config_openai.yaml",
-    "openai_npt": "model_config_openai_npt.yaml",
+# Spellings people naturally type, mapped to the canonical profile name.
+PROFILE_ALIASES = {
+    "opencode-go": "opencode",
+    "opencode_go": "opencode",
+    "opencode go": "opencode",
+    "open-code": "opencode",
+    "lm-studio": "lmstudio",
+    "huggingface": "hugging",
+    "hf": "hugging",
+    "strata-local": "strata",
 }
 
-# Profiles whose base_url / model can be redirected from the environment,
-# so a different host or model can be used without editing the YAML.
-LOCAL_ENDPOINT_ENV = {
-    "lmstudio": ("LMSTUDIO_BASE_URL", "LMSTUDIO_MODEL"),
-    "strata": ("STRATA_BASE_URL", "STRATA_MODEL"),
-}
+# Kept for callers that only need name -> file.
+CONFIG_FILES = {name: filename for name, (filename, _) in PROFILES.items()}
+
+# Local servers can be redirected with <PROFILE>_BASE_URL / <PROFILE>_MODEL
+# without editing the YAML (used by the e2e harnesses).
+LOCAL_PROFILES = {name for name, (_, key_env) in PROFILES.items() if key_env is None}
+
+
+def available_profiles() -> list[str]:
+    """Every profile the selector accepts."""
+    return sorted(PROFILES)
+
+
+def resolve_profile_name(model_name: str) -> str:
+    """Canonicalise a profile name, raising ValueError with the full list."""
+    name = str(model_name or "").strip().lower()
+    name = PROFILE_ALIASES.get(name, name)
+    if name not in PROFILES:
+        raise ValueError(
+            f"Unknown model profile '{model_name}'. "
+            f"Choose one of: {', '.join(available_profiles())}"
+        )
+    return name
 
 
 def _load_dotenv() -> None:
@@ -75,12 +99,15 @@ _load_dotenv()
 def resolve_api_key(model_name: str, config: dict) -> dict:
     """Fill `api_key` from the environment, never from a hard-coded YAML value.
 
-    The env var wins over the YAML key. Previously the YAML key was used
-    verbatim whenever present, so a stale key in the config silently beat the
-    valid key in .env.
+    Remote profiles must have their key in the environment. Local profiles get a
+    harmless placeholder: the OpenAI-compatible client requires an api_key, but a
+    local server never checks it.
     """
-    key_env = API_KEY_ENV.get(model_name)
-    if not key_env or "api_key" not in config:
+    _, key_env = PROFILES[model_name]
+
+    if key_env is None:
+        local_key = os.getenv(f"{model_name.upper()}_API_KEY")
+        config["api_key"] = local_key or "not-needed"
         return config
 
     env_key = os.getenv(key_env)
@@ -91,8 +118,25 @@ def resolve_api_key(model_name: str, config: dict) -> dict:
         raise RuntimeError(
             f"No API key for profile '{model_name}'. "
             f"Set {key_env} (environment or .env) "
-            "or use src/model_config_template.yaml."
+            "or copy src/model_config_template.yaml."
         )
+    return config
+
+
+def apply_env_endpoint(model_name: str, config: dict) -> dict:
+    """Optional override: <PROFILE>_BASE_URL / <PROFILE>_MODEL beat the YAML.
+
+    The YAML is the source of truth; this only exists so a test or a second
+    machine can point at another host without editing the profile file.
+    """
+    upper = model_name.upper()
+    host = os.getenv(f"{upper}_BASE_URL") or os.getenv(f"{upper}_HOST")
+    if host:
+        # Ollama's client takes `host`; every OpenAI-compatible client takes `base_url`.
+        config["host" if "host" in config else "base_url"] = host
+    model = os.getenv(f"{upper}_MODEL")
+    if model:
+        config["model"] = model
     return config
 
 
@@ -103,13 +147,9 @@ def load_model_client(model_name: str | None = None) -> ChatCompletionClient:
     """
     _load_dotenv()
 
-    model_name = (model_name or os.getenv("MODEL_CLIENT", "openai")).strip().lower()
-    if model_name not in CONFIG_FILES:
-        raise ValueError(
-            f"Unknown model_name '{model_name}'. Must be one of {sorted(CONFIG_FILES)}"
-        )
+    model_name = resolve_profile_name(model_name or os.getenv("MODEL_CLIENT", "openai"))
 
-    config_path = SRC_DIR / CONFIG_FILES[model_name]
+    config_path = SRC_DIR / PROFILES[model_name][0]
     if not config_path.exists():
         raise FileNotFoundError(
             f"Model config '{config_path}' is missing. "
@@ -120,20 +160,9 @@ def load_model_client(model_name: str | None = None) -> ChatCompletionClient:
         component = yaml.safe_load(f)
 
     config = component.get("config", {})
-    provider = component.get("provider", "")
 
-    # Allow local servers (LM Studio / Strata / llama.cpp) to be redirected via
-    # env so tests and alternate hosts can point at a different endpoint without
-    # editing the YAML. Example: STRATA_BASE_URL=http://127.0.0.1:47831/v1
-    env_names = LOCAL_ENDPOINT_ENV.get(model_name)
-    if env_names:
-        base_url_env, model_env = env_names
-        base_url = os.getenv(base_url_env)
-        if base_url:
-            config["base_url"] = base_url
-        model = os.getenv(model_env)
-        if model:
-            config["model"] = model
+    # Host and model come from the YAML; env vars may override them.
+    apply_env_endpoint(model_name, config)
 
     # Inject the API key from the environment rather than hard-coding it.
     resolve_api_key(model_name, config)
@@ -146,6 +175,6 @@ def load_model_client(model_name: str | None = None) -> ChatCompletionClient:
     # Remote providers are rate-limited (Groq free tier: 8000 tokens/min for
     # every model). A 429 inside a group chat aborts the whole run, so retry
     # with backoff instead of letting it bubble up.
-    if model_name in API_KEY_ENV:
+    if PROFILES[model_name][1] is not None:
         client = RateLimitRetryClient(client)
     return client

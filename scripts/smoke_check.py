@@ -70,11 +70,34 @@ def check_config() -> None:
     if env_file.exists():
         print("[OK]   .env present (gitignored)")
     else:
-        print("[WARN] No .env. Copy .env.example to .env and set OPENAI_API_KEY.")
-    if not os.getenv("OPENAI_API_KEY"):
-        print("[WARN] OPENAI_API_KEY is not set in the environment or .env")
+        print("[WARN] No .env. Copy .env.example to .env and set your keys.")
 
-    for name in ("lib/agents_config.yaml", "lib/rag_config.yaml", "src/model_config_openai.yaml"):
+    # Validate the lanes actually selected in .env, not a hard-coded profile.
+    PROFILES = {}
+    resolve_profile_name = None
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT / "src"))
+        from model_loader import PROFILES, resolve_profile_name
+    except ImportError:
+        pass
+
+    if resolve_profile_name:
+        for var in ("MODEL_CLIENT", "MODEL_CLIENT_TOOLS", "HUMAN_MODEL"):
+            raw = os.getenv(var, "")
+            try:
+                profile = resolve_profile_name(raw)
+                key_env = PROFILES[profile][1]
+                if key_env and not os.getenv(key_env):
+                    print(f"[WARN] {var}={profile} needs {key_env} in .env")
+                else:
+                    print(f"[OK]   {var}={profile}")
+            except ValueError as exc:
+                print(f"[FAIL] {var}={raw!r}: {exc}")
+    else:
+        if not os.getenv("OPENAI_API_KEY"):
+            print("[WARN] OPENAI_API_KEY is not set in the environment or .env")
+
+    for name in ("lib/agents_config.yaml", "lib/rag_config.yaml", "src/model_config_template.yaml"):
         path = PROJECT_ROOT / name
         print(f"[{'OK' if path.exists() else 'FAIL'}] {name}")
 

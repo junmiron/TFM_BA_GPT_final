@@ -13,12 +13,15 @@ model configs directly - `src/model_loader.py` loads it and injects the key.
 |---|---|---|
 | `MODEL_CLIENT` | `openai` | profile used by the reasoning agents |
 | `MODEL_CLIENT_TOOLS` | `openai_npt` | profile for agents that call tools |
+| `HUMAN_MODEL` | `opencode` | profile for the simulated stakeholder lane |
+| `SIMULATE_HUMAN` | `false` | run the interview against `HUMAN_MODEL` instead of a human |
 | `MAX_MESSAGES` | `300` | hard cap on team turns |
 | `OPENAI_API_KEY` | - | required for `openai` / `openai_npt` |
 | `AZURE_OPENAI_API_KEY` | - | for the `azure` profile |
 | `GROQ_API_KEY` | - | for the `groq` profile |
 | `HF_TOKEN` | - | for the `hugging` profile |
 | `GITHUB_TOKEN` | - | for the `github` profile |
+| `OPENCODE_GO_API_KEY` | - | for the `opencode` profile |
 
 `MODEL_CLIENT_TOOLS` exists because several agents call tools in the same turn,
 and some backends reject `parallel_tool_calls`. `openai_npt` sets
@@ -41,9 +44,13 @@ config:
     json_output: true
 ```
 
-Available out of the box: `openai`, `openai_npt`, `ollama`, `lmstudio`, `onnx`.
-For Azure, Groq, Hugging Face or GitHub Copilot, copy `src/model_config_template.yaml`
-to `src/model_config_<name>.yaml`. Those files are gitignored on purpose.
+Every profile is registered in `src/model_loader.py`, and that registry is the
+model selector: the name you put in `MODEL_CLIENT` is looked up there. Currently
+available: `openai`, `openai_npt`, `azure`, `groq`, `hugging`, `github`,
+`opencode`, `strata`, `lmstudio`, `ollama`, `onnx`.
+
+The profiles with live credentials (`azure`, `github`, `hugging`) are gitignored
+on purpose; `src/model_config_template.yaml` shows the shape for a new one.
 
 Local backends need a running server:
 
@@ -52,6 +59,10 @@ Local backends need a running server:
 | `ollama` | `http://localhost:11434` |
 | `lmstudio` | `http://localhost:1234/v1` |
 | `onnx` | `http://localhost:5272/v1` |
+| `strata` | `http://127.0.0.1:47831/v1` |
+
+`<PROFILE>_BASE_URL` and `<PROFILE>_MODEL` override the YAML without editing it,
+which is how the test harnesses point a profile at a throwaway server.
 
 ## `lib/agents_config.yaml`
 
