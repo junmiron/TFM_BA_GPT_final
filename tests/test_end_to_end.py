@@ -171,7 +171,7 @@ class ScriptedModelClient:
                         "md": "functional_specification.md",
                         "diagram": "process_diagram.png",
                         "md_out": "functional_specification.formatted.md",
-                        "pdf_out": "deliverable.pdf",
+                        "pdf_out": "functional_specification.pdf",
                     }),
                 ])
             if self.terminate_step == 1:
@@ -290,7 +290,7 @@ def test_end_to_end_produces_deliverables():
     shutil.rmtree(PROJECT_ROOT / "experience" / SESSION_ID, ignore_errors=True)
     for name in ("functional_specification.md", "functional_specification.formatted.md",
                  "process_diagram.mmd", "process_diagram.clean.mmd", "process_diagram.png",
-                 "deliverable.pdf"):
+                 "functional_specification.pdf"):
         (WORK_DIR / name).unlink(missing_ok=True)
 
 

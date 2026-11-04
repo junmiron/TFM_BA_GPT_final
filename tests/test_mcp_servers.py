@@ -142,3 +142,43 @@ def test_mermaid_rendering_when_mmdc_is_available(tmp_path):
     out_sized = tmp_path / "diagram_sized.png"
     mermaid.run_mmdc(src, out_sized, "png", theme="forest", width=1400, height=1000)
     assert out_sized.exists() and out_sized.stat().st_size > 1000
+
+
+def test_pdf_export_html_tool_is_callable_through_the_server(tmp_path):
+    """`export_html` is both a module function and an MCP tool name.
+
+    Inside create_server the tool def binds the name locally, so a tool body
+    that called `export_html(...)` resolved to the decorated FunctionTool and
+    died with "TypeError: 'FunctionTool' object is not callable" - the agent
+    saw the tool in its list and every call errored. Drive it through the
+    client so that wiring is checked, not just the function.
+    """
+    from fastmcp import Client
+
+    pdf_server = _load_module(SERVERS["pdf"], "pdf_mcp")
+    session = tmp_path / "sess-html-tool"
+    session.mkdir()
+    (session / "functional_specification.md").write_text(
+        "# Test Spec\n\n## 1. Overview\nSome content.\n\n## Process Diagram\n\n",
+        encoding="utf-8",
+    )
+
+    server = pdf_server.create_server([session], project_root=session)
+
+    async def call():
+        async with Client(server) as client:
+            names = {t.name for t in await client.list_tools()}
+            result = await client.call_tool(
+                "export_html", {"session_dir": str(session)}
+            )
+            return names, result
+
+    names, result = asyncio.run(call())
+    assert "export_html" in names
+    assert not result.is_error
+    data = result.data if isinstance(result.data, dict) else result.content[0].text
+    assert isinstance(data, dict), data
+    out = Path(data["html"])
+    assert out.name == "functional_specification.html" and out.is_file()
+    body = out.read_text(encoding="utf-8")
+    assert "<!DOCTYPE html>" in body and "</html>" in body

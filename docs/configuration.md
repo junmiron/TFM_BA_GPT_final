@@ -125,7 +125,7 @@ allowed_executables = ["npx", "uvx"]
 | `xelatex` | PDF export | TeX Live / MiKTeX |
 
 Check with `python scripts/smoke_check.py`. Missing `pandoc` or `xelatex` only
-changes how `deliverable.pdf` is built (PyMuPDF Story is used instead); `mmdc` costs you
+changes how `functional_specification.pdf` is built (PyMuPDF Story is used instead); `mmdc` costs you
 `process_diagram.png`.
 
 ## What is never committed

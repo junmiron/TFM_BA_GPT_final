@@ -63,7 +63,7 @@ tool, send diagnostics to stderr:
 print("debug", file=sys.stderr)
 ```
 
-## `deliverable.pdf` is missing
+## `functional_specification.pdf` is missing
 
 The export prefers `pandoc` + a LaTeX engine and falls back to PyMuPDF Story:
 
@@ -72,10 +72,27 @@ pandoc --version
 xelatex --version
 ```
 
-Neither is required - without them `deliverable.pdf` is still produced by PyMuPDF,
+Neither is required - without them `functional_specification.pdf` is still produced by PyMuPDF,
 with the diagram embedded and a real bookmark outline. If the PDF is present but has
 no outline in your viewer, it predates v1.1.0; re-run `finalize_deliverables` on the
 session directory and it will be regenerated.
+
+## `functional_specification.html` is missing or shows no diagram
+
+`functional_specification.html` is written by `finalize_deliverables()` in `lib/agents_tools_helpers.py`,
+the same call that guarantees the PDF. It is regenerated whenever
+`functional_specification.md` is newer than the HTML, so re-running the pipeline on the
+session directory refreshes it:
+
+```python
+from lib.agents_tools_helpers import finalize_deliverables
+finalize_deliverables("conversation/<SESSION_ID>")
+```
+
+The HTML is deliberately self-contained: the diagram PNG is inlined as a `data:` URI, so it
+survives being emailed or moved without `process_diagram.png` alongside it. Mermaid source is
+kept inside a collapsed `<details>` block rather than rendered - opening the file needs no
+network access to a Mermaid CDN.
 
 ## Diagram never appears in `conversation/<SESSION_ID>/`
 

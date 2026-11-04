@@ -69,9 +69,10 @@ Two invariants matter:
 3. `move_file_tool` the interview, spec and Mermaid file into that folder
 4. `clean_mermaid(...)` on the `.mmd` file
 5. `render_mermaid_png(...)`
-6. `format_and_export(...)` → `functional_specification.formatted.md` and `deliverable.pdf`
-7. `save_experience_chroma(...)` so the session is retrievable later
-8. output `TERMINATE`
+6. `format_and_export(...)` → `functional_specification.formatted.md` and `functional_specification.pdf`
+7. `finalize_deliverables(...)` → embeds the diagram (PNG + Mermaid fence) into `functional_specification.md` and writes the self-contained `functional_specification.html`
+8. `save_experience_chroma(...)` so the session is retrievable later
+9. output `TERMINATE`
 
 The team also has a hard stop: `MaxMessageTermination(MAX_MESSAGES)` (default 300),
 combined with `TextMentionTermination("TERMINATE")`.

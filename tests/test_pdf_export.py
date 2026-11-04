@@ -78,7 +78,7 @@ def test_pymupdf_fallback_embeds_diagram_and_toc(tmp_path):
     result = pdf._pymupdf_export(
         session / "functional_specification.formatted.md",
         session / "process_diagram.png",
-        session / "deliverable.pdf",
+        session / "functional_specification.pdf",
         title="Laundry Shop Staff App v1",
         toc=True,
         toc_depth=2,
@@ -106,7 +106,7 @@ def test_pymupdf_fallback_without_toc(tmp_path):
     result = pdf._pymupdf_export(
         session / "functional_specification.formatted.md",
         session / "process_diagram.png",
-        session / "deliverable.pdf",
+        session / "functional_specification.pdf",
         title="Laundry Shop Staff App v1",
         toc=False,
     )
@@ -122,7 +122,7 @@ def test_missing_diagram_still_produces_a_pdf(tmp_path):
     result = pdf._pymupdf_export(
         session / "functional_specification.formatted.md",
         session / "does_not_exist.png",
-        session / "deliverable.pdf",
+        session / "functional_specification.pdf",
         title="No diagram",
         toc=True,
     )
@@ -219,7 +219,7 @@ def test_tall_diagram_is_scaled_into_the_page(tmp_path):
     result = pdf._pymupdf_export(
         session / "functional_specification.formatted.md",
         session / "process_diagram.png",
-        session / "deliverable.pdf",
+        session / "functional_specification.pdf",
         title="Tall diagram",
         toc=True,
     )

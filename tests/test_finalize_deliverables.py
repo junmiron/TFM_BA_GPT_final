@@ -1,7 +1,7 @@
 """Deterministic deliverable completion (lib/agents_tools_helpers.finalize_deliverables).
 
 The terminate agent is a local model and can stop before calling the render/export
-tools, so the pipeline must still end with process_diagram.png and deliverable.pdf.
+tools, so the pipeline must still end with process_diagram.png and functional_specification.pdf.
 """
 import sys
 from pathlib import Path
@@ -9,6 +9,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "lib"))
 
+import re
 import shutil
 import pytest
 
@@ -86,7 +87,7 @@ def test_stale_pdf_is_regenerated_when_the_spec_changes(session):
 
     helpers.finalize_deliverables(str(session))
 
-    doc = fitz.open(str(session / "deliverable.pdf"))
+    doc = fitz.open(str(session / "functional_specification.pdf"))
     titles = {t for _, t, _ in doc.get_toc()}
     # PDF text extraction returns typographic ligatures (ﬁ, ﬀ), so a literal
     # substring test against the source markdown reports false negatives.
@@ -112,17 +113,17 @@ def test_finalize_regenerates_a_pdf_that_has_no_outline(session):
     probe[0].get_pixmap().save(session / "process_diagram.png")
     probe.close()
     page.insert_image(page.rect, filename=str(session / "process_diagram.png"))
-    doc.save(str(session / "deliverable.pdf"))
+    doc.save(str(session / "functional_specification.pdf"))
     doc.close()
 
-    doc = fitz.open(str(session / "deliverable.pdf"))
+    doc = fitz.open(str(session / "functional_specification.pdf"))
     assert sum(len(p.get_images()) for p in doc) >= 1
     assert doc.get_toc() == []
     doc.close()
 
     helpers.finalize_deliverables(str(session))
 
-    doc = fitz.open(str(session / "deliverable.pdf"))
+    doc = fitz.open(str(session / "functional_specification.pdf"))
     toc = doc.get_toc()
     doc.close()
     assert toc, "finalize_deliverables left a PDF with no bookmarks"
@@ -171,3 +172,69 @@ def test_render_diagram_png_uses_the_ci_puppeteer_config(monkeypatch, tmp_path):
     png.unlink()
     helpers.render_diagram_png(session)
     assert "-p" not in calls[0], calls[0]
+
+
+def test_markdown_deliverable_carries_the_diagram_and_its_source(session):
+    """The .md is a deliverable too, so it must show the diagram, not just name it."""
+    if not helpers.render_diagram_png(session):
+        pytest.skip("mmdc (mermaid-cli) is not installed on this machine")
+    helpers.finalize_deliverables(str(session))
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert "![Process Diagram](process_diagram.png)" in md
+    assert "```mermaid" in md, "the Markdown deliverable lost the Mermaid source fence"
+    assert "flowchart TD" in md
+
+
+def test_diagram_embedding_is_idempotent(session):
+    (session / "process_diagram.mmd").write_text("flowchart TD\n  A[Start]-->B[End]\n", encoding="utf-8")
+    for _ in range(3):
+        assert helpers.embed_diagram_in_markdown(session)
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert md.count("![Process Diagram]") == 1
+    assert md.count("```mermaid") == 1
+
+
+def test_finalize_produces_a_self_contained_html(session):
+    if not helpers.render_diagram_png(session):
+        pytest.skip("mmdc (mermaid-cli) is not installed on this machine")
+    result = helpers.finalize_deliverables(str(session))
+    html_path = Path(result["html"])
+    assert html_path.is_file()
+    html = html_path.read_text(encoding="utf-8")
+    assert html.startswith("<!DOCTYPE html>")
+    assert "</html>" in html
+    # The PNG is inlined, so the file opens correctly when moved or emailed
+    # without the diagram sitting next to it.
+    assert "data:image/png;base64," in html
+    assert '<nav class="toc">' in html
+    assert "Diagram source (Mermaid)" in html
+    # Every TOC link resolves to a real heading anchor.
+    anchors = set(re.findall(r'<h[1-3] id="([^"]+)"', html))
+    for link in re.findall(r'<a href="#([^"]+)">', html):
+        assert link in anchors, f"TOC link #{link} has no heading"
+
+def test_legacy_deliverable_pdf_is_renamed_not_duplicated(tmp_path):
+    """A pre-v1.1 session folder must not end up with two PDFs."""
+    sd = tmp_path / "sess-old"
+    sd.mkdir()
+    (sd / "functional_specification.md").write_text(SPEC, encoding="utf-8")
+    (sd / "deliverable.pdf").write_text("old pdf", encoding="utf-8")
+    (sd / "deliverable.html").write_text("<html>old</html>", encoding="utf-8")
+
+    renamed = helpers.migrate_legacy_deliverable_names(sd)
+    assert sorted(renamed) == ["deliverable.html -> functional_specification.html",
+                               "deliverable.pdf -> functional_specification.pdf"]
+    assert not (sd / "deliverable.pdf").exists()
+    assert (sd / "functional_specification.pdf").read_text(encoding="utf-8") == "old pdf"
+
+    # Running again is a no-op: the new name already exists.
+    assert helpers.migrate_legacy_deliverable_names(sd) == []
+
+
+def test_rename_does_not_overwrite_an_existing_deliverable(tmp_path):
+    sd = tmp_path / "sess-both"
+    sd.mkdir()
+    (sd / "deliverable.pdf").write_text("old", encoding="utf-8")
+    (sd / "functional_specification.pdf").write_text("new", encoding="utf-8")
+    assert helpers.migrate_legacy_deliverable_names(sd) == []
+    assert (sd / "deliverable.pdf").read_text(encoding="utf-8") == "old"

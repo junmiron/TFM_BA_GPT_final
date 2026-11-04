@@ -9,7 +9,7 @@ model host is pointed at Strata: http://127.0.0.1:47831/v1, model q2_0.
 This validates all four reported bugs together:
   1. spec is fully written to disk (session folder, deduped)
   2. deliverables live in conversation/<SESSION_ID>/
-  3. deliverable.pdf is produced (PyMuPDF fallback, no pandoc)
+  3. functional_specification.pdf is produced (PyMuPDF fallback, no pandoc)
   4. the terminate agent's session steps run
 """
 
@@ -168,7 +168,7 @@ async def main():
         print("RESULT: FAIL (no session dir produced)")
         return 1
     spec = Path(sess_dir) / "functional_specification.md"
-    pdf = Path(sess_dir) / "deliverable.pdf"
+    pdf = Path(sess_dir) / "functional_specification.pdf"
     png = Path(sess_dir) / "process_diagram.png"
     mmd = Path(sess_dir) / "process_diagram.mmd"
 
@@ -186,10 +186,17 @@ async def main():
         ok = False
     print("process_diagram.mmd exists:", mmd.exists())
     print("process_diagram.png exists:", png.exists())
-    print("deliverable.pdf exists:", pdf.exists())
+    print("functional_specification.pdf exists:", pdf.exists())
     if pdf.exists():
         import pymupdf as fitz
         d = fitz.open(str(pdf)); print("pdf pages:", d.page_count); d.close()
+    html = Path(sess_dir) / "functional_specification.html"
+    print("functional_specification.html exists:", html.exists())
+    if html.exists():
+        body = html.read_text(encoding="utf-8")
+        print("html: bytes", len(body), "img", body.count("<img"),
+              "toc", '<nav class="toc"' in body)
+        ok = ok and "<!DOCTYPE html>" in body
 
     print("\nRESULT:", "PASS" if (ok and pdf.exists()) else "PARTIAL" if ok else "FAIL")
     return 0 if (ok and pdf.exists()) else 1

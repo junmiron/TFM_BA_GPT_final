@@ -9,7 +9,7 @@ It exercises the three bugs that were fixed:
   1. The functional specification is written COMPLETELY to disk (chunked writes
      + append dedup) and is session-scoped under conversation/<SESSION_ID>/.
   2. Deliverables land inside conversation/<SESSION_ID>/.
-  3. deliverable.pdf is produced via the pure-Python PyMuPDF fallback (no pandoc).
+  3. functional_specification.pdf is produced via the pure-Python PyMuPDF fallback (no pandoc).
 
 The human answers are role-played from conversation/interview.jsonl.
 """
@@ -171,7 +171,7 @@ async def main():
             f"output_path={SESSION_DIR}/process_diagram.png); "
             f"format_and_export(session_dir={SESSION_DIR}, md=functional_specification.md, "
             "diagram=process_diagram.png, md_out=functional_specification.formatted.md, "
-            "pdf_out=deliverable.pdf, toc=True). Then reply TERMINATE."
+            "pdf_out=functional_specification.pdf, toc=True). Then reply TERMINATE."
         ),
         tools=[helpers.get_session_dir_tool, *mermaid_tools, *pdf_tools],
         reflect_on_tool_use=False,
@@ -202,8 +202,8 @@ async def main():
         import re
         heads = re.findall(r"^##\s+.+$", text, flags=re.MULTILINE)
         print("sections:", heads)
-    pdf = sess_dir / "deliverable.pdf"
-    print("deliverable.pdf exists:", pdf.exists())
+    pdf = sess_dir / "functional_specification.pdf"
+    print("functional_specification.pdf exists:", pdf.exists())
     if pdf.exists():
         import pymupdf as fitz
         d = fitz.open(str(pdf))
@@ -211,8 +211,16 @@ async def main():
         d.close()
     png = sess_dir / "process_diagram.png"
     print("process_diagram.png exists:", png.exists())
+    html = sess_dir / "functional_specification.html"
+    print("functional_specification.html exists:", html.exists())
+    if html.exists():
+        body = html.read_text(encoding="utf-8")
+        print("html: bytes", len(body), "img", body.count("<img"), "toc links", body.count('<nav class="toc"'))
+        print("html embeds mermaid source:", "Diagram source (Mermaid)" in body)
+    md_has_diagram = spec.exists() and "![Process Diagram]" in spec.read_text(encoding="utf-8")
+    print("markdown carries the diagram:", md_has_diagram)
 
-    ok = spec.exists() and pdf.exists() and png.exists()
+    ok = spec.exists() and pdf.exists() and png.exists() and html.exists() and md_has_diagram
     print("\nRESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

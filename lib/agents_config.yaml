@@ -504,7 +504,8 @@ terminate_agent:
           process_diagram.mmd
           process_diagram.png  
           functional_specification.formatted.md
-          deliverable.pdf
+          functional_specification.pdf
+          functional_specification.html
 
     **STEPS STRICT ORDER**
       1 Call 'get_session_dir_tool' (no arguments). It returns the absolute path of
@@ -532,13 +533,22 @@ terminate_agent:
             md="functional_specification.md",
             diagram="process_diagram.png",
             md_out="functional_specification.formatted.md",
-            pdf_out="deliverable.pdf",
+            pdf_out="functional_specification.pdf",
             toc=True, toc_depth=2, margin="1in"
           )
 
-      5 Confirm <SESSION_DIR>/deliverable.pdf exists.
+      5 Build the self-contained HTML (the diagram is inlined, so the file is
+        portable on its own):
+          export_html(
+            session_dir="<SESSION_DIR>",
+            md="functional_specification.formatted.md",
+            html_out="functional_specification.html",
+            diagram="process_diagram.png"
+          )
 
-      6 Save experience metadata:
+      6 Confirm <SESSION_DIR>/functional_specification.pdf and <SESSION_DIR>/functional_specification.html exist.
+
+      7 Save experience metadata:
           save_experience_chroma(
             session_dir="<SESSION_DIR>",
             session_id="<SESSION_ID>"

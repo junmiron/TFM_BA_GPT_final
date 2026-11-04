@@ -625,7 +625,8 @@ async def on_chat_start():
           process_diagram.mmd
           process_diagram.png
           functional_specification.formatted.md
-          deliverable.pdf
+          functional_specification.pdf
+          functional_specification.html
 
     **STEPS STRICT ORDER**
       1 Call 'get_session_dir_tool' (no arguments). It returns the absolute path of
@@ -653,11 +654,11 @@ async def on_chat_start():
             md="functional_specification.md",
             diagram="process_diagram.png",
             md_out="functional_specification.formatted.md",
-            pdf_out="deliverable.pdf",
+            pdf_out="functional_specification.pdf",
             toc=True, toc_depth=2, margin="1in"
           )
 
-      5 Confirm <SESSION_DIR>/deliverable.pdf exists.
+      5 Confirm <SESSION_DIR>/functional_specification.pdf and <SESSION_DIR>/functional_specification.html exist.
 
       6 Save experience metadata:
           save_experience_chroma(
@@ -763,10 +764,23 @@ async def on_message(msg: cl.Message):
 
 
 def _find_latest_session_dir():
-    """Return the most recent conversation/<SESSION_ID>/ dir containing functional_specification.md."""
+    """Return this run's conversation/<SESSION_ID>/ dir.
+
+    The active session (set by `start_workflow`) wins. The mtime scan is only a
+    fallback for when the session was never set - without that guard a stale
+    fixture folder from an earlier run silently supplies the artifacts, so the
+    checker reports another run's spec.
+    """
     conv_root = os.path.join(PROJECT_ROOT, "conversation")
     if not os.path.isdir(conv_root):
         return None
+
+    active = agents_tools_helpers.get_session()
+    if active:
+        d = os.path.join(conv_root, active)
+        if os.path.isdir(d) and os.path.isfile(os.path.join(d, "functional_specification.md")):
+            return d
+
     best_mtime, best_dir = 0.0, None
     for name in os.listdir(conv_root):
         d = os.path.join(conv_root, name)
@@ -808,12 +822,16 @@ async def _present_final_artifacts():
     diagram_png = os.path.join(session_dir, "process_diagram.png")
     if os.path.isfile(diagram_png):
         elements.append(ClImage(path=diagram_png, name="process_diagram.png", display="inline"))
-    deliverable_pdf = os.path.join(session_dir, "deliverable.pdf")
+    deliverable_pdf = os.path.join(session_dir, "functional_specification.pdf")
     if os.path.isfile(deliverable_pdf):
-        elements.append(ClPdf(path=deliverable_pdf, name="deliverable.pdf"))
-    if not artifacts["diagram_png"] or not artifacts["pdf"]:
+        elements.append(ClPdf(path=deliverable_pdf, name="functional_specification.pdf"))
+    deliverable_html = os.path.join(session_dir, "functional_specification.html")
+    if os.path.isfile(deliverable_html):
+        elements.append(ClFile(path=deliverable_html, name="functional_specification.html"))
+    if not artifacts["diagram_png"] or not artifacts["pdf"] or not artifacts["html"]:
         missing = [n for n, v in (("process_diagram.png", artifacts["diagram_png"]),
-                                 ("deliverable.pdf", artifacts["pdf"])) if not v]
+                                 ("functional_specification.pdf", artifacts["pdf"]),
+                                 ("functional_specification.html", artifacts["html"])) if not v]
         await cl.Message(content=f"⚠️ Could not produce: {', '.join(missing)}").send()
     elements.append(ClFile(path=spec_path, name="functional_specification.md"))
 
@@ -828,7 +846,7 @@ async def _present_final_artifacts():
 async def start_workflow(team, user, task_text: str):
     ctx = cl.user_session.get("team_ctx")
     # Create a deterministic session folder for this run so all deliverables
-    # (interview.jsonl, functional_specification.md, diagram, deliverable.pdf)
+    # (interview.jsonl, functional_specification.md, diagram, functional_specification.pdf)
     # land under conversation/<SESSION_ID>/ instead of the flat conversation/ dir.
     session_id = ctx.get("session_id")
     if not session_id:

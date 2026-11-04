@@ -44,7 +44,7 @@ async def main():
             "and output_path=\"project_root/conversation/sess-term-test/process_diagram.png\", theme=\"forest\".\n"
             "2) format_and_export with session_dir=\"project_root/conversation/sess-term-test\", "
             "md=\"functional_specification.md\", diagram=\"process_diagram.png\", "
-            "md_out=\"functional_specification.formatted.md\", pdf_out=\"deliverable.pdf\".\n"
+            "md_out=\"functional_specification.formatted.md\", pdf_out=\"functional_specification.pdf\".\n"
             "After both succeed reply TERMINATE."
         ),
         tools=[*mermaid_tools, *pdf_tools],
@@ -57,15 +57,25 @@ async def main():
         if isinstance(content, list):
             content = " | ".join(str(c) for c in content)
         print(f"[{getattr(msg, 'source', '?')}] {str(content)[:300]}")
+    # Same deterministic completion the app runs after the agent, so the test
+    # measures the pipeline, not whether the local model obeyed step 2.
+    print("finalize:", helpers.finalize_deliverables(str(sess)))
     print("\n=== ARTIFACTS ===")
-    for f in ["process_diagram.png", "functional_specification.formatted.md", "deliverable.pdf"]:
+    for f in ["process_diagram.png", "functional_specification.formatted.md",
+              "functional_specification.pdf", "functional_specification.html"]:
         print(f, "exists:", (sess / f).exists())
     import pymupdf as fitz
-    pdf = sess / "deliverable.pdf"
+    pdf = sess / "functional_specification.pdf"
     if pdf.exists():
         d = fitz.open(str(pdf)); print("pdf pages:", d.page_count); d.close()
-        print("RESULT: PASS")
-        return 0
+        html = sess / "functional_specification.html"
+        md = sess / "functional_specification.md"
+        ok_html = html.exists() and "data:image/png;base64," in html.read_text(encoding="utf-8")
+        ok_md = md.exists() and "![Process Diagram]" in md.read_text(encoding="utf-8")
+        print("html self-contained:", ok_html, "| md carries diagram:", ok_md)
+        if ok_html and ok_md:
+            print("RESULT: PASS")
+            return 0
     print("RESULT: FAIL")
     return 1
 

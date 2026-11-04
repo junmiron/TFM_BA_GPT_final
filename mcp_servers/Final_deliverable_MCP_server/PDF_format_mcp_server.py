@@ -231,18 +231,6 @@ def parse_requirements(block: str) -> list[dict]:
         items = parse_subsection_list(block)
     return items
 
-def ensure_diagram_section(md: str, diagram_name: str) -> str:
-    rel = diagram_name
-    image_md = f"![Process Diagram]({rel}){{ width=95% }}\n"
-    m = re.search(r"(?im)^##\s*Process Diagram\s*$", md)
-    if m:
-        start, end = find_section(md, "Process Diagram", stop_at_level=2)
-        if start != -1:
-            content = md[:start] + "\n" + image_md + "\n" + md[end:]
-            return content
-    tail = "\n\n## Process Diagram\n\n" + image_md + "\n"
-    return md.rstrip() + tail
-
 def ensure_in_scope_requirements_table(md: str) -> tuple[str, int]:
     # Specs name this section "In-Scope", "Scope", or "Purpose & Scope" — the
     # old regex only matched the first, so business requirements came out empty.
@@ -292,7 +280,8 @@ def build_payload(session_dir: Path, session_id: str) -> dict:
         "functional_specification.formatted.md",
         "process_diagram.mmd",
         "process_diagram.png",
-        "deliverable.pdf",
+        "functional_specification.pdf",
+        "functional_specification.html",
     ]
     files = []
     for name in wanted:
@@ -554,8 +543,16 @@ def format_document(session_dir: Path, md_file: str, diagram_file: str, out_file
     # the TOC and the rendered PDF.
     md, numbering_fixes = normalize_heading_numbering(md)
 
-    # Ensure diagram section
-    md = ensure_diagram_section(md, diagram_file)
+    # Ensure diagram section. The Mermaid source is kept so the .md/.html
+    # deliverables carry the diagram and the code that generated it; the PDF
+    # exporter strips the fence because it already embeds the rendered PNG.
+    mermaid_source = None
+    for candidate in ("process_diagram.mmd", "process_diagram.derived.mmd"):
+        source = session_dir / candidate
+        if source.exists():
+            mermaid_source = load_text(source)
+            break
+    md = ensure_diagram_section(md, diagram_file, mermaid_source)
 
     out_path = (session_dir / out_file).resolve()
     save_text(out_path, md)
@@ -669,19 +666,218 @@ def _img_tag(src: str, alt: str, session_dir: Path) -> str:
         return f'<img src="{name}" width="{_CONTENT_W}" height="{_CONTENT_H}" alt="{alt}"/>'
 
 
-def _markdown_to_html(md_text: str, session_dir: Path) -> str:
-    """Markdown -> HTML, with pandoc image attributes turned into real tags."""
+def _strip_mermaid_fences(md_text: str) -> str:
+    """Drop ```mermaid fences before PDF rendering.
+
+    A Mermaid block is source code: PyMuPDF Story would lay it out as a wall of
+    monospaced text, and the rendered PNG is already embedded next to it. The
+    HTML deliverable keeps the fence, the PDF does not.
+    """
+    out, in_fence, fence_lang = [], False, ""
+    for line in md_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            if not in_fence:
+                in_fence, fence_lang = True, stripped[3:].strip().lower()
+                continue
+            in_fence = False
+            continue
+        if in_fence and fence_lang == "mermaid":
+            continue
+        out.append(line)
+    return "\n".join(out) + ("\n" if md_text.endswith("\n") else "")
+
+
+def _mermaid_fence(source: str) -> str:
+    body = source.strip()
+    if body.startswith("```"):  # already fenced - unwrap so we do not nest
+        body = body.split("\n", 1)[1] if "\n" in body else ""
+        if body.rstrip().endswith("```"):
+            body = body.rstrip()[:-3]
+    return "```mermaid\n" + body.strip() + "\n```"
+
+
+def embed_diagram(md: str, diagram_name: str, mermaid_source: Optional[str] = None) -> str:
+    """Insert the rendered diagram (and its Mermaid source) into a Markdown document.
+
+    Idempotent and non-destructive: existing prose in a "Process Diagram" section
+    is kept, and running it twice does not duplicate the image or the fence. This
+    is what makes the .md deliverable self-explanatory - the reader sees the PNG
+    and the source that produced it.
+    """
+    block = f"![Process Diagram]({diagram_name})\n"
+    if mermaid_source and mermaid_source.strip():
+        block += "\n" + _mermaid_fence(mermaid_source) + "\n"
+
+    start, end = find_section(md, "Process Diagram", stop_at_level=2)
+    if start != -1:
+        section = md[start:end]
+        if re.search(r"!\[[^\]]*\]\([^)]*process_diagram", section, re.I):
+            # Image is already there; make sure the source fence follows it.
+            if "```mermaid" not in section and mermaid_source:
+                section = re.sub(
+                    r"!\[[^\]]*\]\([^)]*process_diagram[^)]*\)\s*(?:\{[^}]*\})?\s*",
+                    lambda m: m.group(0).rstrip() + "\n\n" + _mermaid_fence(mermaid_source) + "\n",
+                    section,
+                    count=1,
+                )
+            return md[:start] + section + md[end:]
+        return md[:start] + "\n" + block + "\n" + section + md[end:]
+
+    return md.rstrip() + "\n\n## Process Diagram\n\n" + block + "\n"
+
+
+def ensure_diagram_section(md: str, diagram_name: str, mermaid_source: Optional[str] = None) -> str:
+    rel = diagram_name
+    image_md = f"![Process Diagram]({rel}){{ width=95% }}\n"
+    block = image_md
+    if mermaid_source and mermaid_source.strip():
+        block += "\n" + _mermaid_fence(mermaid_source) + "\n"
+    m = re.search(r"(?im)^##\s*Process Diagram\s*$", md)
+    if m:
+        start, end = find_section(md, "Process Diagram", stop_at_level=2)
+        if start != -1:
+            content = md[:start] + "\n" + block + "\n" + md[end:]
+            return content
+    tail = "\n\n## Process Diagram\n\n" + block + "\n"
+    return md.rstrip() + tail
+
+
+def _markdown_to_html(md_text: str, session_dir: Path, keep_mermaid: bool = False,
+                      img_tag=None) -> str:
+    """Markdown -> HTML fragment, with pandoc image attributes turned into tags.
+
+    Mermaid fences are stripped by default: the rendered PNG is already in the
+    document and raw diagram source would bloat the PDF. The HTML deliverable
+    passes keep_mermaid=True so the source survives as a code block.
+    """
+    img_tag = img_tag or _img_tag
     md_text = ensure_blank_line_before_headings(md_text)
-    md_text = _IMG_MD_RE.sub(lambda m: _img_tag(m.group("src"), m.group("alt"), session_dir), md_text)
+    if not keep_mermaid:
+        md_text = _strip_mermaid_fences(md_text)
+    md_text = _IMG_MD_RE.sub(lambda m: img_tag(m.group("src"), m.group("alt"), session_dir), md_text)
     try:
         import markdown as mdlib
         try:
-            return mdlib.markdown(md_text, extensions=["tables", "fenced_code"])
+            return mdlib.markdown(md_text, extensions=["tables", "fenced_code", "toc"])
         except Exception:
             return mdlib.markdown(md_text)
     except Exception:
         import html as htmlmod
         return "<pre>" + htmlmod.escape(md_text) + "</pre>"
+
+
+_MIME_BY_EXT = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                ".svg": "image/svg+xml", ".gif": "image/gif", ".webp": "image/webp"}
+
+
+def _inline_img_tag(src: str, alt: str, session_dir: Path) -> str:
+    """<img> with the diagram inlined as a data URI, so the HTML stands alone."""
+    name = _resolve_image_src(src, session_dir)
+    if not name:
+        return f"<p>[missing image: {src}]</p>"
+    path = Path(name) if Path(name).is_absolute() else session_dir / name
+    try:
+        import base64
+        raw = path.read_bytes()
+        mime = _MIME_BY_EXT.get(path.suffix.lower(), "application/octet-stream")
+        # A flowchart can be several thousand pixels tall. Wrapping it in a
+        # scrollable figure keeps the page readable instead of dumping a
+        # 3700-pixel image into the middle of the document.
+        return (f'<figure class="diagram"><img src="data:{mime};base64,{base64.b64encode(raw).decode()}" '
+                f'alt="{alt}"/></figure>')
+    except Exception:
+        return f'<img src="{name}" alt="{alt}"/>'
+
+
+_HTML_CSS = """
+:root { color-scheme: light; }
+body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+       max-width: 900px; margin: 0 auto; padding: 24px 32px; line-height: 1.5; color: #1f2430; }
+h1 { font-size: 26px; border-bottom: 2px solid #d0d7de; padding-bottom: 10px; }
+h2 { font-size: 20px; margin-top: 28px; }
+h3 { font-size: 16px; margin-top: 20px; }
+table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+th, td { border: 1px solid #d0d7de; padding: 8px 10px; vertical-align: top; }
+th { background: #f6f8fa; }
+img { max-width: 100%; height: auto; border: 1px solid #d0d7de; border-radius: 6px; }
+figure.diagram { max-height: 760px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px;
+                 padding: 12px; margin: 16px 0; }
+figure.diagram img { border: none; }
+code { background: #f6f8fa; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+details { margin: 12px 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px 14px; }
+summary { font-weight: 600; }
+nav.toc { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 14px 18px; margin: 18px 0; }
+nav.toc ul { margin: 0; padding-left: 18px; }
+nav.toc a { color: #1f2430; text-decoration: none; }
+.meta { color: #6b7280; font-size: 13px; margin-bottom: 8px; }
+@media print { body { max-width: none; padding: 0; } nav.toc { display: none; } figure.diagram { max-height: none; overflow: visible; } }
+"""
+
+
+def _html_toc(body_html: str, depth: int = 3) -> str:
+    """Build an anchored Contents block from the headings the toc extension numbered."""
+    items = re.findall(rf'<h([1-{depth}]) id="([^"]+)"[^>]*>(.*?)</h\1>', body_html)
+    if not items:
+        return ""
+    out = []
+    for level, anchor, text in items:
+        level = int(level)
+        text = re.sub(r"<[^>]+>", "", text).strip()
+        if not text or text.lower() == "contents":
+            continue
+        out.append(f'<li style="margin-left:{(level - 1) * 12}px"><a href="#{anchor}">{_html_escape(text)}</a></li>')
+    return f'<nav class="toc"><h2>Contents</h2><ul>{"".join(out)}</ul></nav>' if out else ""
+
+
+def build_html_deliverable(session_dir: Path, md_file: str, out_file: str,
+                         diagram_file: Optional[str] = None,
+                         title: Optional[str] = None) -> dict:
+    """Write a self-contained HTML deliverable from the (formatted) Markdown."""
+    session_dir = Path(session_dir)
+    md_path = (session_dir / md_file).resolve()
+    if not md_path.exists() and md_file == "functional_specification.formatted.md":
+        # An agent can call export_html without having run format_spec first.
+        # Build the formatted doc rather than failing the tool call.
+        raw = session_dir / "functional_specification.md"
+        if raw.exists():
+            format_document(session_dir, "functional_specification.md",
+                            diagram_file or "process_diagram.png",
+                            "functional_specification.formatted.md")
+            md_path = (session_dir / md_file).resolve()
+    if not md_path.exists():
+        raise FileNotFoundError(f"Missing: {md_path}")
+
+    md_text = load_text(md_path)
+    title = title or _extract_title(md_path)
+    body = _markdown_to_html(md_text, session_dir, keep_mermaid=True, img_tag=_inline_img_tag)
+    # Mermaid source reads better collapsed than as a wall of monospaced text.
+    body = re.sub(
+        r'<pre><code class="language-mermaid">(.*?)</code></pre>',
+        lambda m: f'<details><summary>Diagram source (Mermaid)</summary><pre>{m.group(1)}</pre></details>',
+        body,
+        flags=re.S,
+    )
+    toc = _html_toc(body)
+    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    html = (
+        f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f'<title>{_html_escape(title)}</title>'
+        f'<meta name="generator" content="TFM_BA_GPT deliverable pipeline">'
+        f"<style>{_HTML_CSS}</style></head>"
+        f'<body><div class="meta">Generated {generated}</div>{toc}{body}</body></html>'
+    )
+    out_path = (session_dir / out_file).resolve()
+    save_text(out_path, html)
+    return {
+        "status": "ok",
+        "html": str(out_path),
+        "bytes": out_path.stat().st_size,
+        "toc_entries": toc.count("<li"),
+        "images": body.count("<img"),
+    }
 
 
 def _pymupdf_export(md_path: Path, diagram_path: Optional[Path], pdf_path: Path,
@@ -881,6 +1077,22 @@ def export_to_pdf(session_dir: Path, md_file: str, pdf_out: str, engine: str = "
 def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None) -> FastMCP:
     mcp = FastMCP("final-deliverable-mcp")
 
+    # `export_html` is local to create_server (the tool def binds the name), so the
+    # tool has to call the module-level builder by its own name - otherwise the call
+    # resolves to the decorated FunctionTool and raises
+    # "TypeError: 'FunctionTool' object is not callable".
+
+    @mcp.tool()
+    def export_html(
+        session_dir: str,
+        md: str = "functional_specification.formatted.md",
+        html_out: str = "functional_specification.html",
+        diagram: str = "process_diagram.png",
+    ) -> dict:
+        """Export the specification to a self-contained functional_specification.html (diagram inlined)."""
+        sd = resolve_under_allowed(session_dir, allowed_dirs, project_root)
+        return build_html_deliverable(sd, md, html_out, diagram, title=_extract_title((sd / md).resolve()))
+
     @mcp.tool()
     def format_spec(
         session_dir: str,
@@ -896,7 +1108,7 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
     def export_pdf(
         session_dir: str,
         md: str = "functional_specification.formatted.md",
-        pdf_out: str = "deliverable.pdf",
+        pdf_out: str = "functional_specification.pdf",
         engine: str = "xelatex",
         toc: bool = True,
         toc_depth: int = 2,
@@ -925,7 +1137,7 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
         md: str = "functional_specification.md",
         diagram: str = "process_diagram.svg",
         md_out: str = "functional_specification.formatted.md",
-        pdf_out: str = "deliverable.pdf",
+        pdf_out: str = "functional_specification.pdf",
         engine: str = "xelatex",
         toc: bool = True,
         toc_depth: int = 2,

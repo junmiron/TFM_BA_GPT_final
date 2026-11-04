@@ -7,10 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Makes the pipeline deterministic end-to-end on Windows and moves the model load off a single
 provider: the agent team runs on the local GPU lane, the simulated stakeholder runs on a
-remote lane, and the deliverables (PNG diagram, PDF with a real outline) are produced without
-pandoc or LaTeX.
+remote lane, and the deliverables (Markdown with the diagram, a PDF with a real outline, and a
+self-contained HTML) are produced without pandoc or LaTeX.
 
 ### Added
+- **HTML deliverable.** `functional_specification.html` is written next to the PDF by
+  `finalize_deliverables()`, and `export_html()` is exposed as an MCP tool. The document is
+  self-contained: the diagram PNG is embedded as a data URI, headings get anchor ids, and a
+  linked Contents block is generated from them. It ships with print CSS, and the tall flowchart
+  sits in a scrollable figure so the page does not stretch to 3700 px.
+- **The Mermaid diagram now lives in the Markdown deliverable.** `embed_diagram()` inserts the
+  rendered PNG plus the ```mermaid fence into `functional_specification.md`, which GitHub and
+  most Markdown viewers render natively. It is idempotent and keeps any prose already in the
+  "Process Diagram" section. The PDF keeps only the rendered PNG - the raw source is stripped
+  before the PyMuPDF Story render, since it would otherwise appear as a wall of monospaced text.
 - **Split model lanes.** Agents use `MODEL_CLIENT`/`MODEL_CLIENT_TOOLS`; the simulated stakeholder
   uses `HUMAN_MODEL`. New profiles: `src/model_config_strata.yaml` (local Strata / LM
   Studio-compatible OpenAI endpoint, `max_tokens: 16000`) and `src/model_config_opencode.yaml`
@@ -46,7 +56,7 @@ pandoc or LaTeX.
 - **Memory-backed agents no longer crash on LM Studio / llama.cpp backends.** autogen's `ChromaDBVectorMemory` and `TextCanvasMemory` inject retrieved context as a SystemMessage appended at the *end* of the model context; llama.cpp rejects such requests (`Jinja Exception: System message must be at the beginning`), which killed the interviewer's turn right after the planner's assignment with no visible question. `lib/rag_helpers.py` now provides `TemplateSafeChromaDBVectorMemory` and `TemplateSafeTextCanvasMemory`, which inject the same content as a UserMessage; both apps use them for all memory-backed agents.
 - **Interviewer agent no longer kills the workflow when the ChromaDB RAG store is unopenable.** A `chromadb_storage/` created by a different chromadb version only fails on first query (the client opens lazily), which crashed the interviewer's first turn and stopped the run right after the planner's assignment with no visible question. `app.py`/`app2.py` now validate the store at startup with one warm-up query and continue without RAG memory if it is unopenable (a warning is printed to the console). To restore RAG, delete `chromadb_storage/` and `index_state.json` so the store is rebuilt with the installed chromadb version.
 - Corrected the embedding model name in `docs/troubleshooting.md` (`paraphrase-multilingual-mpnet-base-v2`, not `all-MiniLM-L6-v2`).
-- **Final deliverables are presented in the chat when a run completes.** After "Workflow complete", `app2.py` now renders the full functional specification inline and attaches `process_diagram.png` (inline), `deliverable.pdf` and a downloadable copy of the `.md`. If `terminate_agent` skipped its file steps, it falls back to `conversation/functional_specification.md` and renders the diagram on the fly from `process_diagram.mmd` via `mmdc` (fences stripped; resolved with `shutil.which`, since bare `mmdc` is not found by Python subprocess on Windows).
+- **Final deliverables are presented in the chat when a run completes.** After "Workflow complete", `app2.py` now renders the full functional specification inline and attaches `process_diagram.png` (inline), `functional_specification.pdf` and a downloadable copy of the `.md`. If `terminate_agent` skipped its file steps, it falls back to `conversation/functional_specification.md` and renders the diagram on the fly from `process_diagram.mmd` via `mmdc` (fences stripped; resolved with `shutil.which`, since bare `mmdc` is not found by Python subprocess on Windows).
 
 ### Fixed
 - **A deliverable from a previous run could satisfy the current one.** `finalize_deliverables()`
@@ -106,6 +116,18 @@ pandoc or LaTeX.
 - **LM Studio mid-run failures are explained in the UI.** A model being unloaded (`400 Bad Request - Model unloaded by user or API request`) or a speculative-decoding engine crash previously only showed up as a console traceback; `app2.py` now catches these and posts an actionable hint (reload the model / restart the LM Studio server).
 
 ### Changed
+- **Session lookup no longer picks a stale run.** `_find_latest_session_dir()` chose the
+  newest `functional_specification.md` under `conversation/` regardless of which run it
+  belonged to, so a fixture folder left behind by `test/test_terminate_pipeline.py`
+  (`sess-term-test`, a 426-char stub) could be reported as the current run's output. The
+  active session set by `start_workflow` is now checked first; the mtime scan is a
+  fallback only.
+- **Deliverables are named after what they are.** The PDF and HTML are now
+  `functional_specification.pdf` and `functional_specification.html` instead of
+  `deliverable.pdf` / `deliverable.html`, so every output of one run shares the
+  same stem: `.md`, `.formatted.md`, `.pdf`, `.html`.
+  `migrate_legacy_deliverable_names()` renames the old files in a session folder
+  on the next run, and only when the new name does not already exist.
 - **One standard for model configuration.** No profile YAML holds a secret: every
   `api_key` line was removed from `src/model_config_*.yaml`, and `src/model_loader.py`
   injects the key from the environment (`OPENAI_API_KEY`, `GROQ_API_KEY`,

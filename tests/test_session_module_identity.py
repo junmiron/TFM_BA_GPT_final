@@ -65,3 +65,37 @@ def test_no_duplicate_module_in_sys_path_shadowing():
         "app2.py must import the helpers as lib.agents_tools_helpers so "
         f"set_session() and the tools share one module object (found: {offenders})"
     )
+
+
+def test_find_latest_session_dir_prefers_the_active_session(tmp_path, monkeypatch):
+    """A stale fixture folder must not masquerade as the current run.
+
+    `test_terminate_pipeline.py` leaves `conversation/sess-term-test/` behind with
+    a stub spec. When the real run's session had no spec yet, `_find_latest_session_dir()`
+    returned that fixture and the checker reported 426 chars from another run.
+    """
+    import time
+
+    import app2
+    from lib import agents_tools_helpers
+
+    conv = tmp_path / "conversation"
+    stale = conv / "sess-old-run"
+    active = conv / "sess-current"
+    stale.mkdir(parents=True)
+    active.mkdir(parents=True)
+    (stale / "functional_specification.md").write_text("# old\n", encoding="utf-8")
+    time.sleep(0.05)
+    (active / "functional_specification.md").write_text("# current\n", encoding="utf-8")
+
+    monkeypatch.setattr(app2, "PROJECT_ROOT", str(tmp_path))
+    agents_tools_helpers.set_session("sess-current")
+    try:
+        found = app2._find_latest_session_dir()
+        assert found is not None and Path(found).name == "sess-current", found
+        # Even when the active session has no spec yet, the fallback still works.
+        (active / "functional_specification.md").unlink()
+        found = app2._find_latest_session_dir()
+        assert found is not None and Path(found).name == "sess-old-run", found
+    finally:
+        agents_tools_helpers._ACTIVE_SESSION = None

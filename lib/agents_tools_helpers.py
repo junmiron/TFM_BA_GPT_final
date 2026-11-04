@@ -624,10 +624,85 @@ def render_diagram_png(session_dir: Path) -> Optional[Path]:
     return None
 
 
-def export_deliverable_pdf(session_dir: Path) -> Optional[Path]:
-    """Build deliverable.pdf with the PyMuPDF exporter if it is absent or has no diagram."""
+def _mermaid_source(session_dir: Path) -> Optional[str]:
+    """The diagram source, if the agents wrote one."""
+    for name in ("process_diagram.mmd", "process_diagram.derived.mmd", "canvas_diagram.md"):
+        path = session_dir / name
+        if path.is_file():
+            try:
+                return path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+    return None
+
+
+def embed_diagram_in_markdown(session_dir: Path) -> bool:
+    """Put the rendered diagram and its Mermaid source into functional_specification.md.
+
+    The specification the agents write never mentions the diagram - only the
+    PDF does - so the .md deliverable used to ship without it. Writing it into
+    the Markdown makes the .md a real deliverable: the PNG inline plus a
+    ```mermaid fence, which GitHub and most Markdown viewers render natively.
+    """
     session_dir = Path(session_dir)
-    pdf = session_dir / "deliverable.pdf"
+    spec = session_dir / "functional_specification.md"
+    if not spec.is_file():
+        return False
+    diagram = "process_diagram.png" if (session_dir / "process_diagram.png").is_file() else "process_diagram.svg"
+    try:
+        md = spec.read_text(encoding="utf-8")
+        updated = _pdf_server_module().embed_diagram(md, diagram, _mermaid_source(session_dir))
+        if updated == md:
+            return True  # already embedded
+        spec.write_text(updated, encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _html_has_image(html_path: Path) -> bool:
+    try:
+        return "<img" in html_path.read_text(encoding="utf-8")
+    except OSError:
+        return True
+
+
+def export_deliverable_html(session_dir: Path) -> Optional[Path]:
+    """Build the self-contained functional_specification.html next to the PDF."""
+    session_dir = Path(session_dir)
+    html = session_dir / "functional_specification.html"
+    spec = session_dir / "functional_specification.md"
+    diagram = session_dir / "process_diagram.png"
+    if not spec.is_file():
+        return html if html.is_file() else None
+    if html.is_file():
+        complete = not diagram.is_file() or _html_has_image(html)
+        stale = spec.stat().st_mtime >= html.stat().st_mtime
+        if complete and not stale:
+            return html
+    module = _pdf_server_module()
+    if module is None:
+        return html if html.is_file() else None
+    try:
+        formatted = session_dir / "functional_specification.formatted.md"
+        if not formatted.is_file() or formatted.stat().st_mtime < spec.stat().st_mtime:
+            module.format_document(session_dir, "functional_specification.md",
+                                   "process_diagram.png", "functional_specification.formatted.md")
+        module.build_html_deliverable(
+            session_dir,
+            "functional_specification.formatted.md",
+            "functional_specification.html",
+            title=module._extract_title(spec),
+        )
+        return html if html.is_file() else None
+    except Exception:
+        return html if html.is_file() else None
+
+
+def export_deliverable_pdf(session_dir: Path) -> Optional[Path]:
+    """Build functional_specification.pdf with the PyMuPDF exporter if it is absent or has no diagram."""
+    session_dir = Path(session_dir)
+    pdf = session_dir / "functional_specification.pdf"
     diagram = session_dir / "process_diagram.png"
     spec = session_dir / "functional_specification.md"
     if not spec.is_file():
@@ -680,15 +755,43 @@ def _pdf_has_image(pdf_path: Path) -> bool:
         return True  # can't inspect it - leave the existing PDF alone
 
 
+def migrate_legacy_deliverable_names(session_dir: Path) -> List[str]:
+    """Rename the pre-v1.1 `deliverable.pdf` / `deliverable.html` in place.
+
+    Older runs wrote the PDF as deliverable.pdf. A session folder that still has
+    one would otherwise end up with two copies of the same spec under different
+    names. Only renames when the new name is absent, so a partial migration
+    never overwrites a real deliverable.
+    """
+    session_dir = Path(session_dir)
+    renamed = []
+    for old, new in (("deliverable.pdf", "functional_specification.pdf"),
+                     ("deliverable.html", "functional_specification.html")):
+        src, dst = session_dir / old, session_dir / new
+        if src.is_file() and not dst.is_file():
+            try:
+                src.rename(dst)
+                renamed.append(f"{old} -> {new}")
+            except OSError:
+                pass
+    return renamed
+
+
 def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
-    """Ensure the diagram PNG and deliverable.pdf exist for this run."""
+    """Ensure the diagram PNG, the Markdown, functional_specification.html and functional_specification.pdf exist."""
     sd = Path(session_dir) if session_dir else _session_dir()
+    renamed = migrate_legacy_deliverable_names(sd)
     png = render_diagram_png(sd)
+    embed_diagram_in_markdown(sd)
     pdf = export_deliverable_pdf(sd)
+    html = export_deliverable_html(sd)
     return {
         "session_dir": str(sd),
         "diagram_png": str(png) if png else None,
+        "renamed": renamed,
+        "markdown": str(sd / "functional_specification.md"),
         "pdf": str(pdf) if pdf else None,
+        "html": str(html) if html else None,
     }
 
 
