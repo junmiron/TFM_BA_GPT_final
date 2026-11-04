@@ -52,7 +52,7 @@ def test_finalize_produces_png_and_pdf(session):
     assert result["diagram_png"] and Path(result["diagram_png"]).is_file()
     pdf = Path(result["pdf"])
     assert pdf.is_file()
-    fitz = pytest.importorskip("fitz", reason="PyMuPDF is required for the PDF fallback")
+    fitz = pytest.importorskip("pymupdf", reason="PyMuPDF is required for the PDF fallback")
     doc = fitz.open(str(pdf))
     try:
         assert doc.page_count >= 1
@@ -75,7 +75,7 @@ def test_stale_pdf_is_regenerated_when_the_spec_changes(session):
     The gate used to return any existing PDF that embedded an image, so a run
     that rewrote the spec still "passed" against a PDF from hours earlier.
     """
-    fitz = pytest.importorskip("fitz", reason="PyMuPDF is required for the PDF fallback")
+    fitz = pytest.importorskip("pymupdf", reason="PyMuPDF is required for the PDF fallback")
     helpers.finalize_deliverables(str(session))
 
     spec = session / "functional_specification.md"
@@ -103,7 +103,7 @@ def test_finalize_regenerates_a_pdf_that_has_no_outline(session):
     let a deliverable ship with a rendered "Contents" paragraph but an empty
     outline - the reader's sidebar has nothing to click.
     """
-    fitz = pytest.importorskip("fitz", reason="PyMuPDF is required for the PDF fallback")
+    fitz = pytest.importorskip("pymupdf", reason="PyMuPDF is required for the PDF fallback")
 
     doc = fitz.open()
     page = doc.new_page()

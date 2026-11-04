@@ -13,6 +13,10 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT / "lib"))
+from quiet_deprecations import suppress_third_party_deprecations
+
+suppress_third_party_deprecations()
 
 REQUIRED_MODULES = {
     "chainlit": "chainlit",
@@ -24,7 +28,7 @@ REQUIRED_MODULES = {
     "fastmcp": "fastmcp",
     "lxml": "lxml",
     "readability": "readability-lxml",
-    "fitz": "PyMuPDF",
+    "pymupdf": "PyMuPDF",
     "PIL": "pillow",
 }
 

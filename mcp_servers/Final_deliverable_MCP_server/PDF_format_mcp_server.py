@@ -657,7 +657,7 @@ def _img_tag(src: str, alt: str, session_dir: Path) -> str:
     if not name:
         return f"<p>[missing image: {src}]</p>"
     try:
-        import fitz
+        import pymupdf as fitz
         pix = fitz.Pixmap(str(session_dir / name) if not Path(name).is_absolute() else name)
         w, h = pix.width, pix.height
         pix = None
@@ -695,7 +695,7 @@ def _pymupdf_export(md_path: Path, diagram_path: Optional[Path], pdf_path: Path,
     `toc` is set the page numbers are stabilised with write_stabilized().
     """
     try:
-        import fitz  # PyMuPDF
+        import pymupdf as fitz  # PyMuPDF
     except Exception as e:
         return {"status": "error", "engine": "pymupdf", "message": f"PyMuPDF not available: {e}"}
 

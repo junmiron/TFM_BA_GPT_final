@@ -5,6 +5,20 @@ import sys
 import asyncio
 import types
 from datetime import datetime, timezone
+
+# Ensure project paths are importable when running via `chainlit run app.py`
+PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+LIB_PATH = os.path.join(PROJECT_ROOT, "lib")
+SRC_PATH = os.path.join(PROJECT_ROOT, "src")
+sys.path.append(LIB_PATH)
+sys.path.append(SRC_PATH)
+
+# Must run before chainlit/fastmcp are imported: the deprecation warnings are
+# emitted during those imports.
+from quiet_deprecations import suppress_third_party_deprecations
+
+suppress_third_party_deprecations()
+
 import chainlit as cl
 from autogen_core import SingleThreadedAgentRuntime, CancellationToken
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
@@ -16,12 +30,6 @@ from autogen_agentchat.base import TaskResult
 from autogen_ext.memory.canvas import TextCanvasMemory
 from autogen_ext.tools.mcp import StdioServerParams, mcp_server_tools
 
-# Ensure project paths are importable when running via `chainlit run app.py`
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
-LIB_PATH = os.path.join(PROJECT_ROOT, "lib")
-SRC_PATH = os.path.join(PROJECT_ROOT, "src")
-sys.path.append(LIB_PATH)
-sys.path.append(SRC_PATH)
 
 import mcp_boot 
 from lib import agents_tools_helpers

@@ -659,7 +659,7 @@ def export_deliverable_pdf(session_dir: Path) -> Optional[Path]:
 def _pdf_has_outline(pdf_path: Path) -> bool:
     """True when the PDF has PDF bookmarks, not just a rendered Contents block."""
     try:
-        import fitz
+        import pymupdf as fitz  # `fitz` is the deprecated PyMuPDF alias
         doc = fitz.open(str(pdf_path))
         has = bool(doc.get_toc())
         doc.close()
@@ -671,7 +671,7 @@ def _pdf_has_outline(pdf_path: Path) -> bool:
 def _pdf_has_image(pdf_path: Path) -> bool:
     """True when the PDF already embeds at least one image (the diagram)."""
     try:
-        import fitz
+        import pymupdf as fitz  # `fitz` is the deprecated PyMuPDF alias
         doc = fitz.open(str(pdf_path))
         count = sum(len(page.get_images()) for page in doc)
         doc.close()

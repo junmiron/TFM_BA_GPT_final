@@ -188,7 +188,7 @@ async def main():
     print("process_diagram.png exists:", png.exists())
     print("deliverable.pdf exists:", pdf.exists())
     if pdf.exists():
-        import fitz
+        import pymupdf as fitz
         d = fitz.open(str(pdf)); print("pdf pages:", d.page_count); d.close()
 
     print("\nRESULT:", "PASS" if (ok and pdf.exists()) else "PARTIAL" if ok else "FAIL")

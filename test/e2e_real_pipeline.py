@@ -205,7 +205,7 @@ async def main():
     pdf = sess_dir / "deliverable.pdf"
     print("deliverable.pdf exists:", pdf.exists())
     if pdf.exists():
-        import fitz
+        import pymupdf as fitz
         d = fitz.open(str(pdf))
         print("pdf pages:", d.page_count, "images:", sum(len(p.get_images()) for p in d))
         d.close()

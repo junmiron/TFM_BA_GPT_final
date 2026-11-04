@@ -60,7 +60,7 @@ async def main():
     print("\n=== ARTIFACTS ===")
     for f in ["process_diagram.png", "functional_specification.formatted.md", "deliverable.pdf"]:
         print(f, "exists:", (sess / f).exists())
-    import fitz
+    import pymupdf as fitz
     pdf = sess / "deliverable.pdf"
     if pdf.exists():
         d = fitz.open(str(pdf)); print("pdf pages:", d.page_count); d.close()

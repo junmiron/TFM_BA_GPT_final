@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-fitz = pytest.importorskip("fitz", reason="PyMuPDF is required for the PDF fallback")
+fitz = pytest.importorskip("pymupdf", reason="PyMuPDF is required for the PDF fallback")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PDF_SERVER = PROJECT_ROOT / "mcp_servers" / "Final_deliverable_MCP_server" / "PDF_format_mcp_server.py"
