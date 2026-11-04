@@ -1,8 +1,10 @@
 /data
 /venv
 /install
+# Provider configs that embed a real key in the file. Configs using a
+# REPLACE_WITH_* placeholder (groq, strata, opencode) are tracked; the key
+# itself comes from .env at runtime.
 /src/model_config_azure.yaml
-/src/model_config_groq.yaml
 /src/model_config_hugging.yaml
 /src/model_config_github.yaml
 /venv311

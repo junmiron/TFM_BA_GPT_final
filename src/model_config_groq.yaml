@@ -1,0 +1,17 @@
+provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+config:
+  model: "openai/gpt-oss-120b"
+  # Real key comes from GROQ_API_KEY in .env; load_model_client injects it.
+  api_key: "REPLACE_WITH_GROQ_API_KEY"
+  parallel_tool_calls: false
+  # Groq free tier caps every model at 8000 tokens/minute, so a 16000-token
+  # completion budget makes every request exceed the TPM limit on its own.
+  max_tokens: 4000
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: true
+    family: unknown
+    structured_output: false
+    multiple_system_messages: true
+  base_url: "https://api.groq.com/openai/v1"
