@@ -512,8 +512,18 @@ _LIFECYCLE_STATUSES = ["Check-In", "Received", "In Cleaning", "Quality Check",
                        "Ready for Pickup", "Picked Up", "Check-Out"]
 
 
+_PDF_SERVER_CACHE: Dict[str, Any] = {}
+
+
 def _pdf_server_module():
-    """Load the PDF MCP server module as a plain library (no MCP transport)."""
+    """Load the PDF MCP server module as a plain library (no MCP transport).
+
+    Cached: re-executing the file on every call cost ~40s (it pulls in
+    sentence_transformers), so finalize_deliverables - which calls this five
+    times - could take minutes for no reason.
+    """
+    if "module" in _PDF_SERVER_CACHE:
+        return _PDF_SERVER_CACHE["module"]
     import importlib.util
     path = _PROJECT_ROOT / "mcp_servers" / "Final_deliverable_MCP_server" / "PDF_format_mcp_server.py"
     spec = importlib.util.spec_from_file_location("pdf_format_mcp_server", path)
@@ -521,6 +531,7 @@ def _pdf_server_module():
         return None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    _PDF_SERVER_CACHE["module"] = module
     return module
 
 
@@ -868,6 +879,41 @@ def normalize_markdown_headings(session_dir: Path) -> int:
     return splits
 
 
+# The writer's document template, as the checker is told to verify. Finalize
+# reports the sections that never made it to disk so the operator and the UI can
+# see a truncated spec instead of a silently short one.
+TEMPLATE_SECTIONS = [
+    ("Title Page", r"title\s*page"),
+    ("Introduction", r"introduction|overview"),
+    ("Scope", r"scope"),
+    ("Functional Requirements", r"functional\s*requirements"),
+    ("Non-Functional Requirements", r"non[\s-]*functional\s*requirements"),
+    ("User Roles & Personas", r"user\s*roles|personas|roles?\s*(?:and|&)\s*responsibilities"),
+    ("Assumptions & Constraints", r"assumptions|constraints"),
+    ("Use Cases", r"use\s*cases|user\s*stor(?:y|ies)"),
+    ("Glossary", r"glossar(?:y|ies)"),
+]
+
+
+def missing_template_sections(session_dir: Path) -> List[str]:
+    """Heading names from the template that the spec does not contain."""
+    spec = Path(session_dir) / "functional_specification.md"
+    if not spec.is_file():
+        return [name for name, _ in TEMPLATE_SECTIONS]
+    headings = [line.strip() for line in spec.read_text(encoding="utf-8", errors="ignore").splitlines()
+                if re.match(r"^\s*#{1,6}\s+\S", line)]
+    blob = " \n".join(headings).lower()
+    missing = []
+    for name, pattern in TEMPLATE_SECTIONS:
+        # The writer commonly uses its project name as the document's H1 instead
+        # of a literal "Title Page" heading; that is a valid title page.
+        present = (bool(re.search(pattern, blob)) if name != "Title Page" else
+                   bool(re.search(pattern, blob)) or any(re.match(r"^#\s+\S", h) for h in headings))
+        if not present:
+            missing.append(name)
+    return missing
+
+
 def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
     """Ensure the diagram PNG, the Markdown, functional_specification.html and functional_specification.pdf exist."""
     sd = Path(session_dir) if session_dir else _session_dir()
@@ -883,6 +929,7 @@ def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
         "diagram_pngs": [str(x) for x in pngs],
         "renamed": renamed,
         "glued_headings_split": glued,
+        "missing_sections": missing_template_sections(sd),
         "markdown": str(sd / "functional_specification.md"),
         "pdf": str(pdf) if pdf else None,
         "html": str(html) if html else None,
@@ -903,14 +950,29 @@ TERMINATE = "terminate_agent"
 READY_TOKEN = re.compile(r"^\s*\*{0,2}READY\*{0,2}\s*$", re.I)
 QUESTION_PREFIX = "QUESTION:"
 STATUS_PREFIX = "STATUS:"
-MISSING_WRITER_SECTIONS = re.compile(
-    r"\b("  # key sections the writer must generate
-    r"use\s*cases?|"          # Use Case / Use Cases
-    r"user\s*stor(?:y|ies)|"  # User Story / User Stories
-    r"glossar(?:y|ies)"       # Glossary / Glossaries
-    r")\b",
-    re.IGNORECASE,
-)
+# How many NEEDS_INFO rounds the checker may force before the pipeline moves on
+# to the diagram stage. Each round is a full writer pass plus a checker pass.
+MAX_CHECKER_ROUNDS = int(os.environ.get("MAX_CHECKER_ROUNDS", "3"))
+
+# Every section of the writer's document template. When the checker reports one
+# of these as missing, the fix belongs with the writer (it has the save tools),
+# not with the interviewer - sending it to planning just re-asks the user for
+# information the document already has.
+def checker_flags_missing_section(text: str) -> bool:
+    """True when the checker's NEEDS_INFO list names a section of the template.
+
+    A bare mention of a section word is not enough - "the scope needs the
+    customer's SLA" is a question for the user. Only a line that calls a section
+    missing/absent/incomplete sends the work back to the writer, which is the
+    agent that owns the document and its save tools.
+    """
+    for line in (text or "").splitlines():
+        low = line.lower()
+        if not re.search(r"\b(missing|absent|not present|lacking|incomplete|omitted)\b", low):
+            continue
+        if any(re.search(pattern, low) for _, pattern in TEMPLATE_SECTIONS):
+            return True
+    return False
 
 ASSIGNMENT_MARKER = re.compile(
     r'^\[ASSIGNMENT\]\s+agent=(?P<agent>[a-z_]+)\s+task="[^"]*"\s+awaiting_user_reply=(?P<await>true|false)\s*$',
@@ -1076,7 +1138,14 @@ async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]):
     #   - Otherwise hand control to PLANNING (it will run the interviewer loop with the user).
     if last_src == CHECKER:
         if "NEEDS_INFO" in last_txt:
-            if MISSING_WRITER_SECTIONS.search(last_txt or ""):
+            # Each NEEDS_INFO round costs a full writer + checker pass against a
+            # remote lane. Without a cap the same section can be requested
+            # forever and the run dies on MAX_MESSAGES instead of finishing.
+            rounds = sum(1 for m in messages
+                         if _src(m) == CHECKER and "NEEDS_INFO" in _txt(m))
+            if rounds >= MAX_CHECKER_ROUNDS:
+                return DIAGRAM
+            if checker_flags_missing_section(last_txt):
                 return WRITER
             return PLANNING
         if READY_TOKEN.match(last_txt):

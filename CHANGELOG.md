@@ -133,6 +133,18 @@ each pin are in `docs/dependency-versions.md`.
   out, and `finalize_deliverables` applies it to `functional_specification.md`
   itself so all three deliverables agree. Re-finalizing the affected run gave
   `## 1-5, 7-9` plus `## Process Diagram`, PDF outline 10 entries, HTML 10 `<h2>`.
+- MuPDF could loop forever or silently drop content when a table row was taller
+  than one page. PDF export now splits long rows into paginatable pieces and
+  bounds the Story writer; pathological layouts fail fast instead of hanging.
+  Long-row regression tests confirm the cell text survives in the PDF.
+- A missing template section could be routed back to the interviewer, which
+  repeated questions the document already answered. Checker gaps for all required
+  sections now return to the writer, the retry loop is capped, and finalization
+  reports any still-missing template headings.
+- `/api/sessions` could time out while synchronous model setup started in the
+  background; clients retrying the POST then created duplicate runs. Session runs
+  now start as Starlette background tasks after the response is flushed, with a
+  real-uvicorn regression test for the slow-start path.
 
 ## [1.1.0] - 2026-11-04
 

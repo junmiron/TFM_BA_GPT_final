@@ -513,3 +513,62 @@ def test_split_glued_headings_recovers_a_missing_section():
         "See the `## literal` marker in the notes.\n"
     )[0]
     assert untouched.count("\n##") == 0
+
+def test_story_write_bounds_a_runaway_mu_pdf_layout(tmp_path):
+    """A table row taller than the content box makes MuPDF place() never return
+    more=False. The writer must stop and say so instead of hanging finalize."""
+    pdf = _load_pdf_module()
+    md = "# Stall probe\n\n" + "\n".join(
+        f"## Section {i}\n\n| A | B |\n|---|---|\n"
+        + "".join(f"| {'word ' * 1200} | row {j} |\n" for j in range(6))
+        for i in range(6)
+    )
+    spec = tmp_path / "spec.md"
+    spec.write_text(md, encoding="utf-8")
+    body = pdf._markdown_to_html(md, tmp_path)
+    rectfn = lambda n, f: ((0, 0, pdf._PAGE_W, pdf._PAGE_H),
+                           (pdf._MARGIN, pdf._MARGIN,
+                            pdf._PAGE_W - pdf._MARGIN, pdf._PAGE_H - pdf._MARGIN), None)
+    with pytest.raises(RuntimeError) as exc:
+        pdf._story_write(fitz.Story(f"<body>{body}</body>"), None, rectfn)
+    assert "MuPDF Story" in str(exc.value)
+
+
+def test_flatten_tables_keeps_every_cell_text():
+    pdf = _load_pdf_module()
+    html = ("<table><tr><th>Requirement</th><th>Description</th></tr>"
+            "<tr><td>FR-001</td><td>Scan the QR tag at check-in.</td></tr>"
+            "<tr><td>FR-002</td><td>Notify R&amp;D staff by SMS.</td></tr></table>")
+    flat = pdf._flatten_tables(html)
+    assert "<table" not in flat
+    for fragment in ("FR-001", "Scan the QR tag at check-in.",
+                     "FR-002", "Notify R&amp;D staff by SMS.", "Requirement"):
+        assert fragment in flat, f"{fragment} lost while flattening"
+    assert "R&amp;amp;D" not in flat
+
+    split = pdf._split_long_table_rows(
+        "<table><tr><th>Requirement</th><th>Description</th></tr>"
+        "<tr><td>FR-003</td><td>R&amp;D " + ("word " * 150) + "</td></tr></table>"
+    )
+    assert "FR-003" in split and "R&amp;D" in split
+    assert "R&amp;amp;D" not in split
+
+
+def test_pdf_export_survives_a_table_mu_pdf_cannot_paginate(tmp_path):
+    """The pathological table still produces a deliverable: tables fall back to
+    paragraph layout rather than the export failing or hanging."""
+    pdf = _load_pdf_module()
+    md = ("# Stall probe\n\n## 1. Functional Requirements\n\n"
+          "| Requirement | Description |\n|---|---|\n"
+          + "".join(f"| FR-{i:03d} | {'word ' * 900}|\n" for i in range(8))
+          + "\n## 2. Glossary\n\n| Term | Definition |\n|---|---|\n| QR | Quick Response |\n")
+    spec = tmp_path / "spec.md"
+    spec.write_text(md, encoding="utf-8")
+    result = pdf._pymupdf_export(spec, None, tmp_path / "out.pdf", title="Stall probe")
+    assert result["status"] == "ok", result
+    doc = fitz.open(tmp_path / "out.pdf")
+    text = "".join(page.get_text() for page in doc)
+    pages = doc.page_count
+    doc.close()
+    assert pages > 1
+    assert "FR-000" in text and "Quick Response" in text, "table content was dropped"

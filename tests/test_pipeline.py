@@ -25,6 +25,8 @@ from agents_tools_helpers import (  # noqa: E402
     PLANNING,
     INTERVIEWER,
     WRITER,
+    CHECKER,
+    DIAGRAM,
     TERMINATE,
 )
 
@@ -105,13 +107,33 @@ def test_selector_routing_after_question_and_ready():
     history = [_msg("functional_spec_checker_agent", "Not complete. NEEDS_INFO: missing Use Cases")]
     assert asyncio.run(selector_func(history)) == WRITER
 
-    # Checker flags a real gap -> planner runs the interview loop.
-    history = [_msg("functional_spec_checker_agent", "Not complete. NEEDS_INFO: missing non-functional requirements")]
+    # Checker flags any template section the writer skipped -> the writer fixes it,
+    # because it holds the interview answers and the save tools.
+    for section in ("User Roles & Personas", "Non-Functional Requirements",
+                    "Assumptions & Constraints", "Title Page"):
+        history = [_msg(CHECKER, f"Not complete. NEEDS_INFO: missing {section}")]
+        assert asyncio.run(selector_func(history)) == WRITER, f"{section} went to the interviewer"
+
+    # A gap that is not a template section -> planner runs the interview loop.
+    history = [_msg(CHECKER, "Not complete. NEEDS_INFO: the scope needs the customer's SLA")]
     assert asyncio.run(selector_func(history)) == PLANNING
 
     # terminate_agent keeps the floor until it says TERMINATE.
     assert asyncio.run(selector_func([_msg(TERMINATE, "Exported deliverable.pdf")])) == TERMINATE
     assert asyncio.run(selector_func([_msg(TERMINATE, "Done. TERMINATE")])) == PLANNING
+
+
+def test_checker_needs_info_loop_is_bounded():
+    """A checker that keeps flagging the same gap must not loop forever."""
+    round_one = _msg(CHECKER, "Not complete. NEEDS_INFO: missing Use Cases")
+    assert asyncio.run(selector_func([round_one])) == WRITER
+
+    # Second round still gives the writer a chance.
+    assert asyncio.run(selector_func([round_one, _msg(WRITER, "READY"), round_one])) == WRITER
+
+    # Third round: the writer is no longer re-run, the pipeline moves to the diagram.
+    history = [round_one, _msg(WRITER, "READY"), round_one, _msg(WRITER, "READY"), round_one]
+    assert asyncio.run(selector_func(history)) == DIAGRAM
 
 
 def test_agents_config_is_well_formed():

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -205,6 +205,11 @@ def get_session(session_id: str) -> dict:
 
 
 async def _start_run(session: Session) -> None:
+    # Starlette awaits BackgroundTasks after the response body is sent. Yield once
+    # more before synchronous AutoGen setup so the server can flush that response
+    # to the client before imports/model construction temporarily block the loop.
+    await asyncio.sleep(0.05)
+
     async def ask_user(prompt: Optional[str] = None) -> str:
         # Blocking on the queue is how the UI answers an interview question.
         session.status = "awaiting_answer"
@@ -229,6 +234,9 @@ async def _start_run(session: Session) -> None:
         return
 
     if session.status == "stopped":
+        token = (session.workflow or {}).get("cancellation_token")
+        if token is not None:
+            token.cancel()
         session.record({"type": "artifacts", "artifacts": session.artifacts()})
         return
 
@@ -276,7 +284,7 @@ async def _start_run(session: Session) -> None:
 
 
 @app.post("/api/sessions")
-async def create_session(payload: dict) -> dict:
+async def create_session(payload: dict, background_tasks: BackgroundTasks) -> dict:
     task = (payload.get("task") or "").strip()
     if not task:
         raise HTTPException(status_code=400, detail="task is required")
@@ -284,8 +292,11 @@ async def create_session(payload: dict) -> dict:
     session_id = "sess-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     session = Session(session_id, task)
     SESSIONS[session_id] = session
-    # The run is a background task so the WS connection stays free for answers.
-    asyncio.create_task(_start_run(session))
+    # Starlette sends the HTTP response before awaiting these tasks. Starting
+    # workflow construction with create_task here could run its synchronous model
+    # setup before the response was flushed, making clients time out and retry
+    # this non-idempotent POST (creating duplicate runs).
+    background_tasks.add_task(_start_run, session)
     return {"session_id": session_id}
 
 

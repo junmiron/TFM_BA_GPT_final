@@ -357,3 +357,79 @@ def test_finalize_splits_headings_glued_to_a_paragraph(session):
     assert result["glued_headings_split"] == 1
     md = (session / "functional_specification.md").read_text(encoding="utf-8")
     assert "\n## 4. Functional Requirements\n" in md
+
+def test_missing_template_sections_are_reported(session):
+    """The spec in the fixture has only an Overview, so finalize must say what
+    the writer never produced instead of shipping a silently truncated PDF."""
+    missing = helpers.missing_template_sections(session)
+    assert "Use Cases" in missing
+    assert "Glossary" in missing
+    assert "User Roles & Personas" in missing
+    assert "Introduction" not in missing  # "## 1. Overview" satisfies it
+
+    complete = """# Spec
+
+## 1. Title Page
+Laundry app v1
+
+## 2. Introduction
+Overview of the shop.
+
+## 3. Scope
+In scope: tagging. Out of scope: billing.
+
+## 4. Functional Requirements
+FR-001 Scan the tag.
+
+## 5. Non-Functional Requirements
+Response under two seconds.
+
+## 6. User Roles & Personas
+Staff and manager.
+
+## 7. Assumptions & Constraints
+Printers may be shared.
+
+## 8. Use Cases
+UC-01 Check in an order.
+
+## 9. Glossary
+| Term | Definition |
+|---|---|
+| QR | Quick Response |
+"""
+    (session / "functional_specification.md").write_text(complete, encoding="utf-8")
+    assert helpers.missing_template_sections(session) == []
+
+    # The actual writer commonly uses synonyms rather than literal template
+    # labels; a project H1 is its title page and "Roles and Responsibilities"
+    # satisfies the roles/personas section.
+    realistic = """# Laundry Shop Staff App v1
+
+## 1. Project Overview
+Summary.
+## 2. Scope
+In and out.
+## 3. Functional Requirements
+Requirements.
+## 4. Non-Functional Requirements
+Performance.
+## 5. Roles and Responsibilities
+Staff.
+## 6. Assumptions and Constraints
+Limits.
+## 7. Use Cases
+Scenarios.
+## 8. Glossary
+| Term | Definition |
+|---|---|
+| QR | Code |
+"""
+    (session / "functional_specification.md").write_text(realistic, encoding="utf-8")
+    assert helpers.missing_template_sections(session) == []
+
+
+def test_finalize_result_carries_the_missing_section_report(session):
+    result = helpers.finalize_deliverables(str(session))
+    assert isinstance(result["missing_sections"], list)
+    assert "Glossary" in result["missing_sections"]

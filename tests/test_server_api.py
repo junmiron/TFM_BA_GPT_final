@@ -209,6 +209,40 @@ def test_session_titles_are_headings_not_raw_markdown():
     assert _title_of("") == "untitled run"
 
 
+def test_create_session_responds_before_workflow_initialization(live_server, monkeypatch):
+    """Workflow/model setup may block the event loop; POST must return first so
+    the client does not time out and repeat a non-idempotent create request."""
+    started = threading.Event()
+    release = threading.Event()
+
+    async def slow_create_workflow(ask_user, notify):
+        started.set()
+        release.wait(timeout=3)
+        return {"messages": 0}
+
+    async def finish(workflow, task, sink):
+        await sink.complete("text_mention")
+        return {"stop_reason": "text_mention", "error": None}
+
+    monkeypatch.setattr(api, "create_workflow", slow_create_workflow)
+    monkeypatch.setattr(api, "run_workflow", finish)
+    monkeypatch.setattr(api.agents_tools_helpers, "finalize_deliverables", lambda *_: {})
+    base, _ = live_server
+
+    try:
+        started_at = time.monotonic()
+        response = httpx.post(f"{base}/api/sessions", json={"task": "Inventory app"}, timeout=1.0)
+        elapsed = time.monotonic() - started_at
+        assert response.status_code == 200
+        assert elapsed < 1.0, f"POST waited {elapsed:.2f}s for workflow initialization"
+        assert started.wait(1), "background workflow did not start"
+    finally:
+        release.set()
+
+    sid = response.json()["session_id"]
+    assert _wait_for(lambda: httpx.get(f"{base}/api/sessions/{sid}").json()["status"] == "done", 5)
+
+
 def test_a_blocked_question_reports_as_awaiting_answer(live_server, monkeypatch):
     """While the interviewer waits for a human reply the session must not look
     like a normal run, otherwise the UI has nothing to act on. Answering over

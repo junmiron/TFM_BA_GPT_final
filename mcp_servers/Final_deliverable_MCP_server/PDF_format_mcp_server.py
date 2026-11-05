@@ -24,7 +24,7 @@ import datetime
 
 import argparse
 import io
-from html import escape as _html_escape
+from html import escape as _html_escape, unescape as _html_unescape
 import re
 import shlex
 import subprocess
@@ -39,12 +39,10 @@ from autogen_core.memory import MemoryContent, MemoryMimeType
 from autogen_ext.memory.chromadb import (ChromaDBVectorMemory,
     PersistentChromaDBVectorMemoryConfig)
 
-# If you want local embeddings:
-try:
-    from sentence_transformers import SentenceTransformer
-    _HAS_ST = True
-except Exception:
-    _HAS_ST = False
+# The embedding model is imported lazily inside _make_chroma_memory: this file
+# is also loaded as a plain library by lib/agents_tools_helpers to build the
+# PDF/HTML deliverables, and a top-level `sentence_transformers` import costs
+# ~40s every time, which made finalize_deliverables minutes slow.
 
 # ------------------------------ path guard ------------------------------
 def resolve_under_allowed(path: str | Path, allowed: List[Path], project_root: Path | None = None) -> Path:
@@ -306,6 +304,8 @@ def build_payload(session_dir: Path, session_id: str) -> dict:
 # === CREATE CHROMA MEMORY (Autogen wrapper) ===
 def _make_chroma_memory(collection: str, persistence_path: Path,
                         k: int = 12, score_threshold: float = 0.15):
+
+    from sentence_transformers import SentenceTransformer
 
     model = SentenceTransformer('all-MiniLM-L6-v2')
     try:
@@ -1111,6 +1111,134 @@ def build_html_deliverable(session_dir: Path, md_file: str, out_file: str,
     }
 
 
+def _flatten_tables(html: str) -> str:
+    """Turn every <table> into label: value paragraphs.
+
+    MuPDF's Story can only lay out a table row that fits inside one page rect.
+    A generated requirements table with a 1000-character description cell does
+    not fit, and place() then re-emits the same block forever. Rendering the
+    same content as paragraphs always paginates, so this is the last-resort
+    layout: the words survive, the grid does not.
+    """
+    out = html
+    for table in re.findall(r"<table>.*?</table>", out, flags=re.S):
+        rows = re.findall(r"<tr>(.*?)</tr>", table, flags=re.S)
+        header = [_html_unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in
+                  re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", rows[0], flags=re.S)] if rows else []
+        parts = []
+        for row in rows[1:]:
+            cells = [_html_unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in
+                     re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row, flags=re.S)]
+            if len(cells) == 1:
+                parts.append(f"<p>{_html_escape(cells[0])}</p>")
+                continue
+            first, rest = cells[0], cells[1:]
+            label = header[0] if header else first
+            detail = "; ".join(x for x in rest if x)
+            parts.append(f"<p><strong>{_html_escape(first)}</strong> "
+                         f"{_html_escape(label)}: {_html_escape(detail)}</p>")
+        out = out.replace(table, "".join(parts), 1)
+    return out
+
+
+def _split_long_table_rows(html: str, chunk: int = 700) -> str:
+    """Break a table row whose text will not fit on one page into several rows.
+
+    MuPDF's Story cannot split a row across pages: it either re-emits the same
+    block forever or silently discards it. Writer-generated requirement tables
+    regularly put a 1000-character description in one cell, so every long cell is
+    chopped into page-sized pieces and the row label is repeated on each piece.
+    """
+    out = html
+    for table in re.findall(r"<table>.*?</table>", out, flags=re.S):
+        rows = re.findall(r"<tr>.*?</tr>", table, flags=re.S)
+        rebuilt = []
+        for index, row in enumerate(rows):
+            cells = [_html_unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in
+                     re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row, flags=re.S)]
+            longest = max((len(c) for c in cells), default=0)
+            if index == 0 or longest <= chunk:
+                rebuilt.append(row)
+                continue
+            label = cells[0] if len(cells[0]) <= chunk else cells[0][:chunk]
+            pieces = []
+            for start in range(0, longest, chunk):
+                parts = []
+                for position, cell in enumerate(cells):
+                    piece = label if position == 0 else cell[start:start + chunk]
+                    parts.append(f"<td>{_html_escape(piece)}</td>")
+                pieces.append("<tr>" + "".join(parts) + "</tr>")
+            rebuilt.append("".join(pieces))
+        new_table = table
+        for old_row, new_row in zip(rows, rebuilt):
+            if new_row != old_row:
+                new_table = new_table.replace(old_row, new_row, 1)
+        out = out.replace(table, new_table, 1)
+    return out
+
+
+def _story_write(story, writer, rectfn, positionfn=None, max_pages=400):
+    """Story.write with a hard page cap and a stall guard.
+
+    MuPDF's Story.place() reports more=True with an unchanged filled rect when a
+    table row does not fit inside the content rect: it re-emits the same block
+    page after page and the built-in write() loop never returns. A 15-section
+    spec with 31 tables hung finalize for the whole 600s timeout. Bound the loop
+    and raise on a stall so the caller can retry with a layout MuPDF can break.
+    """
+    dev = None
+    page_num = 0
+    rect_num = 0
+    filled = (0, 0, 0, 0)
+    seen_pages = set()
+    while page_num < max_pages:
+        mediabox, rect, ctm = rectfn(rect_num, filled)
+        rect_num += 1
+        if mediabox:
+            page_num += 1
+        more, filled = story.place(rect)
+        page_layout = []
+
+        def on_position(position):
+            position.page_num = page_num
+            # PyMuPDF hands back a Rect for most elements but a bare tuple for
+            # table cells, so normalise before hashing.
+            page_layout.append((tuple(round(v, 1) for v in position.rect),
+                               (position.text or "")[:60]))
+            if positionfn:
+                positionfn(position)
+
+        story.element_positions(on_position)
+        if writer:
+            if mediabox:
+                if dev:
+                    writer.end_page()
+                dev = writer.begin_page(mediabox)
+            story.draw(dev, ctm)
+            if not more:
+                writer.end_page()
+                dev = None
+                break
+        else:
+            story.draw(None, ctm)
+            if not more:
+                break
+
+        # MuPDF re-emits the overflowing block forever. Tables are not reported
+        # as element positions, so the only reliable signal is a page whose
+        # heading layout is identical to one already drawn.
+        key = tuple(page_layout)
+        if key and key in seen_pages:
+            raise RuntimeError(
+                f"MuPDF Story repeated a page at {page_num}: a table row is taller "
+                f"than the {_CONTENT_H}pt content box"
+            )
+        seen_pages.add(key)
+    else:
+        raise RuntimeError(f"MuPDF Story exceeded the {max_pages} page limit")
+    return page_num
+
+
 def _pymupdf_export(md_path: Path, diagram_path: Optional[Path], pdf_path: Path,
                     title: str, toc: bool = True, toc_depth: int = 2) -> dict:
     """
@@ -1136,104 +1264,132 @@ def _pymupdf_export(md_path: Path, diagram_path: Optional[Path], pdf_path: Path,
     if not re.search(r"^\s*#", md_text, re.M):
         body_html = f"<h1>{title}</h1>\n" + body_html
 
-    css = (
+    # MuPDF's Story cannot break a table row that is taller than the content
+    # rect: it either re-emits the block forever (the finalize hang) or silently
+    # drops it (a PDF missing whole requirement tables). Long rows are split into
+    # page-sized pieces, and _story_write bounds the layout loop so a stall raises
+    # instead of hanging the MCP call.
+    _PDF_CSS_SAFE = (
         "body{font-family:Helvetica,Arial,sans-serif;font-size:11px;}"
         "table{border-collapse:collapse;width:100%;}"
-        "th,td{border:1px solid #888;padding:4px;vertical-align:top;}"
+        "th,td{border:1px solid #888;padding:3px;vertical-align:top;}"
         "h1{font-size:20px;}h2{font-size:16px;}h3{font-size:13px;}"
     )
-    head = f'<head><meta charset="utf-8"><style>{css}</style></head>'
-
-    def wrap(body: str) -> str:
-        return f'<!DOCTYPE html><html>{head}<body>{body}</body></html>'
-
-    html = wrap(body_html)
 
     def rectfn(rect_num, filled):
         return (0, 0, _PAGE_W, _PAGE_H), (_MARGIN, _MARGIN, _PAGE_W - _MARGIN, _PAGE_H - _MARGIN), None
 
-    try:
+    def toc_body(positions, content_html):
+        entries = [
+            p for p in positions
+            if p.heading and 1 <= p.heading <= toc_depth and (p.open_close & 1)
+            and p.text and p.text.strip().lower() != "contents"
+        ]
+        if not entries:
+            return content_html
+        items = "".join(
+            f'<li style="margin-left:{(p.heading - 1) * 12}px">'
+            f"{_html_escape(p.text)} — p.{p.page_num}</li>"
+            for p in entries
+        )
+        return f"<h2>Contents</h2><ul>{items}</ul>" + content_html
+
+    def render(css: str, content_html: str):
+        """Lay out one body; raises RuntimeError if MuPDF stalls."""
+        head = f'<head><meta charset="utf-8"><style>{css}</style></head>'
+
+        def wrap(body: str) -> str:
+            return f'<!DOCTYPE html><html>{head}<body>{body}</body></html>'
+
+        html = wrap(content_html)
         buf = io.BytesIO()
         writer = fitz.DocumentWriter(buf)
         outline: list[list] = []
-        if toc:
-            def toc_body(positions):
-                entries = [
-                    p for p in positions
-                    if p.heading and 1 <= p.heading <= toc_depth and (p.open_close & 1)
-                    and p.text and p.text.strip().lower() != "contents"
-                ]
-                if not entries:
-                    return body_html
-                items = "".join(
-                    f'<li style="margin-left:{(p.heading - 1) * 12}px">'
-                    f"{_html_escape(p.text)} — p.{p.page_num}</li>"
-                    for p in entries
-                )
-                return f"<h2>Contents</h2><ul>{items}</ul>" + body_html
+        try:
+            if toc:
+                # Bounded stabilisation loop. fitz.Story.write_stabilized iterates
+                # until the content stops changing, with no cap: when the TOC
+                # itself shifts page counts the loop can re-render a 15-page
+                # document for minutes and the MCP call times out. Each pass is a
+                # layout-only write (null writer), then the final content renders
+                # once.
+                content = content_html
+                for _ in range(4):
+                    positions = []
+                    _story_write(fitz.Story(wrap(content), archive=str(session_dir)),
+                                 None, rectfn, positionfn=lambda p: positions.append(p))
+                    new_content = toc_body(positions, content_html)
+                    if new_content == content:
+                        break
+                    content = new_content
+                # The final render also collects heading positions, so the bookmark
+                # page numbers match the pages the reader actually sees - the TOC
+                # block itself adds pages and shifts everything after it.
+                final_positions = []
+                _story_write(fitz.Story(wrap(content), archive=str(session_dir)),
+                            writer, rectfn, positionfn=lambda p: final_positions.append(p))
+                for p in final_positions:
+                    # `p.heading` is the h-level (1 for <h1>, 2 for <h2>, ...), not a
+                    # boolean; `p.depth` is DOM nesting depth and is always 1 for a
+                    # flat body, so it cannot be used for the outline level.
+                    level = p.heading or 0
+                    # p.text is None for non-heading layout items.
+                    if not (1 <= level <= toc_depth and (p.open_close & 1)):
+                        continue
+                    text = " ".join((p.text or "").split())
+                    if text and text.lower() != "contents":
+                        outline.append([level, text, p.page_num])
 
-            # Bounded stabilisation loop. fitz.Story.write_stabilized iterates
-            # until the content stops changing, with no cap: when the TOC
-            # itself shifts page counts the loop can re-render a 15-page
-            # document for minutes and the MCP call times out. Each pass is a
-            # layout-only write (null writer), then the final content renders
-            # once.
-            content = body_html
-            for _ in range(4):
-                positions = []
-                story = fitz.Story(wrap(content), archive=str(session_dir))
-                story.write(None, rectfn, positionfn=lambda p: positions.append(p))
-                new_content = toc_body(positions)
-                if new_content == content:
-                    break
-                content = new_content
-            # The final render also collects heading positions, so the bookmark
-            # page numbers match the pages the reader actually sees - the TOC
-            # block itself adds pages and shifts everything after it.
-            final_positions = []
-            fitz.Story(wrap(content), archive=str(session_dir)).write(
-                writer, rectfn, positionfn=lambda p: final_positions.append(p)
-            )
-            for p in final_positions:
-                # `p.heading` is the h-level (1 for <h1>, 2 for <h2>, ...), not a
-                # boolean; `p.depth` is DOM nesting depth and is always 1 for a
-                # flat body, so it cannot be used for the outline level.
-                level = p.heading or 0
-                # p.text is None for non-heading layout items.
-                if not (1 <= level <= toc_depth and (p.open_close & 1)):
-                    continue
-                text = " ".join((p.text or "").split())
-                if text and text.lower() != "contents":
-                    outline.append([level, text, p.page_num])
+                # doc.set_toc rejects a level that jumps more than one below the
+                # previous entry, so shift the shallowest used level to 1 and clamp
+                # any skip.
+                if outline:
+                    # Story can return a wrapped h1 with the line break swallowed
+                    # ("FunctionalSpecification"). Take the top-level heading from
+                    # the markdown source instead, with whitespace normalised.
+                    h1 = next(
+                        (" ".join(m.group(1).split())
+                         for m in (re.match(r"^#\s+(.*)$", ln) for ln in md_text.splitlines())
+                         if m),
+                        None,
+                    )
+                    if outline[0][0] == 1 and h1:
+                        outline[0][1] = h1
+                    shift = min(entry[0] for entry in outline) - 1
+                    prev = 0
+                    for entry in outline:
+                        entry[0] = max(1, entry[0] - shift)
+                        if entry[0] > prev + 1:
+                            entry[0] = prev + 1
+                        prev = entry[0]
+            else:
+                _story_write(fitz.Story(html=html, archive=str(session_dir)), writer, rectfn)
+            writer.close()
+        except Exception:
+            try:
+                writer.close()
+            except Exception:
+                pass
+            raise
+        return buf, outline
 
-            # doc.set_toc rejects a level that jumps more than one below the
-            # previous entry, so shift the shallowest used level to 1 and clamp
-            # any skip.
-            if outline:
-                # Story can return a wrapped h1 with the line break swallowed
-                # ("FunctionalSpecification"). Take the top-level heading from
-                # the markdown source instead, with whitespace normalised.
-                h1 = next(
-                    (" ".join(m.group(1).split())
-                     for m in (re.match(r"^#\s+(.*)$", ln) for ln in md_text.splitlines())
-                     if m),
-                    None,
-                )
-                if outline[0][0] == 1 and h1:
-                    outline[0][1] = h1
-                shift = min(entry[0] for entry in outline) - 1
-                prev = 0
-                for entry in outline:
-                    entry[0] = max(1, entry[0] - shift)
-                    if entry[0] > prev + 1:
-                        entry[0] = prev + 1
-                    prev = entry[0]
-        else:
-            story = fitz.Story(html=html, archive=str(session_dir))
-            story.write(writer, rectfn)
-        writer.close()
-    except Exception as e:
-        return {"status": "error", "engine": "pymupdf", "message": f"PDF export failed: {e}"}
+    # MuPDF stalls on a table row taller than the page box. Try the normal
+    # layout first; if the story cannot paginate, render the tables as
+    # paragraphs so the deliverable is still produced instead of hanging.
+    buf = outline = None
+    last_error = None
+    # MuPDF clips any row taller than the page, so the PDF layout always uses
+    # the split rows; the HTML deliverable keeps real tables for the browser.
+    pdf_body = _split_long_table_rows(body_html)
+    for layout in (pdf_body, _flatten_tables(pdf_body)):
+        try:
+            buf, outline = render(_PDF_CSS_SAFE, layout)
+            break
+        except Exception as e:
+            last_error = e
+    if buf is None:
+        return {"status": "error", "engine": "pymupdf", "message": f"PDF export failed: {last_error}"}
+
 
     try:
         doc = fitz.open("pdf", buf)
