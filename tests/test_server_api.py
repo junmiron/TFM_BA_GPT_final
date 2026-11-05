@@ -339,3 +339,28 @@ def test_stop_cancels_the_run_token(live_server, monkeypatch):
     assert artifacts_recorded
     assert status == "stopped"
     assert token.cancelled
+
+def test_deliverables_land_in_the_folder_the_ui_serves(fake_run, monkeypatch):
+    """lib/pipeline.py invents a `sess-<timestamp>` folder when the workflow has no
+    id, which put the PDF/HTML in a directory the artifacts endpoint never reads:
+    a finished run with zero downloads (seen live on sess-20261105051520)."""
+    monkeypatch.setattr(api.agents_tools_helpers, "finalize_deliverables", lambda d: {})
+
+    async def fake_run_workflow(workflow, task_text, sink):
+        session_id = workflow.get("session_id")
+        if not session_id:
+            session_id = "sess-invented"
+            workflow["session_id"] = session_id
+        folder = api.CONV_ROOT / session_id
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "functional_specification.md").write_text("# Invented run", encoding="utf-8")
+        return {"session_id": session_id, "stop_reason": "text_mention", "error": None}
+
+    monkeypatch.setattr(api, "run_workflow", fake_run_workflow)
+    c = client()
+    sid = c.post("/api/sessions", json={"task": "Laundry shop staff app"}).json()["session_id"]
+    assert _await_finished(c, sid)["status"] == "done"
+
+    arts = c.get(f"/api/sessions/{sid}/artifacts").json()["artifacts"]
+    assert any(a["name"] == "functional_specification.md" for a in arts), arts
+    assert not (fake_run / "sess-invented").exists(), "the run wrote to a folder the UI cannot read"

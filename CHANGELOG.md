@@ -109,6 +109,13 @@ each pin are in `docs/dependency-versions.md`.
   `check_mermaid`/`clean_mermaid` tools report and fix the same pattern. Verified
   end to end: the session that lost diagram 5 now renders all eleven
   (`pdf images 11`, `html imgs 11`, `md images 11`).
+- **A completed run showed zero downloads in the web UI.** `run_workflow`
+  invents its own `sess-<timestamp>` when the workflow has no id, so the
+  interview, the spec, the diagram and the PDF landed in
+  `conversation/sess-20261105051544/` while the API tracked
+  `sess-20261105051520` and reported `artifacts: []`. `_start_run` now pins
+  `workflow["session_id"]` to the id the UI is tracking, and a contract test
+  asserts the deliverables land in exactly that folder.
 - **Two whole sections were missing from the deliverable.** The spec writer
   sometimes glues a heading onto the end of the previous paragraph with no
   newline - `...basic reporting.## 4. Functional Requirements` - so Markdown never

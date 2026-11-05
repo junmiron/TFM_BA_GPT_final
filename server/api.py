@@ -232,6 +232,12 @@ async def _start_run(session: Session) -> None:
         session.record({"type": "artifacts", "artifacts": session.artifacts()})
         return
 
+    # Pin the on-disk folder to the id the UI is tracking. Without this,
+    # run_workflow invents its own `sess-<timestamp>` and every deliverable
+    # lands in a folder the artifacts endpoint never looks at, so a completed
+    # run shows zero downloads.
+    session.workflow["session_id"] = session.id
+
     class Sink:
         async def info(self, content: str) -> None:
             session.record({"type": "info", "content": content})
