@@ -1,0 +1,102 @@
+import { describe, expect, it } from 'vitest';
+import {
+  awaitingQuestion,
+  initialState,
+  isTerminalRun,
+  reducer,
+  type Action,
+  type RunState,
+} from '../state/runState';
+import type { ServerEvent } from '../lib/types';
+
+const apply = (state: RunState, action: Action): RunState => reducer(state, action);
+const event = (e: ServerEvent): Action => ({ type: 'socket/event', id: 's1', event: e });
+
+function startedSession(): RunState {
+  let state = apply(initialState, { type: 'session/createStart', tempId: 'pending-1', task: 'Build a thing' });
+  state = apply(state, { type: 'session/created', tempId: 'pending-1', id: 's1' });
+  return state;
+}
+
+describe('runState reducer', () => {
+  it('promotes a pending session to the real id and keeps the thread', () => {
+    const state = startedSession();
+    expect(state.activeId).toBe('s1');
+    expect(state.sessions.map((s) => s.id)).toEqual(['s1']);
+    expect(state.threads['s1'].turns[0].content).toBe('Build a thing');
+    expect(state.threads['pending-1']).toBeUndefined();
+  });
+
+  it('failed creation leaves no ghost session', () => {
+    let state = apply(initialState, { type: 'session/createStart', tempId: 'pending-9', task: 'x' });
+    state = apply(state, { type: 'session/createFailed', tempId: 'pending-9', message: 'backend down' });
+    expect(state.sessions).toHaveLength(0);
+    expect(state.activeId).toBeNull();
+    expect(state.composerError).toBe('backend down');
+  });
+
+  it('streams chunks into one turn and settles it with the final message', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'chunk', source: 'writer', content: 'Sec' }));
+    state = apply(state, event({ type: 'chunk', source: 'writer', content: 'tion 1' }));
+    // turns[0] is the task the user typed; the streamed agent turn is the second.
+    expect(state.threads.s1.turns).toHaveLength(2);
+    expect(state.threads.s1.turns[1].content).toBe('Section 1');
+    expect(state.threads.s1.turns[1].streaming).toBe(true);
+
+    state = apply(state, event({ type: 'message', source: 'writer', content: 'Section 1 complete' }));
+    expect(state.threads.s1.turns).toHaveLength(2);
+    expect(state.threads.s1.turns[1].streaming).toBe(false);
+    expect(state.threads.s1.turns[1].content).toBe('Section 1 complete');
+  });
+
+  it('confirms an optimistic answer when the server echoes it', () => {
+    let state = startedSession();
+    state = apply(state, { type: 'answer/sent', id: 's1', content: 'Offline first' });
+    expect(state.threads.s1.turns.at(-1)!.pending).toBe(true);
+    state = apply(state, event({ type: 'answer', content: 'Offline first' }));
+    expect(state.threads.s1.turns).toHaveLength(2); // optimistic + echo do not duplicate
+    expect(state.threads.s1.turns.at(-1)!.pending).toBe(false);
+  });
+
+  it('shows the question only while waiting for a human answer', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'message', source: 'interviewer_agent', content: 'QUESTION: Which devices?' }));
+    expect(awaitingQuestion(state.threads.s1)).toBe('Which devices?');
+    state = apply(state, { type: 'answer/sent', id: 's1', content: 'Android' });
+    expect(awaitingQuestion(state.threads.s1)).toBeNull();
+  });
+
+  it('a completed run is terminal and carries artifacts', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'complete', stop_reason: 'terminate_agent', artifacts: [{ name: 'functional_specification.pdf', kind: 'pdf', size: 10, url: '/api/files/s1/functional_specification.pdf' }] }));
+    expect(isTerminalRun(state.threads.s1.run)).toBe(true);
+    expect(state.threads.s1.artifacts).toHaveLength(1);
+    expect(state.sessions[0].status).toBe('completed');
+  });
+
+  it('an error event fails the run', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'error', content: 'model unavailable' }));
+    expect(state.threads.s1.run).toBe('failed');
+    expect(state.threads.s1.turns.at(-1)!.kind).toBe('error');
+  });
+  it('still shows the question when the orchestrator speaks in between', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'message', source: 'interviewer_agent', content: 'QUESTION: How are returns handled?' }));
+    state = apply(state, event({ type: 'message', source: 'planning_agent', content: '1 user : Answer the interviewer_agent\'s question.' }));
+    expect(awaitingQuestion(state.threads.s1)).toBe('How are returns handled?');
+    state = apply(state, { type: 'answer/sent', id: 's1', content: 'Returns are scanned at the counter.' });
+    expect(awaitingQuestion(state.threads.s1)).toBeNull();
+  });
+
+  it('does not duplicate a human answer echoed by the pipeline', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'message', source: 'interviewer_agent', content: 'QUESTION: Which channels?' }));
+    state = apply(state, { type: 'answer/sent', id: 's1', content: 'Online and in person.' });
+    state = apply(state, event({ type: 'message', source: 'user', content: 'Online and in person.' }));
+    const answers = state.threads.s1.turns.filter((turn) => turn.content === 'Online and in person.');
+    expect(answers).toHaveLength(1);
+    expect(answers[0].pending).toBe(false);
+  });
+});

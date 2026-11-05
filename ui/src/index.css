@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-glow: hsl(var(--primary-glow));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-danger: hsl(var(--danger));
+  --color-danger-foreground: hsl(var(--danger-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chat-bot: hsl(var(--chat-bot));
+  --color-chat-bot-foreground: hsl(var(--chat-bot-foreground));
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --background-image-gradient-primary: var(--gradient-primary);
+  --background-image-gradient-secondary: var(--gradient-secondary);
+  --shadow-glow: 0 0 20px hsl(217 91% 60% / 0.3);
+  --animate-fade-in: fade-in 0.25s ease-out;
+  --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    0% { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+}
+
+/* Design tokens (HSL). They mirror the talk-wiz-chat prototype.
+   primary is darkened (46% vs 60%) so white text on it passes WCAG AA (5.8:1). */
+@layer base {
+  :root {
+    --background: 220 20% 98%;
+    --foreground: 220 20% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 15%;
+    --primary: 217 91% 46%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 217 91% 56%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 25%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 40%;
+    --accent: 217 91% 95%;
+    --accent-foreground: 217 91% 35%;
+    --danger: 0 72% 42%;
+    --danger-foreground: 0 0% 100%;
+    --border: 220 13% 88%;
+    --ring: 217 91% 46%;
+    --chat-bot: 220 14% 97%;
+    --chat-bot-foreground: 220 20% 25%;
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 46%), hsl(217 91% 52%));
+    --gradient-secondary: linear-gradient(135deg, hsl(220 14% 96%), hsl(220 14% 98%));
+    --radius: 0.5rem;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    min-width: 320px;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

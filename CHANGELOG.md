@@ -27,8 +27,9 @@ each pin are in `docs/dependency-versions.md`.
 - **`@mermaid-js/mermaid-cli` pinned to 12.2.0** in CI (was unpinned), and the
   local install was upgraded from 12.0.0. Diagram rendering tests pass on the
   new version.
-- CI actions bumped: `actions/checkout` v4 -> v7, `actions/setup-python` v5 -> v7,
-  plus a `python -m pip check` step before the test run.
+- CI actions bumped: `actions/checkout` v4 -> v7.0.1, `actions/setup-python` v5 -> v7.1.0,
+  both commit-pinned; `actions/setup-node` is also commit-pinned for the UI job. A
+  `python -m pip check` step runs before the Python test suite.
 
 ### Removed
 - **langchain and langchain-community are gone.** They were only used for one
@@ -45,6 +46,39 @@ each pin are in `docs/dependency-versions.md`.
   which versions are blocked by which constraint, and the verification gates.
 - `tests/test_rag_splitter.py` - guards that `langchain` is never imported again
   and that the replacement splitter respects chunk size, overlap and content.
+
+### Added - web UI
+- **`ui/` - React + Vite + TypeScript + Tailwind client.** Three columns: session rail
+  (create/switch runs), live transcript with role-coloured turns and streaming chunks,
+  and a run panel showing the seven pipeline stages plus the artifact download list.
+  The answer box only appears when the interviewer is waiting for a human reply.
+  `Ctrl/Cmd + Enter` sends, `Escape` stops the run, focus rings are visible, the
+  transcript is `aria-live`, and `prefers-reduced-motion` disables the animations.
+  The API base comes from `VITE_API_URL` (default `http://127.0.0.1:8000`) - no
+  hardcoded host. `load scripts`, `lets talk` and `phone call` from the Lovable
+  prototype are not implemented.
+- **Frontend toolchain upgraded** to React 19.3.1, Vite 8.3.5, Vitest 5.0.5,
+  TypeScript 7.0.2 and Tailwind 4.3.3; the locked install reports zero npm
+  vulnerabilities. CI now runs the frontend typecheck, tests and production build.
+- **`lib/pipeline.py`** - the AutoGen team, stage table and termination sequence moved
+  out of `app2.py`. Chainlit and FastAPI are now thin adapters over the same workflow,
+  so both front-ends produce identical artifacts.
+- **`server/api.py`** - FastAPI sessions API (`/api/health`, `/api/sessions`,
+  `/api/sessions/{id}`, `/api/sessions/{id}/stop`, `/api/files/{id}/{name}`) plus a
+  `/ws/sessions/{id}` WebSocket that replays history on connect and streams events.
+  Completed sessions are finalized before artifacts are listed.
+- `tests/test_server_api.py` (FastAPI contract, scripted fake workflow - no API key)
+  and `ui/src/**/*.test.ts` (vitest: question extraction, stage derivation, artifact
+  ordering, reducer transitions).
+- FastAPI 0.162.0 and Uvicorn 0.54.0 are pinned as the React UI server stack.
+- `docs/web-ui.md` - architecture, run commands, API contract and UI design rationale.
+
+### Fixed
+- Local Vite development now passes API preflight requests only from the two
+  default localhost origins; credentials and other origins remain disallowed.
+- The web UI Stop action now cancels the workflow, wakes an `ask_user` blocked on
+  the answer queue, and retains `stopped` after the run exits; real-uvicorn tests
+  cover answer delivery, stop while waiting, and stop during team construction.
 
 ## [1.1.0] - 2026-11-04
 

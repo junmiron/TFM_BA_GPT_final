@@ -212,10 +212,12 @@ def test_terminate_token_only_ends_run_from_terminate_agent():
 
 
 def test_apps_restrict_terminate_to_terminate_agent():
-    """app.py and app2.py must both build the termination condition with
+    """Every front-end must build the termination condition with
     sources=['terminate_agent'], otherwise any agent echoing the word kills
     the whole conversation (see test_terminate_token_only_ends_run_from_terminate_agent)."""
-    for app_file in ("app.py", "app2.py"):
+    # The team (and its termination condition) now lives in lib/pipeline.py;
+    # app.py is the legacy front-end that still builds its own team.
+    for app_file in ("lib/pipeline.py", "app.py"):
         text = (PROJECT_ROOT / app_file).read_text(encoding="utf-8")
         assert 'TextMentionTermination("TERMINATE", sources=["terminate_agent"])' in text, (
             f"{app_file} must restrict TextMentionTermination to sources=['terminate_agent']"

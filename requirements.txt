@@ -4,8 +4,11 @@ autogen-agentchat==0.7.5
 autogen-core==0.7.5
 autogen-ext[openai,chromadb,mcp,ollama]==0.7.5
 
-# Web UI (Chainlit is the debug/operator front end; it caps mcp below 2.0).
+# Web UI. Chainlit is the operator front end (it caps mcp below 2.0);
+# FastAPI + uvicorn serve the React client in ui/ and share lib/pipeline.py.
 chainlit==2.12.0
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
 
 # MCP servers (Mermaid rendering + deliverable export). fastmcp 4.x needs
 # mcp>=2.3, which chainlit forbids, so 3.4.11 is the ceiling that still works.

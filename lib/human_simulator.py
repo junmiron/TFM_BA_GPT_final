@@ -31,7 +31,7 @@ class HumanSimulator:
 
     def __init__(self, model_name: Optional[str] = None, brief: str = "", client=None) -> None:
         if client is None:
-            from model_loader import load_model_client
+            from src.model_loader import load_model_client
             client = load_model_client(model_name or os.getenv("HUMAN_MODEL", "opencode"))
         self._client = client
         self._persona = os.getenv("HUMAN_PERSONA", DEFAULT_PERSONA)

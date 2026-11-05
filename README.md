@@ -60,13 +60,19 @@ cp .env.example .env                # then set OPENAI_API_KEY
 # 3. Verify the machine
 python scripts/smoke_check.py
 
-# 4. Run
+# 4. Run - pick a front-end
+# React web UI (recommended)
+cd ui && npm ci && npm run build && cd ..
+python -m uvicorn server.api:app --port 8000
+
+# or the Chainlit operator view
 chainlit run app2.py -w
 ```
 
 Open http://localhost:8000, type a task ("Design an order fulfilment process"),
 and answer the interviewer. The run ends when `terminate_agent` exports the
-deliverables.
+deliverables. Both front-ends drive the same `lib/pipeline.py`, so behaviour and
+artifacts are identical. Web UI details: [docs/web-ui.md](docs/web-ui.md).
 
 Detailed setup: [docs/configuration.md](docs/configuration.md)
 Design and agent flow: [docs/architecture.md](docs/architecture.md)
@@ -119,17 +125,21 @@ API keys are never stored in the YAML profiles - `src/model_loader.py` injects
 them from the environment or `.env`. Set `SIMULATE_HUMAN=true` to run the
 stakeholder interview on the `HUMAN_MODEL` lane instead of typing answers.
 
-## Two entry points
+## Two front-ends, one pipeline
 
-- `app2.py` - agents defined inline; the recommended, self-contained app.
-- `app.py` - the same team loaded from `lib/agents_config.yaml`.
+- `app2.py` - Chainlit operator view.
+- `server/api.py` + `ui/` - React web app (session rail, live transcript,
+  answer box, workflow progress, artifact downloads).
 
-Both use the same model loader, selector, RAG memory and tools.
+Both call `lib/pipeline.py`, which builds the AutoGen team, wires MCP tools and
+runs the termination sequence. `app.py` is the older variant that loads the team
+from `lib/agents_config.yaml`.
 
 ## Tests
 
 ```bash
 python -m pytest -q tests
+cd ui && npm test
 ```
 
 | Test | Covers | Needs |
@@ -137,6 +147,8 @@ python -m pytest -q tests
 | `tests/test_pipeline.py` | file/JSONL tools, selector routing, config hygiene | nothing |
 | `tests/test_mcp_servers.py` | boots both MCP servers, checks their tools | `mmdc` for one test (skipped otherwise) |
 | `tests/test_end_to_end.py` | the whole 11-agent team with a scripted model client | `mmdc` (skipped otherwise); **no API key, no network** |
+| `tests/test_server_api.py` | FastAPI session/stop/artifact/WebSocket contract | fake workflow, **no API key** |
+| `ui/src/**/*.test.ts` | question extraction, stage derivation, artifact order, reducer | vitest |
 
 The end-to-end test asserts the interview log, the spec in `conversation/<session>/`
 and the rendered PNG all exist.
@@ -144,16 +156,19 @@ and the rendered PNG all exist.
 ## Project layout
 
 ```
-app.py / app2.py          Chainlit entry points
-lib/                      agent factory, tools, selector, RAG indexer, MCP boot
-src/                      model client loader + model profiles
-mcp_servers/              Mermaid renderer + deliverable formatter (stdio MCP)
-scripts/smoke_check.py    release-readiness checker
-tests/                    offline pytest suite
-data/                     reference docs indexed into ChromaDB (local, gitignored)
-conversation/            working files during a session (gitignored)
-conversation/<session>/  final deliverables (gitignored)
-docs/                     architecture, configuration, troubleshooting + thesis material
+app2.py                 Chainlit entry point (thin adapter)
+server/api.py           FastAPI adapter for the web UI
+ui/                     React/Vite/Tailwind client
+lib/pipeline.py         the AutoGen team, stages and termination
+lib/                    agent factory, tools, selector, RAG indexer, MCP boot
+src/                    model client loader + model profiles
+mcp_servers/            Mermaid renderer + deliverable formatter (stdio MCP)
+scripts/smoke_check.py  release-readiness checker
+tests/                  offline pytest suite
+data/                   reference docs indexed into ChromaDB (local, gitignored)
+conversation/           working files during a session (gitignored)
+conversation/<session>/ final deliverables (gitignored)
+docs/                   architecture, configuration, troubleshooting + thesis material
 ```
 
 ## Requirements

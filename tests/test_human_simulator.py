@@ -90,3 +90,15 @@ def test_persona_forbids_meta_commentary():
 
 def test_task_brief_is_not_empty():
     assert len(TASK_BRIEF) > 100
+
+
+def test_lib_simulator_imports_the_loader_from_src():
+    """`uvicorn server.api:app` does not put src/ on sys.path, so the library
+    simulator must import the loader as `src.model_loader`, not bare `model_loader`.
+    A bare import makes the simulated stakeholder silently unavailable and the
+    web UI hangs waiting for a human answer."""
+    from pathlib import Path
+
+    source = Path("lib/human_simulator.py").read_text(encoding="utf-8")
+    assert "from src.model_loader import load_model_client" in source
+    assert "from model_loader import" not in source

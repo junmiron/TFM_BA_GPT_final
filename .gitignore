@@ -56,6 +56,9 @@ docs/Conversation/*.tar.gz
 .chainlit/translations
 .files
 
+# web UI
+ui/node_modules
+ui/dist
 # frontend build artifacts
 frontend/talk-wiz-chat/node_modules
 frontend/talk-wiz-chat/dist
