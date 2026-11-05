@@ -99,4 +99,30 @@ describe('runState reducer', () => {
     expect(answers).toHaveLength(1);
     expect(answers[0].pending).toBe(false);
   });
+
+  it('complete event carries artifacts so downloads unlock', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'complete', stop_reason: 'TERMINATE', artifacts: [{ name: 'functional_specification.pdf', kind: 'pdf', size: 100, url: '/api/files/s1/functional_specification.pdf' }] }));
+    expect(state.threads.s1.artifacts).toHaveLength(1);
+    expect(state.sessions[0].artifact_count).toBe(1);
+  });
+
+  it('a bare complete does not wipe an already-fetched artifact list', () => {
+    let state = startedSession();
+    state = apply(state, { type: 'artifacts/loaded', id: 's1', artifacts: [{ name: 'interview.jsonl', kind: 'json', size: 10, url: '/api/files/s1/interview.jsonl' }] });
+    state = apply(state, event({ type: 'complete', stop_reason: 'TERMINATE' }));
+    expect(state.threads.s1.artifacts).toHaveLength(1);
+  });
+
+  it('the artifacts event after completion sets the final download list', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'complete', stop_reason: 'TERMINATE', artifacts: [] }));
+    state = apply(state, event({ type: 'artifacts', artifacts: [
+      { name: 'functional_specification.md', kind: 'markdown', size: 50, url: '/api/files/s1/functional_specification.md' },
+      { name: 'functional_specification.pdf', kind: 'pdf', size: 600, url: '/api/files/s1/functional_specification.pdf' },
+    ] }));
+    expect(state.threads.s1.artifacts).toHaveLength(2);
+    expect(state.sessions[0].status).toBe('completed');
+    expect(state.sessions[0].artifact_count).toBe(2);
+  });
 });

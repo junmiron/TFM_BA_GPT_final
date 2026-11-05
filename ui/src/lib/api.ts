@@ -102,7 +102,7 @@ export function sessionSocketUrl(sessionId: string): string {
   return `${WS_BASE_URL}/ws/sessions/${encodeURIComponent(sessionId)}`;
 }
 
-const SERVER_EVENT_TYPES = new Set(['info', 'answer', 'message', 'chunk', 'complete', 'error']);
+const SERVER_EVENT_TYPES = new Set(['info', 'answer', 'message', 'chunk', 'complete', 'error', 'artifacts']);
 
 /** Validates an incoming WebSocket frame. Returns null for anything off-contract. */
 export function parseServerEvent(raw: unknown): ServerEvent | null {

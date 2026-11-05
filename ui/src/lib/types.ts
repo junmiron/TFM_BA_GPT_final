@@ -48,6 +48,11 @@ export interface ServerChunkEvent {
 export interface ServerCompleteEvent {
   type: 'complete';
   stop_reason: string;
+  /** Artifact list as of completion; a follow-up `artifacts` event carries the final list. */
+  artifacts?: Artifact[];
+}
+export interface ServerArtifactsEvent {
+  type: 'artifacts';
   artifacts: Artifact[];
 }
 export interface ServerErrorEvent {
@@ -61,6 +66,7 @@ export type ServerEvent =
   | ServerMessageEvent
   | ServerChunkEvent
   | ServerCompleteEvent
+  | ServerArtifactsEvent
   | ServerErrorEvent;
 
 export interface ClientAnswerEvent {

@@ -12,7 +12,7 @@ import os
 import sys
 import types
 from datetime import datetime, timezone
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Optional, Protocol
 
 from autogen_core import CancellationToken
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
@@ -108,7 +108,12 @@ def question_aware_selector(selector_func, pending_question: dict):
     """
 
     async def wrapper(messages):
-        captured = agents_tools_helpers.latest_question(messages)
+        # Prefer the interviewer's own QUESTION turn; when this round only
+        # produced a status line, the planner's instruction is the only text
+        # naming what the stakeholder is being asked.
+        captured = (agents_tools_helpers.latest_question(messages)
+                    or agents_tools_helpers.question_from_planner(messages)
+                    or agents_tools_helpers.question_from_coverage(messages))
         if captured:
             pending_question["text"] = captured
         return await selector_func(messages)
@@ -116,7 +121,7 @@ def question_aware_selector(selector_func, pending_question: dict):
     return wrapper
 
 
-async def create_workflow(ask_user: Callable, notify: Callable) -> dict:
+async def create_workflow(ask_user: Callable, notify: Callable, session_id: Optional[str] = None) -> dict:
     """Build the team. ``ask_user`` is the UI's answer channel and ``notify``
     posts an informational message, so the agents never touch a UI directly."""
     rag_vector_memory = await rag_indexer_runner(os.path.join(PROJECT_ROOT, "lib", "rag_config.yaml"))
@@ -293,7 +298,7 @@ async def create_workflow(ask_user: Callable, notify: Callable) -> dict:
       1 Call agents_tools_helpers.save_conversation_to_jsonl **ONCE** with a single payload that contains **both** records, interviewer question + user answer and include:
           subject: the current subject name
           q_index: the running counter for this subject, 1..2
-          session_id: the session id provided by the planner fallback: generate a short id
+          session_id: the pinned id substituted in the tool spec below — copy it exactly
       2 Update your per-subject counters and status.
       3 Either emit the next `QUESTION:` for the same subject max 2 OR mark subject done and move on. When all relevant subjects are done or targeted NEEDS_INFO items, output exactly: **READY**
 
@@ -351,8 +356,8 @@ async def create_workflow(ask_user: Callable, notify: Callable) -> dict:
     ***RUNTIME FIELDS YOU MAINTAIN***
       current_subject
       q_index[current_subject] start at 1, increment after each Q&A pair is successfully saved
-      SESSION_ID: use the one provided by the planner in its first assignment; if missing, set once per interview to 'sess-<yyyyMMddHHmmss>' and keep using it.
-    """,
+      SESSION_ID: already pinned for this run and substituted below; never invent a different one.
+    """.replace("<SESSION_ID>", session_id or "<sess-<yyyyMMddHHmmss>>"),
         tools=[save_conversation_to_jsonl],
         # reflect_on_tool_use=True makes AutoGen issue a final "answer" call with
         # tool_choice="none". Local Qwen then imitates the next tool call as plain
@@ -786,7 +791,7 @@ async def create_workflow(ask_user: Callable, notify: Callable) -> dict:
         selector_func=question_aware_selector(selector_func, pending_question),
     )
 
-    return {"team": team, "user": user, "human_sim": human_sim}
+    return {"team": team, "user": user, "human_sim": human_sim, "session_id": session_id}
 
 
 async def run_workflow(workflow: dict, task_text: str, sink: EventSink) -> dict:

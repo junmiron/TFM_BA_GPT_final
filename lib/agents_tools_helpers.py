@@ -1146,37 +1146,122 @@ TERMINATE = "terminate_agent"
 READY_TOKEN = re.compile(r"^\s*\*{0,2}READY\*{0,2}\s*$", re.I)
 QUESTION_PREFIX = "QUESTION:"
 STATUS_PREFIX = "STATUS:"
+# The planner names the question it wants the stakeholder to answer
+# ("Answer the interviewer's question about measurable KPIs..."). The
+# interviewer's own turn in a round is often only a status line, so this is
+# the only place the current question is written down.
+_PLANNER_QUESTION_RE = re.compile(
+    r"question[^.\n]{0,60}?(?:about|regarding|on)\s+([^.\n;]+)", re.I
+)
 # How many NEEDS_INFO rounds the checker may force before the pipeline moves on
 # to the diagram stage. Each round is a full writer pass plus a checker pass.
 MAX_CHECKER_ROUNDS = int(os.environ.get("MAX_CHECKER_ROUNDS", "3"))
 
 
+def current_round(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> list:
+    """The turns since the stakeholder's previous answer.
+
+    Scanning the whole history makes latest_question return a question from an
+    earlier round whenever the interviewer's current turn was only a status
+    line, which is how the simulated stakeholder ends up re-answering a question
+    it already answered.
+    """
+    items = list(messages)
+    for i in range(len(items) - 1, -1, -1):
+        if (getattr(items[i], "source", "") or "").strip().lower() == USER:
+            return items[i + 1:]
+    return items
+
+
+def _extract_question(content: str) -> str:
+    """Pull the 'QUESTION:' line out of a turn that also carries other text.
+
+    The interviewer keeps its subject-status table in the same turn as the
+    question, so the question is rarely the first thing in the message:
+    "Product Overview asked=1, status=done ... QUESTION: On what devices ...".
+    Matching only a leading 'QUESTION:' drops it and the stakeholder is then
+    handed the status table as its prompt.
+    """
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(QUESTION_PREFIX):
+            return stripped
+    index = content.find(QUESTION_PREFIX)
+    if index >= 0:
+        return content[index:].strip()
+    return ""
+
+
 def latest_question(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str:
-    """Return the most recent 'QUESTION:' turn, looking past the planner's turn.
+    """Return this round's 'QUESTION:' turn, looking past the planner's turn.
 
     The selector routes every interviewer question through planning_agent before
     the user answers, so AutoGen's input_func receives the planner's
     "Task state:" line rather than the question. Anything that needs the real
     question - the simulated stakeholder above all - has to walk back over it.
     """
-    for m in reversed(list(messages)):
+    for m in reversed(current_round(messages)):
         content = getattr(m, "content", "")
-        if isinstance(content, str) and content.strip().startswith(QUESTION_PREFIX):
-            return content.strip()
+        if isinstance(content, str):
+            question = _extract_question(content)
+            if question:
+                return question
+    return ""
+
+
+def question_from_planner(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str:
+    """Recover the question the planner asked the stakeholder to answer.
+
+    Used when the interviewer emitted only a status line this round: the planner's
+    instruction is the only text that states what is being asked.
+    """
+    for m in reversed(current_round(messages)):
+        content = getattr(m, "content", "")
+        if not isinstance(content, str):
+            continue
+        match = _PLANNER_QUESTION_RE.search(content)
+        if match:
+            return f"{QUESTION_PREFIX} {match.group(1).strip()}"
+    return ""
+
+
+_COVERAGE_RE = re.compile(
+    r"([A-Za-z][A-Za-z &,-]{3,40}?)\s*asked=(\d+),\s*status=([a-z ]+)"
+)
+_STATUSISH_RE = re.compile(r"task (state|tracking)|asked=\d|assign|pending|not started", re.I)
+
+
+def question_from_coverage(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str:
+    """Turn the interviewer's coverage table into the question it is about to ask.
+
+    The interviewer often emits only a progress line
+    ("Product Overview asked=1, status=done  KPI & Success Metrics asked=0,
+    status=not started") and the actual question arrives in the next turn. The
+    first subject still open is what the stakeholder is being asked about, so the
+    simulated stakeholder gets a real question instead of the status line.
+    """
+    for m in reversed(current_round(messages)):
+        content = getattr(m, "content", "")
+        if not isinstance(content, str) or "asked=" not in content:
+            continue
+        for subject, asked, status in _COVERAGE_RE.findall(content):
+            if asked == "0" and "done" not in status and "skipped" not in status:
+                return f"QUESTION: {subject.strip()} - what does this look like in your day-to-day operation?"
     return ""
 
 
 def question_for_user(prompt: str | None, captured: str = "") -> str:
     """Choose what the stakeholder is actually being asked.
 
-    A planner "Task state:" prompt carries no question, so the captured
-    interviewer question wins; a genuine question prompt is used as-is.
+    Planner turns ("Task state:" / "Task tracking:") and interviewer progress
+    tables carry no question, so a captured question wins over them; a genuine
+    QUESTION prompt is used as-is.
     """
     text = (prompt or "").strip()
     if text.startswith(QUESTION_PREFIX):
         return text
-    if captured and ("Task state" in text or not text):
-        return captured
+    if _STATUSISH_RE.search(text):
+        return captured or "Please describe how this should work in your shop."
     return text or captured or "Please describe how this should work."
 
 # Every section of the writer's document template. When the checker reports one

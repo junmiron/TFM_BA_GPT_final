@@ -34,6 +34,21 @@ export default function App() {
     if (terminal) scheduleRefresh();
   }, [terminal, scheduleRefresh]);
 
+  // Safety net: if the run finished but the socket never delivered the artifact
+  // list (dropped frame during a reconnect), fetch it once so downloads are not lost.
+  const refetchedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeId || activeId.startsWith(PENDING_PREFIX)) return;
+    if (!terminal) return;
+    if (thread.artifacts && thread.artifacts.length > 0) return;
+    if (refetchedFor.current === activeId) return;
+    refetchedFor.current = activeId;
+    api
+      .listArtifacts(activeId)
+      .then((artifacts) => dispatch({ type: 'artifacts/loaded', id: activeId, artifacts }))
+      .catch(() => undefined);
+  }, [activeId, terminal, thread.artifacts]);
+
   // Load artifacts for a session when it is selected and has none yet.
   useEffect(() => {
     if (!activeId || activeId.startsWith(PENDING_PREFIX)) return;

@@ -230,7 +230,7 @@ async def _start_run(session: Session) -> None:
         session.record({"type": "answer" if author == "user" else "info", "content": content})
 
     try:
-        session.workflow = await create_workflow(ask_user, notify)
+        session.workflow = await create_workflow(ask_user, notify, session.id)
     except Exception as e:
         session.status = "failed"
         session.error = f"Could not build the team: {type(e).__name__}: {e}"
@@ -264,7 +264,8 @@ async def _start_run(session: Session) -> None:
             pass
 
         async def complete(self, stop_reason: Any) -> None:
-            session.record({"type": "complete", "stop_reason": str(stop_reason)})
+            session.record({"type": "complete", "stop_reason": str(stop_reason),
+                                "artifacts": session.artifacts()})
 
         async def error(self, content: str) -> None:
             session.record({"type": "error", "content": content})

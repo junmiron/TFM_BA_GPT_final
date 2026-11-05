@@ -81,7 +81,7 @@ def live_server(monkeypatch, tmp_path):
 def fake_run(monkeypatch, tmp_path):
     """Replace the real team with a scripted one and point the session dir at tmp_path."""
 
-    async def fake_create_workflow(ask_user, notify):
+    async def fake_create_workflow(ask_user, notify, session_id=None):
         return {"team": None, "user": None, "human_sim": None, "messages": 0}
 
     async def fake_run_workflow(workflow, task_text, sink):
@@ -141,6 +141,12 @@ def test_run_streams_events_and_lists_artifacts(fake_run):
 
     types = [e["type"] for e in detail["events"]]
     assert "info" in types and "message" in types and "complete" in types
+
+    # The completion carries the artifact snapshot and is followed by the
+    # authoritative artifacts event; without both the UI shows no downloads.
+    completes = [e for e in detail["events"] if e["type"] == "complete"]
+    assert completes and "artifacts" in completes[-1]
+    assert "artifacts" in types
 
     # Every event carries a timestamp so the UI can order the transcript.
     assert all("ts" in e for e in detail["events"])
@@ -215,7 +221,7 @@ def test_create_session_responds_before_workflow_initialization(live_server, mon
     started = threading.Event()
     release = threading.Event()
 
-    async def slow_create_workflow(ask_user, notify):
+    async def slow_create_workflow(ask_user, notify, session_id=None):
         started.set()
         release.wait(timeout=3)
         return {"messages": 0}
@@ -248,7 +254,7 @@ def test_a_blocked_question_reports_as_awaiting_answer(live_server, monkeypatch)
     like a normal run, otherwise the UI has nothing to act on. Answering over
     the socket must release the workflow."""
 
-    async def create_with_user_input(ask_user, notify):
+    async def create_with_user_input(ask_user, notify, session_id=None):
         return {"ask_user": ask_user, "messages": 0}
 
     async def run_that_asks(workflow, task_text, sink):
@@ -283,7 +289,7 @@ def test_turn_counter_moves_while_the_run_is_in_progress(live_server, monkeypatc
     yet." even with dozens of messages in the transcript.
     """
 
-    async def create(ask_user, notify):
+    async def create(ask_user, notify, session_id=None):
         return {"ask_user": ask_user, "messages": 0}
 
     async def run_that_waits(workflow, task_text, sink):
@@ -318,7 +324,7 @@ def test_stop_during_team_construction_skips_the_run(live_server, monkeypatch):
     """A fast Stop click must be remembered while the workflow is being built."""
     run_calls = []
 
-    async def create_slowly(ask_user, notify):
+    async def create_slowly(ask_user, notify, session_id=None):
         await asyncio.sleep(0.5)
         return {"ask_user": ask_user, "messages": 0}
 
@@ -344,7 +350,7 @@ def test_stop_during_team_construction_skips_the_run(live_server, monkeypatch):
 def test_stop_unblocks_an_interview_waiting_for_an_answer(live_server, monkeypatch):
     """Stopping while the UI answer box is open must release ask_user immediately."""
 
-    async def create_with_user_input(ask_user, notify):
+    async def create_with_user_input(ask_user, notify, session_id=None):
         return {"ask_user": ask_user, "cancellation_token": type("Token", (), {"cancel": lambda self: None})()}
 
     async def run_waiting_for_answer(workflow, task_text, sink):
@@ -382,7 +388,7 @@ def test_stop_cancels_the_run_token(live_server, monkeypatch):
 
     token = Token()
 
-    async def create_with_token(ask_user, notify):
+    async def create_with_token(ask_user, notify, session_id=None):
         return {"ask_user": ask_user, "cancellation_token": token, "messages": 0}
 
     async def run_until_cancelled(workflow, task_text, sink):

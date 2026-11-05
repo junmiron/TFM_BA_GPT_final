@@ -210,7 +210,9 @@ function applyEvent(state: RunState, id: string, event: ServerEvent): RunState {
     }
 
     case 'complete': {
-      const artifacts = event.artifacts ?? [];
+      // Never wipe a list the UI already fetched: the authoritative
+      // artifact list arrives with the `artifacts` event after finalization.
+      const artifacts = event.artifacts ?? thread.artifacts ?? [];
       return {
         ...withThread(state, id, {
           ...thread,
@@ -226,6 +228,16 @@ function applyEvent(state: RunState, id: string, event: ServerEvent): RunState {
           }),
         }),
         sessions: setSessionStatus(state.sessions, id, 'completed', artifacts.length),
+      };
+    }
+
+    case 'artifacts': {
+      // Recorded after deliverable finalization — the final download list.
+      const artifacts = event.artifacts ?? thread.artifacts ?? [];
+      const status = thread.run === 'stopped' ? 'stopped' : 'completed';
+      return {
+        ...withThread(state, id, { ...thread, artifacts, artifactsError: null }),
+        sessions: setSessionStatus(state.sessions, id, status, artifacts.length),
       };
     }
 
