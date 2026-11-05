@@ -195,7 +195,7 @@ async def main():
     if html.exists():
         body = html.read_text(encoding="utf-8")
         print("html: bytes", len(body), "img", body.count("<img"),
-              "toc", '<nav class="toc"' in body)
+              "toc", '<aside class="toc"' in body)
         ok = ok and "<!DOCTYPE html>" in body
 
     print("\nRESULT:", "PASS" if (ok and pdf.exists()) else "PARTIAL" if ok else "FAIL")

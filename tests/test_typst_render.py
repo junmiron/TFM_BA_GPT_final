@@ -1,0 +1,173 @@
+"""The Typst deliverable renderer: cover page, linked Contents, proportional
+table columns, bundled Inter font - and the PyMuPDF fallback when the Typst
+toolchain is not installed.
+
+Run with:  python -m pytest -q tests/test_typst_render.py
+"""
+
+import importlib.util
+import re
+from pathlib import Path
+
+import pytest
+
+fitz = pytest.importorskip("pymupdf", reason="PyMuPDF is required for PDF QA and the fallback")
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PDF_SERVER = PROJECT_ROOT / "mcp_servers" / "Final_deliverable_MCP_server" / "PDF_format_mcp_server.py"
+TYPST_RENDER = PROJECT_ROOT / "mcp_servers" / "Final_deliverable_MCP_server" / "typst_render.py"
+
+SPEC = """# Laundry Shop Staff App v1 — Functional Requirements Specification
+
+## 1. Title Page / Document Information
+
+**Project Name:** Laundry Shop Staff App v1
+**Version:** 1.0
+**Date:** 2026-11-05
+**Document Status:** Draft Functional Specification
+**Prepared By:** Business Analysis Team
+
+## 2. Functional Requirements
+
+| ID | Requirement | Description | Acceptance criteria | Priority |
+|---|---|---|---|---|
+| FR-01.1 | Check-in | Each bag gets a unique QR tag attached at check-in; the app records the staff ID, timestamp and bag count so the queue is visible from the first scan. | The tag ID appears in the bag list within 5 seconds of the scan. | Must |
+| FR-01.2 | Stage scan | Staff scan the tag at every stage transition (washing, drying, folding, ready). | Each scan updates the stage and the alert list within 5 seconds. | Must |
+
+## 3. Process Diagram
+
+![Process Diagram](process_diagram.png){ width=95% }
+
+```mermaid
+flowchart TD
+  A[Check-In] --> B[In Cleaning]
+  B --> C[Ready for Pickup]
+```
+"""
+
+
+def _load(module_name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _make_session(tmp_path: Path) -> Path:
+    session = tmp_path / "sess-typst"
+    session.mkdir(parents=True, exist_ok=True)
+    (session / "functional_specification.formatted.md").write_text(SPEC, encoding="utf-8")
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=400)
+    page.draw_rect((50, 50, 550, 350), color=(0, 0, 0), fill=(0.9, 0.95, 1.0))
+    page.get_pixmap().save(session / "process_diagram.png")
+    doc.close()
+    return session
+
+
+def test_metadata_extracted_from_title_page():
+    mod = _load("typst_render", TYPST_RENDER)
+    meta = mod.extract_metadata(SPEC, "Fallback Title")
+    assert meta["title"] == "Laundry Shop Staff App v1"
+    assert meta["version"] == "1.0"
+    assert meta["date"] == "2026-11-05"
+    assert meta["status"] == "Draft Functional Specification"
+    assert meta["author"] == "Business Analysis Team"
+
+
+def test_mermaid_fences_are_stripped():
+    mod = _load("typst_render", TYPST_RENDER)
+    cleaned = mod.strip_mermaid_fences(SPEC)
+    assert "flowchart TD" not in cleaned
+    assert "![Process Diagram](process_diagram.png)" in cleaned
+
+
+def test_equal_columns_are_replaced_with_proportional_ones():
+    """pandoc gives every column of a 5-column FR table 20%, which wraps the
+    long description cell every two or three words. The post-processor must
+    make the columns proportional to their content and keep them summing to
+    100%."""
+    mod = _load("typst_render", TYPST_RENDER)
+    typst = (
+        "#table(\n"
+        "  columns: (20%, 20%, 20%, 20%, 20%),\n"
+        "  table.header([ID], [Requirement], [Description], [Acceptance criteria], [Priority],),\n"
+        "  [FR-01.1], [Check-in], [Each bag gets a unique QR tag attached at check-in; "
+        "the app records the staff ID, timestamp and bag count so the queue is visible "
+        "from the first scan.], [Tag appears in the list within 5 seconds.], [Must],\n"
+        ")\n"
+    )
+    fixed = mod.fix_table_columns(typst)
+    widths = [int(w) for w in re.findall(r"(\d+)%", fixed)]
+    assert len(widths) == 5
+    assert sum(widths) == 100
+    assert widths[2] > widths[4]  # description wider than priority
+    assert 'fill: (x, y) =>' in fixed
+    assert "fill: white" in fixed  # header text readable on the dark row
+    assert "columns: (20%, 20%, 20%, 20%, 20%)" not in fixed
+
+
+@pytest.mark.skipif(not _load("typst_render", TYPST_RENDER).engines_available(),
+                    reason="typst/pandoc not installed (run scripts/install_render_tools.py)")
+def test_typst_render_produces_cover_toc_and_linked_body(tmp_path):
+    mod = _load("typst_render", TYPST_RENDER)
+    session = _make_session(tmp_path)
+    result = mod.render(session / "functional_specification.formatted.md",
+                        session / "functional_specification.pdf")
+    assert result["status"] == "ok", result.get("message")
+    assert result["engine"] == "typst"
+    assert result["pages"] >= 3
+    assert result["images"] >= 1
+    assert result["toc_entries"] >= 4
+    assert result["raw_mermaid"] == 0
+    assert any("Inter" in font for font in result["fonts"])
+
+    doc = fitz.open(str(session / "functional_specification.pdf"))
+    try:
+        cover = doc[0].get_text()
+        assert "BUSINESS ANALYSIS" in cover
+        assert "Laundry Shop Staff App v1" in cover
+        assert "Contents" in doc[1].get_text()
+        assert "Page 3 of" in doc[2].get_text()  # running footer past the cover
+        # The body headings are real PDF bookmarks (Typst's outline links).
+        assert any("Functional Requirements" in entry[1] for entry in doc.get_toc())
+    finally:
+        doc.close()
+
+    # The intermediate Typst files must not linger in the session folder.
+    assert not (session / "__tfm_main.typ").exists()
+    assert not (session / "__tfm_body.typ").exists()
+    assert not (session / "__tfm_body.md").exists()
+
+
+def test_render_pdf_deliverable_falls_back_when_binaries_missing(tmp_path, monkeypatch):
+    """On a machine without typst/pandoc the deliverable must still be produced
+    by the PyMuPDF Story renderer rather than failing the terminate stage."""
+    pdf_mod = _load("pdf_format_mcp_server", PDF_SERVER)
+    monkeypatch.setattr(pdf_mod, "_typst_render_module", lambda: None)
+    session = _make_session(tmp_path)
+    result = pdf_mod.render_pdf_deliverable(session, "functional_specification.formatted.md",
+                                           "functional_specification.pdf")
+    assert result["status"] == "ok"
+    assert result["engine"] == "pymupdf"
+    assert "fallback" in result.get("note", "").lower()
+    assert (session / "functional_specification.pdf").is_file()
+
+
+def test_html_deliverable_has_sidebar_cover_and_dark_table_headers(tmp_path):
+    pdf_mod = _load("pdf_format_mcp_server", PDF_SERVER)
+    session = _make_session(tmp_path)
+    result = pdf_mod.build_html_deliverable(session, "functional_specification.formatted.md",
+                                           "functional_specification.html")
+    assert result["status"] == "ok"
+    body = (session / "functional_specification.html").read_text(encoding="utf-8")
+    assert '<aside class="toc" aria-label="Document contents">' in body
+    assert '<div class="cover">' in body
+    assert "sticky" in body and "thead th" in body  # dark repeating table headers
+    assert "@media print" in body and "aside.toc { display: none; }" in body
+    assert "IntersectionObserver" in body  # scroll-spy highlight
+    assert result["toc_entries"] >= 3
+    # The H1 title lives in the cover header, not twice in the document.
+    assert body.count('<h1 id=') <= 1
+    assert "<details>" in body  # Mermaid source kept collapsed for the web version

@@ -42,7 +42,7 @@ After one session, `conversation/<SESSION_ID>/` contains:
 | `process_diagram_N.png` | One rendered PNG per canvas diagram (the first is `process_diagram.png`) |
 | `process_diagram.png` | rendered diagram |
 | `functional_specification.formatted.md` | FSD with requirements tables and page breaks |
-| `functional_specification.pdf` | PDF export with a real bookmark outline (`pandoc` + `xelatex` optional; PyMuPDF fallback when they are absent) |
+| `functional_specification.pdf` | Typst-typeset PDF: cover page, linked Contents with leaders, running header/footer, repeating table headers, bundled Inter font (PyMuPDF fallback when `typst`/`pandoc` are absent) |
 
 ## Quick start
 
@@ -185,14 +185,14 @@ docs/                   architecture, configuration, troubleshooting + thesis ma
 |---|---|
 | Python 3.11 or 3.13 (both tested in CI) | the app |
 | Node.js + `mermaid-cli` | PNG/SVG diagram rendering |
-| `pandoc` + `xelatex` | nicer PDF export; **optional** - without them the PDF is built with PyMuPDF Story |
+| `typst` + `pandoc` | the Typst PDF renderer (cover page, linked contents, header/footer); **optional** - run `python scripts/install_render_tools.py` once, or without them the PDF is built with PyMuPDF Story |
 | An LLM (OpenAI / Ollama / LM Studio) | the agents |
 
 ## Known limitations
 
 - The interview is interactive: a human must answer every `QUESTION:`.
 - `summarizer_agent` only accepts the exact phrase `APPROVE SUMMARY`.
-- PDF export uses `pandoc`/`xelatex` when available, otherwise PyMuPDF Story.
+- PDF export uses `typst` + `pandoc` when available (install with `scripts/install_render_tools.py`), otherwise PyMuPDF Story.
 - ChromaDB embeddings run locally via `paraphrase-multilingual-mpnet-base-v2` (CPU by default).
 
 ## License

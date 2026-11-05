@@ -28,6 +28,11 @@ jobs:
       - name: Install mermaid-cli (needed for diagram rendering tests)
         run: npm install -g @mermaid-js/mermaid-cli@12.2.0
 
+      - name: Install Typst + pandoc (pinned portable binaries for the Typst PDF renderer)
+        run: |
+          python scripts/install_render_tools.py ||
+            echo "Render tools unavailable; PDF tests will use the PyMuPDF fallback."
+
       - name: Release-readiness check
         run: python scripts/smoke_check.py
 

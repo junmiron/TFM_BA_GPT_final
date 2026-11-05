@@ -218,7 +218,7 @@ async def main():
     print("functional_specification.html exists:", html.exists())
     if html.exists():
         body = html.read_text(encoding="utf-8")
-        print("html: bytes", len(body), "img", body.count("<img"), "toc links", body.count('<nav class="toc"'))
+        print("html: bytes", len(body), "img", body.count("<img"), "toc links", body.count('<aside class="toc"'))
         print("html embeds mermaid source:", "Diagram source (Mermaid)" in body)
     md_has_diagram = spec.exists() and "![Process Diagram]" in spec.read_text(encoding="utf-8")
     print("markdown carries the diagram:", md_has_diagram)

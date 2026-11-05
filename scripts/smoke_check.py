@@ -33,9 +33,12 @@ REQUIRED_MODULES = {
 }
 
 OPTIONAL_TOOLS = {
+    "typst": "typst - the Typst PDF renderer (cover page, linked contents, header/footer); "
+            "install with scripts/install_render_tools.py, otherwise export falls back to PyMuPDF",
+    "pandoc": "pandoc - Markdown to Typst conversion for the Typst renderer "
+              "(also installed by scripts/install_render_tools.py)",
     "mmdc": "mermaid-cli (npm i -g @mermaid-js/mermaid-cli) - required for the PNG diagram",
-    "pandoc": "pandoc - optional for functional_specification.pdf; without it the export uses PyMuPDF Story",
-    "xelatex": "a LaTeX engine - only used when pandoc is available",
+    "xelatex": "a LaTeX engine - only used when engine=\"xelatex\" is passed explicitly",
 }
 
 

@@ -33,6 +33,8 @@ mcp_servers/*/.venv_win
 /conversation
 index_state.json
 *.log
+# pinned portable typst/pandoc binaries fetched by scripts/install_render_tools.py
+mcp_servers/Final_deliverable_MCP_server/vendor/
 docs/Screencasts
 docs/data.7z
 

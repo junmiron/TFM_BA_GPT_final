@@ -65,11 +65,12 @@ print("debug", file=sys.stderr)
 
 ## `functional_specification.pdf` is missing
 
-The export prefers `pandoc` + a LaTeX engine and falls back to PyMuPDF Story:
+The export prefers `typst` + `pandoc` and falls back to PyMuPDF Story:
 
 ```bash
+python scripts/install_render_tools.py   # pinned typst 0.15.1 + pandoc 3.13
+typst --version
 pandoc --version
-xelatex --version
 ```
 
 Neither is required - without them `functional_specification.pdf` is still produced by PyMuPDF,

@@ -121,10 +121,10 @@ allowed_executables = ["npx", "uvx"]
 | Tool | Needed for | Install |
 |---|---|---|
 | `mmdc` | PNG/SVG/PDF diagram rendering | `npm i -g @mermaid-js/mermaid-cli` |
-| `pandoc` | PDF export via pandoc+LaTeX (optional) | `winget install pandoc` / `apt install pandoc` |
-| `xelatex` | PDF export | TeX Live / MiKTeX |
+| `typst` + `pandoc` | Typst PDF renderer: cover page, linked Contents, header/footer | `python scripts/install_render_tools.py` (pinned portable binaries) |
+| `xelatex` | only when `export_pdf` is called with `engine="xelatex"` | TeX Live / MiKTeX |
 
-Check with `python scripts/smoke_check.py`. Missing `pandoc` or `xelatex` only
+Check with `python scripts/smoke_check.py`. Missing `typst` or `pandoc` only
 changes how `functional_specification.pdf` is built (PyMuPDF Story is used instead); `mmdc` costs you
 `process_diagram.png`.
 

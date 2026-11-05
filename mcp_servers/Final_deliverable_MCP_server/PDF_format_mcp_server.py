@@ -663,6 +663,67 @@ def _extract_title(md_path: Path) -> str:
     return md_path.stem
 
 
+# --------------------------- Typst render bridge ---------------------------
+# The deliverable PDF is typeset with Typst (cover page, linked contents,
+# running header/footer, repeating table headers, bundled Inter font) when the
+# typst + pandoc binaries are installed; see typst_render.py for the pipeline
+# and scripts/install_render_tools.py for the pinned portable binaries. When
+# they are missing, every caller falls back to the pure-Python PyMuPDF Story
+# renderer below, so the pipeline never depends on external tools.
+
+_TYPST_RENDER_CACHE: Dict[str, Any] = {}
+
+
+def _typst_render_module():
+    """Load the sibling typst_render.py as a library (cached, like _pdf_server_module)."""
+    if "module" in _TYPST_RENDER_CACHE:
+        return _TYPST_RENDER_CACHE["module"]
+    import importlib.util
+    path = Path(__file__).with_name("typst_render.py")
+    spec = importlib.util.spec_from_file_location("typst_render", path)
+    if not spec or not spec.loader:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        return None
+    _TYPST_RENDER_CACHE["module"] = module
+    return module
+
+
+def render_pdf_deliverable(session_dir: Path, md_file: str, pdf_out: str,
+                           toc: bool = True, toc_depth: int = 3) -> dict:
+    """Render the specification PDF: Typst when available, PyMuPDF otherwise.
+
+    Returns the same result shape as _pymupdf_export (status, engine, pdf,
+    pages, images, toc_entries) plus Typst QA fields (fonts, raw_mermaid).
+    """
+    session_dir = Path(session_dir)
+    md_path = (session_dir / md_file).resolve()
+    pdf_path = (session_dir / pdf_out).resolve()
+    if not md_path.exists():
+        raise FileNotFoundError(f"Missing markdown file: {md_path}")
+    title = _extract_title(md_path)
+
+    module = _typst_render_module()
+    if module is None:
+        pdf = _pymupdf_export(md_path, None, pdf_path, title=title, toc=toc, toc_depth=toc_depth)
+        return {**pdf, "note": "typst renderer module unavailable; used PyMuPDF fallback."}
+    try:
+        if module.engines_available():
+            result = module.render(md_path, pdf_path, title=title)
+            if result.get("status") == "ok":
+                return result
+            note = result.get("message") or "Typst render failed"
+        else:
+            note = "typst/pandoc not installed; used PyMuPDF fallback."
+    except Exception as exc:
+        note = f"Typst render error ({exc}); used PyMuPDF fallback."
+    pdf = _pymupdf_export(md_path, None, pdf_path, title=title, toc=toc, toc_depth=toc_depth)
+    return {**pdf, "note": note}
+
+
 # Pandoc-style image syntax emitted by ensure_diagram_section:
 #   ![Process Diagram](process_diagram.png){ width=95% }
 # MuPDF's Story has no notion of pandoc attributes, so the "{ width=95% }" tail
@@ -1026,50 +1087,176 @@ def _inline_img_tag(src: str, alt: str, session_dir: Path) -> str:
 
 
 _HTML_CSS = """
-:root { color-scheme: light; }
-body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-       max-width: 900px; margin: 0 auto; padding: 24px 32px; line-height: 1.5; color: #1f2430; }
-h1 { font-size: 26px; border-bottom: 2px solid #d0d7de; padding-bottom: 10px; }
-h2 { font-size: 20px; margin-top: 28px; }
-h3 { font-size: 16px; margin-top: 20px; }
-table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
-th, td { border: 1px solid #d0d7de; padding: 8px 10px; vertical-align: top; }
-th { background: #f6f8fa; }
-img { max-width: 100%; height: auto; border: 1px solid #d0d7de; border-radius: 6px; }
-figure.diagram { max-height: 760px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px;
-                 padding: 12px; margin: 16px 0; }
+:root {
+  --accent: #2563eb; --accent-soft: #eff6ff; --ink: #111827; --sub: #374151;
+  --faint: #9ca3af; --line: #e5e7eb; --bg: #ffffff; --bg-soft: #f9fafb;
+  --code-bg: #f3f4f6; --sidebar-w: 22rem;
+  --font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+body { margin: 0; font-family: var(--font); font-size: 16px; line-height: 1.65;
+       color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- two-column layout with sticky contents sidebar ---------- */
+.layout { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); min-height: 100vh; }
+aside.toc { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+            width: var(--sidebar-w); border-right: 1px solid var(--line);
+            background: var(--bg-soft); padding: 1.5rem 1.25rem 3rem; }
+aside.toc .toc-title { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em;
+                       text-transform: uppercase; color: var(--faint); margin: 0 0 0.75rem; }
+aside.toc ul { list-style: none; margin: 0; padding: 0; }
+aside.toc li a { display: block; padding: 0.28rem 0.5rem; border-radius: 6px;
+                 color: var(--sub); font-size: 0.9rem; line-height: 1.35;
+                 border-left: 2px solid transparent; }
+aside.toc li a:hover { background: #eef2ff; color: var(--accent); text-decoration: none; }
+aside.toc li a.active { background: var(--accent-soft); color: var(--accent);
+                        border-left-color: var(--accent); font-weight: 600; }
+aside.toc li.lvl0 a { font-weight: 700; color: var(--ink); margin-top: 0.4rem; }
+aside.toc li.lvl1 a { padding-left: 1rem; }
+aside.toc li.lvl2 a { padding-left: 2rem; font-size: 0.85rem; }
+main { padding: 2.5rem 3rem 5rem; min-width: 0; }
+
+/* ---------- cover header ---------- */
+.cover { border-bottom: 3px solid var(--accent); padding-bottom: 1.75rem; margin-bottom: 2.25rem; }
+.cover .kicker { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em;
+                 text-transform: uppercase; color: var(--accent); margin: 0 0 0.5rem; }
+.cover h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 0.35rem; font-weight: 800; }
+.cover .subtitle { font-size: 1.15rem; color: var(--sub); margin: 0 0 1.1rem; }
+.meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem 1.25rem; margin: 0; }
+.meta div { font-size: 0.85rem; }
+.meta dt { color: var(--faint); font-size: 0.72rem; text-transform: uppercase;
+          letter-spacing: 0.05em; font-weight: 600; }
+.meta dd { margin: 0.1rem 0 0; color: var(--ink); font-weight: 500; }
+.badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+         font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+         background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+/* ---------- prose ---------- */
+article h1 { font-size: 1.7rem; font-weight: 800; margin: 2.5rem 0 1rem;
+             padding-bottom: 0.4rem; border-bottom: 1px solid var(--line); }
+article h2 { font-size: 1.4rem; font-weight: 700; margin: 2.2rem 0 0.8rem; }
+article h3 { font-size: 1.15rem; font-weight: 700; margin: 1.7rem 0 0.6rem; color: var(--sub); }
+article h4 { font-size: 1rem; font-weight: 700; margin: 1.3rem 0 0.5rem; }
+article p { margin: 0.85rem 0; }
+article ul, article ol { padding-left: 1.4rem; }
+article li { margin: 0.3rem 0; }
+article hr { border: none; border-top: 1px solid var(--line); margin: 2rem 0; }
+article code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+               font-size: 0.86em; background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: 4px; }
+article pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+              padding: 0.9rem 1rem; overflow-x: auto; }
+article pre code { background: none; padding: 0; }
+article img { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
+article blockquote { border-left: 3px solid var(--accent); margin: 1rem 0;
+                      padding: 0.35rem 1rem; background: var(--accent-soft); color: var(--sub); }
+figure.diagram { max-height: 760px; overflow: auto; border: 1px solid var(--line);
+                 border-radius: 8px; padding: 12px; margin: 16px 0; }
 figure.diagram img { border: none; }
-code { background: #f6f8fa; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
-details { margin: 12px 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px 14px; }
-summary { font-weight: 600; }
-nav.toc { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 14px 18px; margin: 18px 0; }
-nav.toc ul { margin: 0; padding-left: 18px; }
-nav.toc a { color: #1f2430; text-decoration: none; }
-.meta { color: #6b7280; font-size: 13px; margin-bottom: 8px; }
-@media print { body { max-width: none; padding: 0; } nav.toc { display: none; } figure.diagram { max-height: none; overflow: visible; } }
+
+/* ---------- tables: dark sticky header, zebra rows ---------- */
+article table { border-collapse: collapse; width: 100%; font-size: 0.9rem; line-height: 1.5; margin: 1.1rem 0; }
+article thead th { position: sticky; top: 0; background: var(--ink); color: #fff;
+                    text-align: left; font-weight: 600; padding: 0.55rem 0.7rem; }
+article tbody td { padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+article tbody tr:nth-child(even) { background: var(--bg-soft); }
+article tbody tr:hover { background: var(--accent-soft); }
+
+details { margin: 1rem 0; }
+summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+
+@media print {
+  .layout { display: block; }
+  aside.toc { display: none; }
+  main { padding: 0; }
+  article thead th { position: static; background: #eef2f7; color: #111;
+                     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  a { color: inherit; }
+  figure.diagram { max-height: none; overflow: visible; }
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  aside.toc { position: static; height: auto; width: auto; border-right: none;
+              border-bottom: 1px solid var(--line); }
+  main { padding: 1.5rem 1.25rem 3rem; }
+  .meta { grid-template-columns: 1fr 1fr; }
+}
+"""
+
+# Scroll-spy: highlight the sidebar entry for the heading currently in view.
+_HTML_JS = """
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  if (!links.length) return;
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+  var headings = document.querySelectorAll('article h1, article h2, article h3, article h4');
+  if (!headings.length) return;
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      var a = byId[entry.target.id];
+      if (!a) return;
+      links.forEach(function (l) { l.classList.remove('active'); });
+      a.classList.add('active');
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0.1 });
+  headings.forEach(function (h) { if (h.id) observer.observe(h); });
+})();
 """
 
 
-def _html_toc(body_html: str, depth: int = 3) -> str:
-    """Build an anchored Contents block from the headings the toc extension numbered."""
+def _html_toc(body_html: str, depth: int = 4) -> str:
+    """Build sidebar <li> items from the headings the toc extension numbered."""
     items = re.findall(rf'<h([1-{depth}]) id="([^"]+)"[^>]*>(.*?)</h\1>', body_html)
-    if not items:
-        return ""
     out = []
     for level, anchor, text in items:
         level = int(level)
         text = re.sub(r"<[^>]+>", "", text).strip()
         if not text or text.lower() == "contents":
             continue
-        out.append(f'<li style="margin-left:{(level - 1) * 12}px"><a href="#{anchor}">{_html_escape(text)}</a></li>')
-    return f'<nav class="toc"><h2>Contents</h2><ul>{"".join(out)}</ul></nav>' if out else ""
+        out.append(f'<li class="lvl{min(level - 1, 2)}"><a href="#{anchor}">{_html_escape(text)}</a></li>')
+    return "".join(out)
+
+
+_META_FIELDS = (
+    ("Project Name", "title"),
+    ("Version", "version"),
+    ("Date", "date"),
+    ("Document Status", "status"),
+    ("Prepared By", "author"),
+)
+
+
+def _doc_metadata(md_text: str, title: str) -> dict:
+    """Cover-header fields parsed from the Title Page section, with defaults."""
+    meta = {
+        "title": title,
+        "subtitle": "Functional Requirements Specification",
+        "version": "1.0",
+        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "status": "Draft",
+        "author": "Business Analysis Team",
+    }
+    for label, key in _META_FIELDS:
+        match = re.search(rf"\*\*{label}:\*\*\s*(.+)", md_text)
+        if match:
+            meta[key] = match.group(1).strip().rstrip()
+    return meta
 
 
 def build_html_deliverable(session_dir: Path, md_file: str, out_file: str,
                          diagram_file: Optional[str] = None,
                          title: Optional[str] = None) -> dict:
-    """Write a self-contained HTML deliverable from the (formatted) Markdown."""
+    """Write a self-contained HTML deliverable from the (formatted) Markdown.
+
+    Layout: sticky Contents sidebar with scroll-spy highlighting, a cover header
+    carrying the Title Page metadata, and tables with dark sticky headers. The
+    document title from the Markdown H1 is not duplicated in the body - the cover
+    header already shows it.
+    """
     session_dir = Path(session_dir)
     md_path = (session_dir / md_file).resolve()
     if not md_path.exists() and md_file == "functional_specification.formatted.md":
@@ -1086,7 +1273,8 @@ def build_html_deliverable(session_dir: Path, md_file: str, out_file: str,
 
     md_text = load_text(md_path)
     title = title or _extract_title(md_path)
-    body = _markdown_to_html(md_text, session_dir, keep_mermaid=True, img_tag=_inline_img_tag)
+    body_md = re.sub(r"^\s*#\s+[^\n]*\n", "", md_text, count=1)
+    body = _markdown_to_html(body_md, session_dir, keep_mermaid=True, img_tag=_inline_img_tag)
     # Mermaid source reads better collapsed than as a wall of monospaced text.
     body = re.sub(
         r'<pre><code class="language-mermaid">(.*?)</code></pre>',
@@ -1094,15 +1282,33 @@ def build_html_deliverable(session_dir: Path, md_file: str, out_file: str,
         body,
         flags=re.S,
     )
+    meta = _doc_metadata(md_text, title)
     toc = _html_toc(body)
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    cover = (
+        f'<div class="cover">'
+        f'<p class="kicker">Business analysis</p>'
+        f'<h1>{_html_escape(meta["title"])}</h1>'
+        f'<p class="subtitle">{_html_escape(meta["subtitle"])}</p>'
+        f'<dl class="meta">'
+        f'<div><dt>Version</dt><dd>{_html_escape(meta["version"])}</dd></div>'
+        f'<div><dt>Date</dt><dd>{_html_escape(meta["date"])}</dd></div>'
+        f'<div><dt>Status</dt><dd><span class="badge">{_html_escape(meta["status"])}</span></dd></div>'
+        f'<div><dt>Prepared by</dt><dd>{_html_escape(meta["author"])}</dd></div>'
+        f'<div><dt>Generated</dt><dd>{generated}</dd></div>'
+        f'</dl></div>'
+    )
     html = (
         f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         f'<meta name="viewport" content="width=device-width, initial-scale=1">'
         f'<title>{_html_escape(title)}</title>'
         f'<meta name="generator" content="TFM_BA_GPT deliverable pipeline">'
         f"<style>{_HTML_CSS}</style></head>"
-        f'<body><div class="meta">Generated {generated}</div>{toc}{body}</body></html>'
+        f'<body><div class="layout">'
+        f'<aside class="toc" aria-label="Document contents">'
+        f'<p class="toc-title">Contents</p><ul>{toc}</ul></aside>'
+        f'<main>{cover}<article>{body}</article></main>'
+        f'</div><script>{_HTML_JS}</script></body></html>'
     )
     out_path = (session_dir / out_file).resolve()
     save_text(out_path, html)
@@ -1500,18 +1706,24 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
         session_dir: str,
         md: str = "functional_specification.formatted.md",
         pdf_out: str = "functional_specification.pdf",
-        engine: str = "xelatex",
+        engine: str = "typst",
         toc: bool = True,
-        toc_depth: int = 2,
+        toc_depth: int = 3,
         margin: str = "1in",
         mainfont: Optional[str] = None,
         monofont: Optional[str] = None,
     ) -> dict:
-        """Export a (formatted) Markdown file to PDF using Pandoc with robust preprocessing."""
+        """Export a (formatted) Markdown file to PDF.
+
+        engine "typst" (default) typesets with Typst + pandoc - cover page, linked
+        contents, running header/footer - and falls back to the PyMuPDF renderer
+        when those binaries are not installed. engine "pymupdf" forces the
+        pure-Python path; "xelatex"/"weasyprint" use pandoc with that engine.
+        """
         sd = resolve_under_allowed(session_dir, allowed_dirs, project_root)
-        if not have_pandoc():
-            # No pandoc/LaTeX on this machine: use the pure-Python PyMuPDF path
-            # instead of failing the whole terminate step.
+        if engine in ("typst", "auto"):
+            return render_pdf_deliverable(sd, md, pdf_out, toc=toc, toc_depth=toc_depth)
+        if engine == "pymupdf" or not have_pandoc():
             md_path = (sd / md).resolve()
             if not md_path.exists():
                 raise RuntimeError(f"Missing: {md_path}")
@@ -1519,7 +1731,7 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
                                         sd / "process_diagram.jpg") if p.exists()), None)
             pdf = _pymupdf_export(md_path, diagram, (sd / pdf_out).resolve(),
                                   title=_extract_title(md_path), toc=toc, toc_depth=toc_depth)
-            return {**pdf, "note": "pandoc not found; used PyMuPDF fallback."}
+            return {**pdf, "note": "used the PyMuPDF renderer."}
         return export_to_pdf(sd, md, pdf_out, engine, toc, toc_depth, margin, mainfont, monofont)
 
     @mcp.tool()
@@ -1529,9 +1741,9 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
         diagram: str = "process_diagram.svg",
         md_out: str = "functional_specification.formatted.md",
         pdf_out: str = "functional_specification.pdf",
-        engine: str = "xelatex",
+        engine: str = "typst",
         toc: bool = True,
-        toc_depth: int = 2,
+        toc_depth: int = 3,
         margin: str = "1in",
         mainfont: Optional[str] = None,
         monofont: Optional[str] = None,
@@ -1539,16 +1751,8 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
         """Run formatting then export to PDF in one call."""
         sd = resolve_under_allowed(session_dir, allowed_dirs, project_root)
         fmt = format_document(sd, md, diagram, md_out)
-        if not have_pandoc():
-            # No pandoc/LaTeX on this machine: use the pure-Python PyMuPDF path.
-            md_out_path = (sd / md_out).resolve()
-            pdf = _pymupdf_export(md_out_path, (sd / diagram).resolve() if diagram else None,
-                                  (sd / pdf_out).resolve(),
-                                  title=_extract_title(md_out_path),
-                                  toc=toc, toc_depth=toc_depth)
-            return {**fmt, "pdf": pdf, "note": "pandoc not found; used PyMuPDF fallback."}
-        pdf = export_to_pdf(sd, md_out, pdf_out, engine, toc, toc_depth, margin, mainfont, monofont)
-        return {**fmt, **{"pdf": pdf}}
+        pdf = render_pdf_deliverable(sd, md_out, pdf_out, toc=toc, toc_depth=toc_depth)
+        return {**fmt, "pdf": pdf}
 
 
     @mcp.tool()

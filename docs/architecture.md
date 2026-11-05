@@ -90,8 +90,9 @@ corrupt the JSON-RPC stream.
 
 **`mcp_servers/Final_deliverable_MCP_server/PDF_format_mcp_server.py`** -
 `format_spec`, `export_pdf`, `format_and_export`, `save_experience_chroma`,
-`recall_experience_chroma`. Formatting is pure Python; the PDF step uses `pandoc` + `xelatex` when
-present, otherwise PyMuPDF Story. Embeddings use `paraphrase-multilingual-mpnet-base-v2`, GPU if available,
+`recall_experience_chroma`. Formatting is pure Python; the PDF step uses the Typst renderer
+(`typst_render.py`: pandoc Markdown to Typst, cover page, linked Contents, bundled Inter font)
+when the binaries are installed - otherwise PyMuPDF Story. Embeddings use `paraphrase-multilingual-mpnet-base-v2`, GPU if available,
 otherwise CPU.
 
 ## RAG memory

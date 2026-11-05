@@ -206,10 +206,10 @@ def test_finalize_produces_a_self_contained_html(session):
     # The PNG is inlined, so the file opens correctly when moved or emailed
     # without the diagram sitting next to it.
     assert "data:image/png;base64," in html
-    assert '<nav class="toc">' in html
+    assert '<aside class="toc" aria-label="Document contents">' in html
     assert "Diagram source (Mermaid)" in html
     # Every TOC link resolves to a real heading anchor.
-    anchors = set(re.findall(r'<h[1-3] id="([^"]+)"', html))
+    anchors = set(re.findall(r'<h[1-4] id="([^"]+)"', html))
     for link in re.findall(r'<a href="#([^"]+)">', html):
         assert link in anchors, f"TOC link #{link} has no heading"
 

@@ -814,10 +814,10 @@ def export_deliverable_pdf(session_dir: Path) -> Optional[Path]:
     try:
         module.format_document(spec.parent, "functional_specification.md", "process_diagram.png",
                                "functional_specification.formatted.md")
-        module._pymupdf_export(spec.parent / "functional_specification.formatted.md",
-                               diagram if diagram.is_file() else None,
-                               pdf,
-                               title=module._extract_title(spec))
+        # Typst when the binaries are installed, PyMuPDF fallback otherwise -
+        # same entry point the export_pdf MCP tool uses.
+        module.render_pdf_deliverable(spec.parent, "functional_specification.formatted.md",
+                                      "functional_specification.pdf")
         return pdf if pdf.is_file() else None
     except Exception:
         return pdf if pdf.is_file() else None
