@@ -41,7 +41,7 @@ was required.
 | `python-dotenv` | `>=1.0` | **1.2.4** | |
 | `PyYAML` | `>=6.0` | **6.0.3** | |
 | `pytest` | `>=8.0` | **9.2.0** | |
-| `numpy` | unpinned | **>=1.26,<2.5** | numpy 2.5 requires Python ≥3.12; CI runs 3.11. |
+| `numpy` | unpinned | **>=1.26,<2.5** | numpy 2.5 requires Python ≥3.12; CI runs 3.11 and 3.13. |
 | `onnxruntime` | commented out | **>=1.31** | chromadb's default embedding path; now installed, so the smoke check stops warning. |
 
 ## 3. Packages removed
@@ -90,7 +90,7 @@ The upgrades were applied in compatibility batches and verified after each:
 | `@tailwindcss/vite` | — | **4.3.3** | Tailwind's Vite plugin, compatible with Vite 8; replaces the v3 PostCSS integration. |
 
 The next patch releases of `@vitejs/plugin-react` (6.2.1), Tailwind (4.3.4)
-and Vitest (5.1.0) had been published on Nov 2, less than the dependency
+and Vitest (5.1.0) had been published on Nov 2, right at the dependency
 upgrade policy's three-day cooldown on Nov 5. The newest older compatible
 releases are selected above; those newer patches are deferred until the cooldown
 expires. The Tailwind 4 target requires Safari 16.4+, Chrome 111+, and Firefox 128+.

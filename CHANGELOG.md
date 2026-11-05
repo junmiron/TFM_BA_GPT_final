@@ -109,6 +109,14 @@ each pin are in `docs/dependency-versions.md`.
   `check_mermaid`/`clean_mermaid` tools report and fix the same pattern. Verified
   end to end: the session that lost diagram 5 now renders all eleven
   (`pdf images 11`, `html imgs 11`, `md images 11`).
+- **The "You" role tag was invisible.** It used `bg-white/20` with
+  `text-primary-foreground`; white composited on the white card is white on white,
+  a measured WCAG ratio of 1.00. The tag now uses the primary fill with
+  primary-foreground text (5.78:1), and `ui/src/components/roleStyles.test.ts`
+  rejects translucent white tag backgrounds so the mistake cannot return.
+- `ui/src/index.css` mapped `--color-input` to `hsl(var(--input))` while `--input`
+  was never declared in `:root`, so inputs fell back to an accidental border
+  colour. `--input: 220 13% 85%` is now defined next to `--border`.
 - **A completed run showed zero downloads in the web UI.** `run_workflow`
   invents its own `sess-<timestamp>` when the workflow has no id, so the
   interview, the spec, the diagram and the PDF landed in

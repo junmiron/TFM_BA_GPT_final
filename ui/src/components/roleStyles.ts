@@ -17,7 +17,7 @@ export const ROLE_STYLE: Record<RoleId, RoleStyle> = {
   diagram: { bubble: 'bg-emerald-50 border-emerald-500', tag: 'bg-emerald-100 text-emerald-900' },
   reviewer: { bubble: 'bg-rose-50 border-rose-500', tag: 'bg-rose-100 text-rose-900' },
   terminate: { bubble: 'bg-slate-100 border-slate-500', tag: 'bg-slate-200 text-slate-800' },
-  user: { bubble: 'bg-primary text-primary-foreground border-primary', tag: 'bg-white/20 text-primary-foreground' },
+  user: { bubble: 'bg-primary text-primary-foreground border-primary', tag: 'bg-primary text-primary-foreground' },
   system: { bubble: 'bg-secondary border-border', tag: 'bg-card text-muted-foreground' },
   other: { bubble: 'bg-chat-bot border-border', tag: 'bg-secondary text-secondary-foreground' },
 };
