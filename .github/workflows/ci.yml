@@ -14,9 +14,9 @@ jobs:
         python-version: ["3.11", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -26,10 +26,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Install mermaid-cli (needed for diagram rendering tests)
-        run: npm install -g @mermaid-js/mermaid-cli
+        run: npm install -g @mermaid-js/mermaid-cli@12.2.0
 
       - name: Release-readiness check
         run: python scripts/smoke_check.py
+
+      - name: Dependency consistency check
+        run: python -m pip check
 
       - name: Tests
         run: python -m pytest -q tests

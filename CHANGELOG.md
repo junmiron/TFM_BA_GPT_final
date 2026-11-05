@@ -3,6 +3,49 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-11-05
+
+Dependency upgrade anchored on AutoGen 0.7.5 (the final release of the archived
+microsoft/autogen project). Every other package is pinned to the newest version
+that is provably compatible with it. The full matrix and the reasoning behind
+each pin are in `docs/dependency-versions.md`.
+
+### Changed
+- **AutoGen 0.7.4 -> 0.7.5** (`autogen-agentchat`, `autogen-core`,
+  `autogen-ext[openai,chromadb,mcp,ollama]`). No code changes were needed: the
+  0.7.5 API surface is identical, and all three model lanes
+  (`strata`, `opencode`, `groq`) were re-probed live after the bump.
+- **Every dependency is now pinned exactly** instead of using open ranges:
+  chainlit 2.12.0, fastmcp 3.4.11, mcp 1.30.0, chromadb 1.5.9,
+  sentence-transformers 6.2.0, lxml 6.1.3, lxml_html_clean 0.4.2,
+  readability-lxml 0.9, PyMuPDF 2.1, markdown 3.11.2, python-dotenv 1.2.4,
+  PyYAML 6.0.3, pillow 13.0.0, beautifulsoup4 4.15.0, pytest 9.2.0.
+  `requirements.txt` now installs a reproducible set on both CI Python 3.11
+  and 3.13.
+- **fastmcp stays on the 3.x line on purpose**: 4.1.6 requires `mcp>=2.3`, and
+  chainlit 2.12 caps `mcp<2.0.0`. 3.4.11 is the newest that satisfies both.
+- **`@mermaid-js/mermaid-cli` pinned to 12.2.0** in CI (was unpinned), and the
+  local install was upgraded from 12.0.0. Diagram rendering tests pass on the
+  new version.
+- CI actions bumped: `actions/checkout` v4 -> v7, `actions/setup-python` v5 -> v7,
+  plus a `python -m pip check` step before the test run.
+
+### Removed
+- **langchain and langchain-community are gone.** They were only used for one
+  text splitter and four document loaders; `langchain-community` is sunset and
+  emits a `DeprecationWarning` on import, and langchain 1.x dropped
+  `langchain.text_splitter` entirely. `lib/rag_helpers.py` now carries a
+  ~40-line recursive splitter plus PyMuPDF/httpx/stdlib OOXML readers, so the
+  RAG corpus is indexed with libraries the project already depends on.
+- The `lxml.html.clean.Cleaner` import (deprecated shim) is replaced by
+  `lxml_html_clean.Cleaner`.
+
+### Added
+- `docs/dependency-versions.md` - the upgrade analysis: why each package moved,
+  which versions are blocked by which constraint, and the verification gates.
+- `tests/test_rag_splitter.py` - guards that `langchain` is never imported again
+  and that the replacement splitter respects chunk size, overlap and content.
+
 ## [1.1.0] - 2026-11-04
 
 Makes the pipeline deterministic end-to-end on Windows and moves the model load off a single

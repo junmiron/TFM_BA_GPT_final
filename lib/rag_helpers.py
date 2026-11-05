@@ -9,9 +9,13 @@ returns a vector memory object for use in RAG-enabled applications.
 import asyncio
 import json
 import os
+import re
+import zipfile
+import xml.etree.ElementTree as ET
 import yaml  # Requires pyyaml
+import httpx
 import lxml.html
-from lxml.html.clean import Cleaner
+from lxml_html_clean import Cleaner
 from autogen_core.memory import (
     MemoryContent,
     MemoryMimeType,
@@ -24,12 +28,79 @@ from autogen_ext.memory.chromadb import (ChromaDBVectorMemory,
     PersistentChromaDBVectorMemoryConfig)
 from autogen_ext.memory.canvas import TextCanvasMemory
 from chromadb.utils import embedding_functions
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import (
-    PyMuPDFLoader, TextLoader, UnstructuredWordDocumentLoader, WebBaseLoader)
+import pymupdf
 from readability import Document
 from pathlib import Path
 from typing import Union
+
+
+def split_text(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> list[str]:
+    """Recursive character splitter.
+
+    Replaces langchain's RecursiveCharacterTextSplitter: langchain-community is
+    sunset and warns on import, and all we ever used from it is this split.
+    Every returned chunk is at most ``chunk_size`` characters long, and
+    consecutive chunks share up to ``chunk_overlap`` trailing characters.
+    """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    overlap = max(0, min(chunk_overlap, chunk_size - 1))
+
+    def hard_split(piece: str) -> list[str]:
+        out, start = [], 0
+        while start < len(piece):
+            end = min(start + chunk_size, len(piece))
+            out.append(piece[start:end])
+            if end == len(piece):
+                break
+            start = end - overlap
+        return out
+
+    def recursive(piece: str, separators: list[str]) -> list[str]:
+        if len(piece) <= chunk_size:
+            return [piece]
+        for index, sep in enumerate(separators):
+            if sep == "" or sep not in piece:
+                continue
+            merged, buffer = [], ""
+            for part in piece.split(sep):
+                candidate = buffer + sep + part if buffer else part
+                if len(candidate) <= chunk_size:
+                    buffer = candidate
+                else:
+                    if buffer:
+                        merged.append(buffer)
+                    buffer = part
+            if buffer:
+                merged.append(buffer)
+            out = []
+            for chunk in merged:
+                if len(chunk) > chunk_size:
+                    out.extend(recursive(chunk, separators[index + 1:]))
+                else:
+                    out.append(chunk)
+            return out
+        return hard_split(piece)
+
+    return [c.strip() for c in recursive(text, ["\n\n", "\n", " ", ""]) if c.strip()]
+
+def _read_pdf(path: str) -> list[str]:
+    with pymupdf.open(path) as doc:
+        return [page.get_text() for page in doc]
+
+
+def _read_docx(path: str) -> list[str]:
+    """Minimal OOXML text extraction - no external dependency needed."""
+    ns = "{http://www.w3.org/2001/wordprocessingml/2006/main}"
+    with zipfile.ZipFile(path) as zf:
+        xml = zf.read("word/document.xml").decode("utf-8", errors="ignore")
+    root = ET.fromstring(xml)
+    paragraphs = []
+    for para in root.iter(f"{ns}p"):
+        text = "".join(t.text or "" for t in para.iter(f"{ns}t"))
+        if text.strip():
+            paragraphs.append(text)
+    return paragraphs
 
 
 class TemplateSafeChromaDBVectorMemory(ChromaDBVectorMemory):
@@ -128,39 +199,39 @@ async def load_and_index_documents(
         chunk_size (int): Number of characters in each chunk.
         chunk_overlap (int): Number of overlapping characters between chunks.
     """
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-
+    total_chunks = 0
     for file_name in os.listdir(docs_dir):
         file_path = os.path.join(docs_dir, file_name)
         ext = os.path.splitext(file_name)[-1].lower()
 
         try:
             if ext == ".pdf":
-                loader = PyMuPDFLoader(file_path)
+                pages = _read_pdf(file_path)
             elif ext == ".txt":
-                loader = TextLoader(file_path)
-            elif ext in [".doc", ".docx"]:
-                loader = UnstructuredWordDocumentLoader(file_path)
+                pages = [Path(file_path).read_text(encoding="utf-8", errors="ignore")]
+            elif ext in (".doc", ".docx"):
+                pages = _read_docx(file_path)
             else:
                 print(f"Unsupported file format: {file_name}")
                 continue
 
-            docs = loader.load()
-            split_docs = text_splitter.split_documents(docs)
+            chunks = []
+            for page in pages:
+                chunks.extend(split_text(page, chunk_size, chunk_overlap))
 
-            for i, chunk in enumerate(split_docs):
+            for i, chunk in enumerate(chunks):
                 await doc_vector_memory.add(
                     MemoryContent(
-                        content=chunk.page_content,
+                        content=chunk,
                         mime_type=MemoryMimeType.TEXT,
                         metadata={"source": file_name, "chunk_index": i}
                     )
                 )
 
-            print(f"Indexed {len(split_docs)} chunks from {file_name}.")
+            total_chunks += len(chunks)
+            print(f"Indexed {len(chunks)} chunks from {file_name}.")
 
-        except (FileNotFoundError, ValueError, RuntimeError) as e:
+        except (FileNotFoundError, ValueError, RuntimeError, zipfile.BadZipFile) as e:
             print(f"Error processing {file_name}: {e}")
     return chunk_size, chunk_overlap
 
@@ -197,9 +268,6 @@ async def load_and_index_web_page(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap
-    )
 
     cleaner = Cleaner(
         scripts=True,
@@ -258,11 +326,12 @@ async def load_and_index_web_page(
 
     async def process_url(url):
         try:
-            loader = WebBaseLoader(url)
-            docs = loader.load()
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+                response = await client.get(url, headers={"User-Agent": os.getenv("USER_AGENT", "Mozilla/5.0 (compatible; TFM-BA-GPT/1.0)")})
+                response.raise_for_status()
+                pages = [response.text]
 
-            for doc in docs:
-                raw_html = doc.page_content
+            for raw_html in pages:
 
                 # Extract readable HTML
                 readable_doc = Document(raw_html)
