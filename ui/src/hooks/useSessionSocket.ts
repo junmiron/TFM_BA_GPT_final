@@ -9,7 +9,8 @@ const MAX_BACKOFF_MS = 15_000;
 export interface SocketControls {
   /** Sends a human answer. Returns false (and sends nothing) when the socket is not open. */
   send: (content: string) => boolean;
-  /** Closes the local socket and marks the run stopped in this window. */
+  /** Cancels the run server-side (WebSocket `stop` plus the REST fallback),
+  then closes the local socket and marks the run stopped in this window. */
   stop: () => void;
 }
 
