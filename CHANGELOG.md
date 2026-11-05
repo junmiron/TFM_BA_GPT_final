@@ -166,6 +166,15 @@ each pin are in `docs/dependency-versions.md`.
   and the hole is visible. `finalize_deliverables` reports
   `auto_filled_sections` and `placeholder_sections`, and the API posts both to
   the session transcript.
+- **The simulated stakeholder answered the planner instead of the interviewer.** AutoGen
+  passes the *last* message to `input_func`, and every `QUESTION:` from `interviewer_agent`
+  is routed through `planning_agent` before the user replies, so the persona kept receiving
+  `Task state: ...` and answered "I don't see the analyst's question".
+  `selector_with_question` now stashes the real question and `workflow_user_input` feeds that
+  to the persona, consuming the capture once per answer. The wrapper must be `async`:
+  AutoGen decides sync-vs-async with `inspect.iscoroutinefunction` when the team is built, and
+  a sync wrapper that returns a coroutine aborts the run with
+  `Selector function returned an invalid speaker name`.
 - `/api/sessions` could time out while synchronous model setup started in the
   background; clients retrying the POST then created duplicate runs. Session runs
   now start as Starlette background tasks after the response is flushed, with a

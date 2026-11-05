@@ -94,6 +94,28 @@ class ConsoleSink:
         print(f"[error] {content}")
 
 
+def question_aware_selector(selector_func, pending_question: dict):
+    """Wrap a selector so it also remembers the interviewer's question.
+
+    AutoGen hands `input_func` the *last* message. This team routes every
+    interviewer QUESTION through planning_agent before the user answers, so the
+    prompt the stakeholder sees is the planner's "Task state:" line. The wrapper
+    stashes the real question so the interview answers the question that was
+    asked. The inner function must be async: AutoGen decides sync-vs-async with
+    inspect.iscoroutinefunction when the team is built, and a sync wrapper that
+    returns a coroutine raises 'Selector function returned an invalid speaker
+    name'.
+    """
+
+    async def wrapper(messages):
+        captured = agents_tools_helpers.latest_question(messages)
+        if captured:
+            pending_question["text"] = captured
+        return await selector_func(messages)
+
+    return wrapper
+
+
 async def create_workflow(ask_user: Callable, notify: Callable) -> dict:
     """Build the team. ``ask_user`` is the UI's answer channel and ``notify``
     posts an informational message, so the agents never touch a UI directly."""
@@ -133,12 +155,20 @@ async def create_workflow(ask_user: Callable, notify: Callable) -> dict:
             print(f"⚠️  Human simulator unavailable ({type(e).__name__}: {e}); falling back to real user input.")
             human_sim = None
 
+    # AutoGen's input_func receives the *last* message, and this team routes every
+    # interviewer QUESTION through planning_agent before the user speaks, so the
+    # prompt handed to the stakeholder is the planner's "Task state:" line. Keep
+    # the real question in reach so the interview answers the question asked.
+    pending_question = {"text": ""}
+
     async def workflow_user_input(prompt=None, cancellation_token=None):
         while True:
             if cancellation_token is not None and getattr(cancellation_token, "is_canceled", False):
                 raise asyncio.CancelledError()
             if human_sim is not None:
-                question = (prompt or "").strip() or "Please describe how this should work."
+                question = agents_tools_helpers.question_for_user(
+                    prompt, pending_question.pop("text", "")
+                )
                 answer = await human_sim.ask(question)
                 await notify(f"🧣 Stakeholder: {answer}", author="user")
                 return answer
@@ -753,7 +783,7 @@ async def create_workflow(ask_user: Callable, notify: Callable) -> dict:
         selector_prompt=selector_prompt,
         allow_repeated_speaker=False,
         model_client_streaming=False,
-        selector_func=selector_func,
+        selector_func=question_aware_selector(selector_func, pending_question),
     )
 
     return {"team": team, "user": user, "human_sim": human_sim}

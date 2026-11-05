@@ -1150,6 +1150,35 @@ STATUS_PREFIX = "STATUS:"
 # to the diagram stage. Each round is a full writer pass plus a checker pass.
 MAX_CHECKER_ROUNDS = int(os.environ.get("MAX_CHECKER_ROUNDS", "3"))
 
+
+def latest_question(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str:
+    """Return the most recent 'QUESTION:' turn, looking past the planner's turn.
+
+    The selector routes every interviewer question through planning_agent before
+    the user answers, so AutoGen's input_func receives the planner's
+    "Task state:" line rather than the question. Anything that needs the real
+    question - the simulated stakeholder above all - has to walk back over it.
+    """
+    for m in reversed(list(messages)):
+        content = getattr(m, "content", "")
+        if isinstance(content, str) and content.strip().startswith(QUESTION_PREFIX):
+            return content.strip()
+    return ""
+
+
+def question_for_user(prompt: str | None, captured: str = "") -> str:
+    """Choose what the stakeholder is actually being asked.
+
+    A planner "Task state:" prompt carries no question, so the captured
+    interviewer question wins; a genuine question prompt is used as-is.
+    """
+    text = (prompt or "").strip()
+    if text.startswith(QUESTION_PREFIX):
+        return text
+    if captured and ("Task state" in text or not text):
+        return captured
+    return text or captured or "Please describe how this should work."
+
 # Every section of the writer's document template. When the checker reports one
 # of these as missing, the fix belongs with the writer (it has the save tools),
 # not with the interviewer - sending it to planning just re-asks the user for
