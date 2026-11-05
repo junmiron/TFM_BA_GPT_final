@@ -113,6 +113,19 @@ def test_health_reports_lanes():
     assert body["max_messages"] == int(os.getenv("MAX_MESSAGES", "300"))
 
 
+def test_health_human_lane_is_a_model_only_when_simulating(monkeypatch):
+    monkeypatch.setenv("SIMULATE_HUMAN", "true")
+    monkeypatch.setenv("HUMAN_MODEL", "opencode")
+    body = client().get("/api/health").json()
+    assert body["simulate_human"] is True
+    assert body["lanes"]["human_model"] == "opencode"
+
+    monkeypatch.delenv("SIMULATE_HUMAN", raising=False)
+    body = client().get("/api/health").json()
+    assert body["simulate_human"] is False
+    assert body["lanes"]["human_model"] == "user"
+
+
 def test_local_vite_dev_origin_has_cors_access_only():
     c = client()
     headers = {

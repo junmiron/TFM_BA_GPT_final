@@ -238,6 +238,25 @@ each pin are in `docs/dependency-versions.md`.
   bookmarks, Inter font, no leftover intermediate files), the PyMuPDF fallback
   when the toolchain is absent, and the HTML sidebar/cover/`<details>` contract.
 
+### Fixed
+- **The web UI model lane mislabeled the human.** `/api/health` reported
+  `HUMAN_MODEL` (default `opencode`) as the "human" lane even when
+  `SIMULATE_HUMAN` was off and the answers came from the browser. The backend
+  now reports `user`, and the header reads `you (human)`; the model name still
+  appears when the stakeholder really is simulated.
+- **The answer composer scrolled out of view on long transcripts.** The chat
+  column is capped to the viewport height at `lg`, the transcript scrolls inside
+  its own pane, and the answer box is pinned at the bottom (`sticky bottom-0`).
+  New turns auto-scroll the transcript only when the reader is already near the
+  bottom (`shouldFollowLatest` in `ui/src/lib/scroll.ts`), so scrolling up to
+  read history is never hijacked.
+- **"Start interview" was clipped in the 18rem rail.** The kbd hint and the
+  button did not fit in the 262px row, so the flex row compressed the button and
+  its text wrapped inside the fixed 32px height. The button is now full-width on
+  its own row with the shortcut as a caption below.
+- **Artifacts panel sat below Workflow in the right rail.** RunPanel now
+  renders Artifacts first, Workflow second.
+
 ## [1.1.0] - 2026-11-04
 
 Makes the pipeline deterministic end-to-end on Windows and moves the model load off a single

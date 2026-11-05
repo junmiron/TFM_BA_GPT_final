@@ -132,20 +132,22 @@ function Composer({ error, starting, onStart }: { error: string | null; starting
         placeholder="Describe the product, users and interview goal"
         className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span id="task-hint" className="text-xs text-muted-foreground">
-          <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-mono text-[10px]">Ctrl</kbd>
-          {' / '}
-          <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-mono text-[10px]">⌘</kbd>
-          {' + '}
-          <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-mono text-[10px]">Enter</kbd>
-          {' to start'}
-        </span>
-        <Button type="submit" variant="primary" size="sm" disabled={!canStart}>
-          <PlusIcon />
-          <span>{starting ? 'Starting…' : 'Start interview'}</span>
-        </Button>
-      </div>
+            <button
+        type="submit"
+        className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-glow disabled:opacity-60"
+        disabled={!canStart}
+      >
+        <PlusIcon />
+        <span>{starting ? 'Starting…' : 'Start interview'}</span>
+      </button>
+      <p id="task-hint" className="mt-1 text-xs text-muted-foreground">
+        <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-mono text-[10px]">Ctrl</kbd>
+        {' / '}
+        <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-mono text-[10px]">⌘</kbd>
+        {' + '}
+        <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-mono text-[10px]">Enter</kbd>
+        {' also starts'}
+      </p>
       {error && (
         <p role="alert" className="mt-2 text-sm text-rose-800">
           {error}

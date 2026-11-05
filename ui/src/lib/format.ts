@@ -97,7 +97,7 @@ export function formatLanes(lanes: HealthResponse['lanes']): string[] {
   for (const [name, value] of Object.entries(lanes)) {
     if (typeof value !== 'string' && typeof value !== 'number') continue;
     const label = LANE_LABEL[name] ?? name;
-    const entry = `${value} (${label})`;
+    const entry = value === 'user' ? 'you (human)' : `${value} (${label})`;
     if (!out.includes(entry)) out.push(entry);
   }
   return out;

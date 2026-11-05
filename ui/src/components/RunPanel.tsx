@@ -37,6 +37,15 @@ export function RunPanel({
 }: RunPanelProps) {
   return (
     <aside aria-label="Run progress" className="flex min-h-0 flex-col gap-4 lg:sticky lg:top-6">
+      <Panel title="Artifacts" headingId="artifacts-heading">
+        <ArtifactsBody
+          sessionId={sessionId}
+          artifacts={artifacts}
+          error={artifactsError}
+          runActive={runActive}
+          onRetry={onRetryArtifacts}
+        />
+      </Panel>
       <Panel title="Workflow" headingId="workflow-heading">
         <ol aria-labelledby="workflow-heading" className="space-y-2 p-4">
           {STAGES.map((stage) => {
@@ -65,15 +74,6 @@ export function RunPanel({
         )}
       </Panel>
 
-      <Panel title="Artifacts" headingId="artifacts-heading">
-        <ArtifactsBody
-          sessionId={sessionId}
-          artifacts={artifacts}
-          error={artifactsError}
-          runActive={runActive}
-          onRetry={onRetryArtifacts}
-        />
-      </Panel>
     </aside>
   );
 }

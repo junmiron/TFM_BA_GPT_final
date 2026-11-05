@@ -10,6 +10,7 @@ import { useSessionSocket } from './hooks/useSessionSocket';
 import { api, downloadArtifact } from './lib/api';
 import { errorMessage, formatLanes, sessionTitle } from './lib/format';
 import { findSpecArtifact } from './lib/artifacts';
+import { shouldFollowLatest } from './lib/scroll';
 import { isActiveRun, reducer, initialState, EMPTY_THREAD, awaitingQuestion, stageStates, PENDING_PREFIX, isTerminalRun, type RunStatus, type Thread } from './state/runState';
 
 export default function App() {
@@ -105,14 +106,18 @@ export default function App() {
     downloadArtifact(activeId, specArtifact).catch((error: unknown) => setDownloadError(errorMessage(error)));
   }, [activeId, specArtifact]);
 
-  // A question is the moment that needs attention: bring the composer into view.
-  const answerRef = useRef<HTMLDivElement | null>(null);
+  // Copilot-style: the composer is pinned at the bottom of the chat column,
+  // so the transcript scrolls up to keep the latest turn in view. We only
+  // auto-scroll when the reader is already near the bottom, so scrolling up
+  // to read history is never hijacked by a new agent message.
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = answerRef.current;
+    const el = transcriptRef.current;
     if (!el) return;
-    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
-  }, [question]);
+    if (shouldFollowLatest(el.scrollHeight, el.scrollTop, el.clientHeight, Boolean(question))) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [thread.turns, question]);
 
   // Escape stops an active run (keyboard shortcut from the spec).
   useEffect(() => {
@@ -159,9 +164,13 @@ export default function App() {
           onRetry={() => void refresh()}
         />
 
-        <main id="main" aria-label="Interview transcript" className="flex min-h-[60vh] min-w-0 flex-col gap-4">
-          <section aria-label="Live transcript" className="min-h-0 flex-1 rounded-lg border border-border bg-card p-4 shadow-lg sm:p-5">
-            <div className="mb-3 flex items-center justify-between gap-2">
+        <main
+          id="main"
+          aria-label="Interview transcript"
+          className="flex min-h-[60vh] min-w-0 flex-col gap-4 lg:max-h-[calc(100vh-7rem)]"
+        >
+          <section aria-label="Live transcript" className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card shadow-lg">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3 sm:px-5">
               <h2 className="text-sm font-semibold text-foreground">
                 {activeSession ? sessionTitle(activeSession) : 'Transcript'}
               </h2>
@@ -171,16 +180,18 @@ export default function App() {
                 </span>
               )}
             </div>
-            <Transcript
-              turns={thread.turns}
-              hasSession={activeId !== null}
-              busy={runActive}
-              historical={activeId !== null && thread.turns.length === 0 && !runActive}
-            />
+            <div ref={transcriptRef} className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+              <Transcript
+                turns={thread.turns}
+                hasSession={activeId !== null}
+                busy={runActive}
+                historical={activeId !== null && thread.turns.length === 0 && !runActive}
+              />
+            </div>
           </section>
 
           {question && (
-            <div ref={answerRef}>
+            <div className="sticky bottom-0 shrink-0">
               <AnswerBox question={question} connected={connected} onSend={send} />
             </div>
           )}

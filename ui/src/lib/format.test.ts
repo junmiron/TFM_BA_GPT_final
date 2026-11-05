@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractQuestion,
   formatBytes,
+  formatLanes,
   formatRelativeTime,
   formatTurnBudget,
   sessionCountLabel,
@@ -23,6 +24,15 @@ describe('format helpers', () => {
     expect(formatRelativeTime('2026-01-01T11:59:30Z', now)).toBe('just now');
     expect(formatRelativeTime('2026-01-01T11:50:00Z', now)).toBe('10 min ago');
     expect(formatRelativeTime('2026-01-01T09:00:00Z', now)).toBe('3 h ago');
+  });
+
+  it('labels the human lane honestly', () => {
+    expect(
+      formatLanes({ model_client: 'strata', model_client_tools: 'strata', human_model: 'user' }),
+    ).toEqual(['strata (chat)', 'strata (tools)', 'you (human)']);
+    expect(
+      formatLanes({ model_client: 'strata', model_client_tools: 'strata', human_model: 'opencode' }),
+    ).toEqual(['strata (chat)', 'strata (tools)', 'opencode (human)']);
   });
 
   it('extracts the QUESTION line', () => {

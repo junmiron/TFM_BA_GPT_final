@@ -181,14 +181,17 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health() -> dict:
+    simulate_human = os.getenv("SIMULATE_HUMAN", "").strip().lower() in ("1", "true", "yes")
     return {
         "status": "ok",
         "lanes": {
             "model_client": os.getenv("MODEL_CLIENT", "openai"),
             "model_client_tools": os.getenv("MODEL_CLIENT_TOOLS", "openai_npt"),
-            "human_model": os.getenv("HUMAN_MODEL", "opencode"),
+            # The human lane is only a model when SIMULATE_HUMAN is on. When a
+            # real person answers in the browser, report "user", not the sim lane.
+            "human_model": os.getenv("HUMAN_MODEL", "opencode") if simulate_human else "user",
         },
-        "simulate_human": os.getenv("SIMULATE_HUMAN", "").strip().lower() in ("1", "true", "yes"),
+        "simulate_human": simulate_human,
         "max_messages": int(os.getenv("MAX_MESSAGES", "300")),
         "ui_build": UI_DIST.is_dir(),
     }
