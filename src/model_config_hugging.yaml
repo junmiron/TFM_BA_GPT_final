@@ -1,0 +1,14 @@
+provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+config:
+  model: "deepseek-ai/DeepSeek-V3"
+  # key comes from HF_TOKEN in .env
+
+  parallel_tool_calls: false
+  model_info:
+    vision: false
+    function_calling: true
+    json_output: true
+    family: unknown
+    structured_output: false
+    multiple_system_messages: true
+  base_url: "https://router.huggingface.co/v1"

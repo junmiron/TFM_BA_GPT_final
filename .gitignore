@@ -1,12 +1,10 @@
 /data
 /venv
 /install
-# Provider configs that embed a real key in the file. Configs using a
-# REPLACE_WITH_* placeholder (groq, strata, opencode) are tracked; the key
-# itself comes from .env at runtime.
-/src/model_config_azure.yaml
-/src/model_config_hugging.yaml
-/src/model_config_github.yaml
+# Model profiles are tracked: none of them carry a secret, the key is injected
+# from the environment by src/model_loader.py. Only a local override that
+# someone pastes a key into stays out of the repo.
+/src/model_config_*.local.yaml
 /venv311
 /venv
 /.venv
