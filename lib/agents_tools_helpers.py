@@ -711,10 +711,20 @@ def _mermaid_source(session_dir: Path) -> Optional[str]:
     return None
 
 
-def _diagram_png_names(session_dir: Path) -> List[str]:
-    """PNG basenames for every diagram rendered from the canvas, in order."""
-    names = [p.name for p in render_diagram_pngs(session_dir)]
-    return names or ["process_diagram.svg"]
+def _diagram_png_names(session_dir: Path) -> List[Optional[str]]:
+    """One slot per canvas diagram, `None` where mmdc failed to render.
+
+    Positional on purpose. `render_diagram_pngs` returns only the PNGs that
+    exist, so a compacted list puts `process_diagram_6.png` under the fifth
+    diagram's heading and loses the last diagram entirely. `_diagram_block`
+    pairs the list with the canvas by index, so a missing render must stay a
+    slot - the heading keeps its Mermaid source and simply gets no image.
+    """
+    server = _pdf_server_module()
+    if server is None:
+        return [p.name for p in render_diagram_pngs(session_dir)] or ["process_diagram.png"]
+    names = server._diagram_png_names(Path(session_dir))
+    return names or ["process_diagram.png"]
 
 
 def embed_diagram_in_markdown(session_dir: Path) -> bool:

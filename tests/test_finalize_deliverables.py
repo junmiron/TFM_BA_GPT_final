@@ -433,3 +433,41 @@ def test_finalize_result_carries_the_missing_section_report(session):
     result = helpers.finalize_deliverables(str(session))
     assert isinstance(result["missing_sections"], list)
     assert "Glossary" in result["missing_sections"]
+
+
+def test_a_failed_render_keeps_diagrams_in_the_right_place(session):
+    """A missing PNG must stay a slot rather than compact the name list.
+
+    Three canvas diagrams, the second render fails. A compacted list would put
+    `process_diagram_3.png` under "Bag lifecycle" and leave "Shelf moves" with
+    no image at all.
+    """
+    fence = "```"
+    canvas = (
+        "## Process Diagram\n\n"
+        + fence + "mermaid\nflowchart TD\n  A[Order] --> B[Picked up]\n" + fence + "\n\n"
+        "### Bag lifecycle\n\n"
+        + fence + "mermaid\nstateDiagram-v2\n  [*] --> Open\n" + fence + "\n\n"
+        "### Shelf moves\n\n"
+        + fence + "mermaid\nflowchart TD\n  C[Shelf] --> D[Counter]\n" + fence + "\n"
+    )
+    (session / "canvas_diagram.md").write_text(canvas, encoding="utf-8")
+    (session / "functional_specification.md").write_text(
+        "# Test App\n\n" + canvas, encoding="utf-8"
+    )
+    for name in ("process_diagram.png", "process_diagram_3.png"):
+        (session / name).write_bytes(b"PNG")
+
+    assert helpers._diagram_png_names(session) == [
+        "process_diagram.png", None, "process_diagram_3.png"
+    ]
+    assert helpers.embed_diagram_in_markdown(session)
+
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    images = [line for line in md.splitlines() if line.startswith("![")]
+    assert images == [
+        "![Process Diagram](process_diagram.png){ width=95% }",
+        "![Shelf moves](process_diagram_3.png){ width=95% }",
+    ]
+    assert "![Bag lifecycle]" not in md
+    assert md.count(fence + "mermaid") == 3

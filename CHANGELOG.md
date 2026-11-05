@@ -137,6 +137,12 @@ each pin are in `docs/dependency-versions.md`.
   than one page. PDF export now splits long rows into paginatable pieces and
   bounds the Story writer; pathological layouts fail fast instead of hanging.
   Long-row regression tests confirm the cell text survives in the PDF.
+- The Markdown/HTML embedder still compacted the PNG list:
+  `lib/agents_tools_helpers._diagram_png_names` returned only the files that
+  exist, so when the second of three canvas diagrams failed to render,
+  `process_diagram_3.png` landed under "Bag lifecycle" and "Shelf moves" lost
+  its image. It now returns one slot per canvas diagram, `None` where the render
+  failed, matching the positional list the PDF path already used.
 - A missing template section could be routed back to the interviewer, which
   repeated questions the document already answered. Checker gaps for all required
   sections now return to the writer, the retry loop is capped, and finalization
