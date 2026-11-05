@@ -848,10 +848,31 @@ def migrate_legacy_deliverable_names(session_dir: Path) -> List[str]:
     return renamed
 
 
+def normalize_markdown_headings(session_dir: Path) -> int:
+    """Split headings glued onto the end of a paragraph, in place.
+
+    `functional_specification.md` is the writer's own file, and the writer
+    sometimes appends `## 4. Functional Requirements` straight after the previous
+    sentence with no newline. Markdown then never sees a heading, so the section
+    is missing from every rendered deliverable. Fix the source file once so the
+    .md, .html and .pdf all agree.
+    """
+    module = _pdf_server_module()
+    spec = Path(session_dir) / "functional_specification.md"
+    if module is None or not spec.is_file():
+        return 0
+    text = spec.read_text(encoding="utf-8")
+    fixed, splits = module.split_glued_headings(text)
+    if splits:
+        spec.write_text(fixed, encoding="utf-8")
+    return splits
+
+
 def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
     """Ensure the diagram PNG, the Markdown, functional_specification.html and functional_specification.pdf exist."""
     sd = Path(session_dir) if session_dir else _session_dir()
     renamed = migrate_legacy_deliverable_names(sd)
+    glued = normalize_markdown_headings(sd)
     pngs = render_diagram_pngs(sd)
     embed_diagram_in_markdown(sd)
     pdf = export_deliverable_pdf(sd)
@@ -861,6 +882,7 @@ def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
         "diagram_png": str(pngs[0]) if pngs else None,
         "diagram_pngs": [str(x) for x in pngs],
         "renamed": renamed,
+        "glued_headings_split": glued,
         "markdown": str(sd / "functional_specification.md"),
         "pdf": str(pdf) if pdf else None,
         "html": str(html) if html else None,

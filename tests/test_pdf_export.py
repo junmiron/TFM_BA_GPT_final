@@ -490,3 +490,26 @@ def test_a_failed_diagram_render_does_not_truncate_the_rest(tmp_path):
     qr = next(i for i, line in enumerate(lines) if "QR Scanning Fallback" in line)
     nearby = [line for line in lines[qr:qr + 4] if line.startswith("![")]
     assert not nearby, "the sixth PNG was attached to the fifth diagram after the gap"
+
+
+def test_split_glued_headings_recovers_a_missing_section():
+    pdf = _load_pdf_module()
+    md = (
+        "# Spec\n\n"
+        "## 3. Objectives\n"
+        "Keep records current.## 4. Functional Requirements\n"
+        "### 4.1 Order management\n"
+        "Text ends.## 6. Use Cases\n"
+        "### UC-01: Create an order\n"
+    )
+    fixed, splits = pdf.split_glued_headings(md)
+    assert splits == 2
+    headings = [l for l in fixed.splitlines() if l.startswith("#")]
+    assert "## 4. Functional Requirements" in headings
+    assert "## 6. Use Cases" in headings
+    # table rows, code fences and inline code spans are never split
+    untouched = pdf.split_glued_headings(
+        "| id | # label |\n```\ninline ## not a heading\n```\n"
+        "See the `## literal` marker in the notes.\n"
+    )[0]
+    assert untouched.count("\n##") == 0

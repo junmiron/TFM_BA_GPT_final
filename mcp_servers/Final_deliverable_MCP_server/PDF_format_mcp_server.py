@@ -444,6 +444,44 @@ def ensure_functional_requirements_table(md: str) -> tuple[str, int]:
 
 # ------------------------------ formatting core ------------------------------
 
+def split_glued_headings(md: str) -> tuple[str, int]:
+    """Break section headings the writer glued onto the end of a paragraph.
+
+    The spec writer sometimes appends a heading straight after the previous
+    sentence with no newline - "...basic reporting.## 4. Functional Requirements" -
+    so Markdown never sees a heading and the whole section vanishes from the
+    outline, the TOC and the PDF (its subsections then look orphaned).
+    Lines inside fenced code blocks, table rows and inline code spans are left
+    alone.
+    """
+    out: list[str] = []
+    splits = 0
+    in_fence = False
+    for line in md.splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if in_fence or line.lstrip().startswith("|"):
+            out.append(line)
+            continue
+        rest, pieces = line, []
+        while True:
+            # A run of `#` is a heading only where it starts: `## 4.` inside
+            # "text.## 4." qualifies, the second `#` of "## 4." does not.
+            match = re.search(r"(?<!#)(?<=\S)#{1,6}\s+\S", rest)
+            if not match:
+                break
+            if rest[:match.start()].count("`") % 2:   # inside an inline code span
+                break
+            pieces.append(rest[:match.start()])
+            rest = rest[match.start():]
+            splits += 1
+        pieces.append(rest)
+        out.extend(pieces)
+    return "\n".join(out) + ("\n" if md.endswith("\n") else ""), splits
+
+
 def ensure_blank_line_before_headings(md: str) -> str:
     """Separate blocks that Markdown's table extension would otherwise merge.
 
@@ -539,6 +577,11 @@ def format_document(session_dir: Path, md_file: str, diagram_file: str, out_file
     md, n_br = ensure_in_scope_requirements_table(md)
     md, n_fr = ensure_functional_requirements_table(md)
 
+    # A heading glued to the end of the previous paragraph ("...reporting.## 4.
+    # Functional Requirements") is not a heading at all, and the section then
+    # disappears from the outline, the TOC and the PDF.
+    md, glued = split_glued_headings(md)
+
     # The writer can emit stale/duplicated subsection numbers, which leak into
     # the TOC and the rendered PDF.
     md, numbering_fixes = normalize_heading_numbering(md)
@@ -560,6 +603,7 @@ def format_document(session_dir: Path, md_file: str, diagram_file: str, out_file
         "written_to": str(out_path),
         "business_requirements": n_br,
         "functional_requirements": n_fr,
+        "glued_headings_split": glued,
         "diagram": diagram_file,
         "numbering_fixes": numbering_fixes,
     }

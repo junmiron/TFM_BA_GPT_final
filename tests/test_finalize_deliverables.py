@@ -346,3 +346,14 @@ def test_mermaid_repair_rescues_semicolon_messages():
     assert "Open bag record, same actions allowed as after a scan" in fixed
     assert "stroke:#333;" in fixed, "classDef separators must survive"
     assert helpers._mermaid_repair("flowchart TD\n    A --> B\n") == "flowchart TD\n    A --> B\n"
+
+def test_finalize_splits_headings_glued_to_a_paragraph(session):
+    (session / "functional_specification.md").write_text(
+        "# Test App\n\n## 1. Overview\nKeep records current.## 4. Functional Requirements\n"
+        "### 4.1 Intake\n",
+        encoding="utf-8",
+    )
+    result = helpers.finalize_deliverables(str(session))
+    assert result["glued_headings_split"] == 1
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert "\n## 4. Functional Requirements\n" in md

@@ -109,6 +109,15 @@ each pin are in `docs/dependency-versions.md`.
   `check_mermaid`/`clean_mermaid` tools report and fix the same pattern. Verified
   end to end: the session that lost diagram 5 now renders all eleven
   (`pdf images 11`, `html imgs 11`, `md images 11`).
+- **Two whole sections were missing from the deliverable.** The spec writer
+  sometimes glues a heading onto the end of the previous paragraph with no
+  newline - `...basic reporting.## 4. Functional Requirements` - so Markdown never
+  sees a heading: sections 4 and 8 vanished from the outline, the TOC and the
+  HTML, and their subsections were re-parented under the wrong section
+  (`### 4.1` became `### 3.1`). `split_glued_headings` now breaks those headings
+  out, and `finalize_deliverables` applies it to `functional_specification.md`
+  itself so all three deliverables agree. Re-finalizing the affected run gave
+  `## 1-5, 7-9` plus `## Process Diagram`, PDF outline 10 entries, HTML 10 `<h2>`.
 
 ## [1.1.0] - 2026-11-04
 
