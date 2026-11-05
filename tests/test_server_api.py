@@ -277,6 +277,43 @@ def test_a_blocked_question_reports_as_awaiting_answer(live_server, monkeypatch)
     assert "Inventory only" in labels
 
 
+def test_turn_counter_moves_while_the_run_is_in_progress(live_server, monkeypatch):
+    """The UI's "N of M turns used" line reads session.messages. It was only
+    assigned after the workflow returned, so every live run read "No turns used
+    yet." even with dozens of messages in the transcript.
+    """
+
+    async def create(ask_user, notify):
+        return {"ask_user": ask_user, "messages": 0}
+
+    async def run_that_waits(workflow, task_text, sink):
+        await sink.message("interviewer_agent", "QUESTION: What is the scope?")
+        await sink.message("planning_agent", "Task state: - user: pending")
+        await sink.message("interviewer_agent", "QUESTION: Who are the users?")
+        await sink.message("summarizer_agent", "Summary drafted. **READY**")
+        answer = await workflow["ask_user"]("Confirm the summary")
+        await sink.message("user", answer)
+        await sink.complete("text_mention")
+        return {"session_id": "sess-fake", "stop_reason": "text_mention", "error": None}
+
+    monkeypatch.setattr(api, "create_workflow", create)
+    monkeypatch.setattr(api, "run_workflow", run_that_waits)
+
+    base, port = live_server
+    sid = httpx.post(f"{base}/api/sessions", json={"task": "Inventory app"}).json()["session_id"]
+
+    def detail():
+        return httpx.get(f"{base}/api/sessions/{sid}").json()
+
+    assert _wait_for(lambda: detail()["messages"] >= 4, 10), detail()
+    assert detail()["status"] in ("running", "awaiting_answer"), "run finished too early"
+
+    with ws_connect(f"ws://127.0.0.1:{port}/ws/sessions/{sid}") as ws:
+        ws.send(json.dumps({"type": "answer", "content": "Inventory only"}))
+        assert _wait_for(lambda: detail()["status"] == "done", 10)
+    assert detail()["messages"] == 5, detail()["messages"]
+
+
 def test_stop_during_team_construction_skips_the_run(live_server, monkeypatch):
     """A fast Stop click must be remembered while the workflow is being built."""
     run_calls = []

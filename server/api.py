@@ -85,6 +85,10 @@ class Session:
     def record(self, event: dict) -> None:
         event.setdefault("ts", datetime.now(timezone.utc).isoformat())
         self.events.append(event)
+        # The UI shows "N of M turns used" live, so the counter has to move as
+        # events stream, not only when the run finishes.
+        if event.get("type") in ("message", "answer"):
+            self.messages += 1
         for ws in list(self.clients):
             try:
                 asyncio.create_task(ws.send_json(event))
@@ -269,7 +273,6 @@ async def _start_run(session: Session) -> None:
         result = await run_workflow(session.workflow, session.task, Sink())
     except Exception as e:  # a crash inside the run must surface in the UI, not vanish
         result = {"error": f"{type(e).__name__}: {e}", "stop_reason": None}
-    session.messages = session.workflow.get("messages", 0)
     session.error = result.get("error")
     if session.status != "stopped":
         session.status = "done" if result.get("stop_reason") and not result.get("error") else "failed"

@@ -30,6 +30,28 @@ cross-origin requests:
 cd ui && cp .env.example .env && npm run dev
 ```
 
+## Test it
+
+```bash
+# 1. the client: types, unit tests, production build
+cd ui && npm run typecheck && npm test && npm run build
+
+# 2. the backend contract (REST + WebSocket), against a real uvicorn
+python -m pytest tests/test_server_api.py -q
+
+# 3. a full run through the same API the UI calls (needs SIMULATE_HUMAN=true)
+SIMULATE_HUMAN=true python -m uvicorn server.api:app --port 8000
+python test/ui_backend_e2e.py          # prints RESULT: PASS/FAIL
+
+# 4. the rendered page in a real browser
+#    open http://127.0.0.1:8000 - start an interview, watch the stage rail,
+#    Stop mid-run, then check the download links under the transcript
+```
+
+`test/ui_backend_e2e.py` mirrors the UI exactly (POST a task, follow the event
+stream, verify the four deliverables exist and that the PDF has images,
+bookmarks and no raw Mermaid text). Point it at any port with `UI_E2E_BASE`.
+
 ## API contract
 
 | Method | Path | Purpose |
