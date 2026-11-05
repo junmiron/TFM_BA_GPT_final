@@ -94,6 +94,26 @@ survives being emailed or moved without `process_diagram.png` alongside it. Merm
 kept inside a collapsed `<details>` block rather than rendered - opening the file needs no
 network access to a Mermaid CDN.
 
+## Diagrams show up as Mermaid source code in the PDF
+
+The Mermaid reviewer keeps the canvas as a Markdown document - a heading and a ```mermaid
+fence per diagram. Older versions wrapped that whole document in one fence, which nests the
+inner fences: the first diagram rendered as a PNG and every diagram below it printed as raw
+source.
+
+`render_diagram_pngs()` renders each fence with its own `mmdc` call, producing
+`process_diagram.png`, `process_diagram_2.png`, ... and `embed_diagram()` writes one image plus
+its source per diagram. To repair an existing session, re-run the finalizer:
+
+```python
+from lib.agents_tools_helpers import finalize_deliverables
+finalize_deliverables("conversation/<SESSION_ID>")
+```
+
+If a diagram still does not render, `mmdc` rejected that particular block. Check the PNG's
+size on disk - a stub keeps the block visible instead of dropping it, so a tiny file means the
+render failed rather than the fence being wrong.
+
 ## Diagram never appears in `conversation/<SESSION_ID>/`
 
 `terminate_agent` moves the source files from `conversation/` into

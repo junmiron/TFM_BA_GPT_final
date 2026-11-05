@@ -552,7 +552,7 @@ def format_document(session_dir: Path, md_file: str, diagram_file: str, out_file
         if source.exists():
             mermaid_source = load_text(source)
             break
-    md = ensure_diagram_section(md, diagram_file, mermaid_source)
+    md = ensure_diagram_section(md, _diagram_png_names(session_dir, diagram_file), mermaid_source)
 
     out_path = (session_dir / out_file).resolve()
     save_text(out_path, md)
@@ -625,6 +625,11 @@ _PAGE_W, _PAGE_H = 595, 842          # A4 in points
 _MARGIN = 36
 _CONTENT_W = _PAGE_W - 2 * _MARGIN
 _CONTENT_H = _PAGE_H - 2 * _MARGIN
+# Story silently drops an <img> that cannot fit in the space left on the page,
+# so a diagram is capped below the full content height to leave room for the
+# heading that precedes it. At exactly _CONTENT_H the tenth diagram in a
+# multi-diagram spec disappeared from the PDF.
+_IMAGE_MAX_H = _CONTENT_H - 60
 
 
 def _resolve_image_src(src: str, session_dir: Path) -> Optional[str]:
@@ -658,7 +663,7 @@ def _img_tag(src: str, alt: str, session_dir: Path) -> str:
         pix = fitz.Pixmap(str(session_dir / name) if not Path(name).is_absolute() else name)
         w, h = pix.width, pix.height
         pix = None
-        scale = min(_CONTENT_W / w, _CONTENT_H / h, 1.0)
+        scale = min(_CONTENT_W / w, _IMAGE_MAX_H / h, 1.0)
         w = max(1, int(w * scale))
         h = max(1, int(h * scale))
         return f'<img src="{name}" width="{w}" height="{h}" alt="{alt}"/>'
@@ -672,6 +677,11 @@ def _strip_mermaid_fences(md_text: str) -> str:
     A Mermaid block is source code: PyMuPDF Story would lay it out as a wall of
     monospaced text, and the rendered PNG is already embedded next to it. The
     HTML deliverable keeps the fence, the PDF does not.
+
+    A line with a language on it opens a fence; only a bare ``` closes one. That
+    detail matters when a multi-diagram canvas is nested inside a single fence -
+    treating the inner ```mermaid lines as closers mis-pairs the fences and the
+    diagram source leaks into the PDF as prose.
     """
     out, in_fence, fence_lang = [], False, ""
     for line in md_text.splitlines():
@@ -679,8 +689,8 @@ def _strip_mermaid_fences(md_text: str) -> str:
         if stripped.startswith("```"):
             if not in_fence:
                 in_fence, fence_lang = True, stripped[3:].strip().lower()
-                continue
-            in_fence = False
+            elif not stripped[3:].strip():
+                in_fence = False
             continue
         if in_fence and fence_lang == "mermaid":
             continue
@@ -688,59 +698,232 @@ def _strip_mermaid_fences(md_text: str) -> str:
     return "\n".join(out) + ("\n" if md_text.endswith("\n") else "")
 
 
-def _mermaid_fence(source: str) -> str:
-    body = source.strip()
-    if body.startswith("```"):  # already fenced - unwrap so we do not nest
-        body = body.split("\n", 1)[1] if "\n" in body else ""
-        if body.rstrip().endswith("```"):
-            body = body.rstrip()[:-3]
-    return "```mermaid\n" + body.strip() + "\n```"
+def _normalise_title(title: str) -> str:
+    """A heading compared without its leading section number."""
+    return re.sub(r"^\d+[a-z]?\.\s*", "", (title or "").strip()).lower()
 
 
-def embed_diagram(md: str, diagram_name: str, mermaid_source: Optional[str] = None) -> str:
-    """Insert the rendered diagram (and its Mermaid source) into a Markdown document.
+_FENCE_OPEN_RE = re.compile(r"^[ \t]*`{3,}[ \t]*([A-Za-z0-9_-]*)[ \t]*$")
+_FENCE_CLOSE_RE = re.compile(r"^[ \t]*`{3,}[ \t]*$")
+_HEADING_RE = re.compile(r"^[ \t]*(#{1,6})[ \t]+(.*)$", re.M)
+_DIAGRAM_KEYWORDS = (
+    "graph", "flowchart", "sequenceDiagram", "classDiagram", "stateDiagram",
+    "stateDiagram-v2", "erDiagram", "journey", "gantt", "pie", "mindmap",
+    "sankey-beta", "xychart-beta", "block-beta", "quadrantChart", "requirementDiagram",
+)
 
-    Idempotent and non-destructive: existing prose in a "Process Diagram" section
-    is kept, and running it twice does not duplicate the image or the fence. This
-    is what makes the .md deliverable self-explanatory - the reader sees the PNG
-    and the source that produced it.
+
+def canvas_diagrams(source: str) -> List[Dict[str, str]]:
+    """Split a Mermaid canvas into [{"title": ..., "source": ...}, ...].
+
+    The diagram reviewer keeps the canvas as a Markdown document: a heading, then
+    a ```mermaid fence, per diagram. mmdc renders exactly one diagram per
+    invocation, and wrapping the whole document in one fence nests the inner
+    fences - which is what made the PDF print raw Mermaid source as text.
     """
-    block = f"![Process Diagram]({diagram_name})\n"
-    if mermaid_source and mermaid_source.strip():
-        block += "\n" + _mermaid_fence(mermaid_source) + "\n"
+    diagrams: List[Dict[str, str]] = []
+    title = ""
+    lines = (source or "").splitlines()
+    i = 0
+    while i < len(lines):
+        opener = _FENCE_OPEN_RE.match(lines[i].strip())
+        if opener:
+            language = opener.group(1).lower()
+            body: List[str] = []
+            i += 1
+            while i < len(lines) and not _FENCE_CLOSE_RE.match(lines[i].strip()):
+                body.append(lines[i])
+                i += 1
+            i += 1  # consume the closing fence
+            text = "\n".join(body).strip()
+            is_diagram = language == "mermaid" or any(
+                re.match(rf"(?im)^\s*{kw}\b", text) for kw in _DIAGRAM_KEYWORDS
+            )
+            if text and is_diagram:
+                diagrams.append({"title": title, "source": text})
+            continue
+        heading = _HEADING_RE.match(lines[i])
+        if heading:
+            title = re.sub(r"^\d+[a-z]?\.\s*", "", heading.group(2).strip())
+        i += 1
+    if diagrams:
+        return diagrams
+    body = (source or "").strip()
+    return [{"title": title or "Process Diagram", "source": body}] if body else []
+
+
+def _canvas_heading_titles(source: str) -> set:
+    """Every heading title in the canvas document, normalised.
+
+    The canvas carries its own title and a Notes block as well as the diagram
+    headings. Those are canvas chrome, not spec content, and they are what the
+    reader sees as stray "diagrams as code" once a canvas is pasted into the
+    document.
+    """
+    return {_normalise_title(m.group(2)) for m in _HEADING_RE.finditer(source or "")}
+
+
+def _canvas_dump_region_end(md: str, start: int, canvas_titles: set) -> int:
+    """End of a contiguous canvas dump beginning at `start`.
+
+    Walks heading sections forward while each heading belongs to the canvas
+    document, stopping at the first heading the canvas did not produce.
+    """
+    headings = list(_HEADING_RE.finditer(md, start))
+    for index, match in enumerate(headings):
+        if _normalise_title(match.group(2)) not in canvas_titles:
+            return match.start()
+    return len(md)
+
+
+def _diagram_block(diagrams: List[Dict[str, str]], png_names: List[str]) -> str:
+    """One Markdown block per diagram: the rendered PNG, then its Mermaid source.
+
+    The first diagram keeps the plain "Process Diagram" caption; later ones get a
+    subheading so the .md, .html and the PDF bookmark tree name each diagram.
+    """
+    if not diagrams:
+        png = png_names[0] if png_names else "process_diagram.png"
+        return f"![Process Diagram]({png}){{ width=95% }}\n"
+
+    parts: List[str] = []
+    for index, diagram in enumerate(diagrams):
+        title = diagram.get("title") or "Process Diagram"
+        if title and title != "Process Diagram":
+            parts.append(f"### {title}")
+        png = png_names[index] if index < len(png_names) else None
+        if png:
+            alt = "Process Diagram" if index == 0 else title
+            parts.append(f"![{alt}]({png}){{ width=95% }}")
+        source = diagram.get("source", "").strip()
+        if source:
+            parts.append("```mermaid\n" + source + "\n```")
+    return "\n\n".join(parts) + "\n"
+
+
+def _drop_duplicate_diagram_sections(md: str, titles: List[str]) -> str:
+    """Remove headings that only exist because a canvas got pasted into the spec.
+
+    The Mermaid canvas is itself a Markdown document with a heading per diagram.
+    When it was embedded whole, every diagram became its own `## N. Title` section
+    with a fence and no rendered image - the "mermaid showing as code" the reader
+    sees below the real diagram. Those sections are redundant once the Process
+    Diagram section carries each diagram itself.
+    """
+    wanted = {re.sub(r"^\d+[a-z]?\.\s*", "", t).strip().lower() for t in titles if t}
+    if not wanted:
+        return md
+
+    headings = list(re.finditer(r"^[ \t]*(#{1,6})[ \t]+(.*)$", md, re.M))
+    cuts: List[tuple] = []
+    for index, match in enumerate(headings):
+        title = re.sub(r"^\d+[a-z]?\.\s*", "", match.group(2).strip()).lower()
+        if title not in wanted:
+            continue
+        level = len(match.group(1))
+        end = len(md)
+        for nxt in headings[index + 1:]:
+            if len(nxt.group(1)) <= level:
+                end = nxt.start()
+                break
+        body = md[match.end():end]
+        has_fence = "```mermaid" in body
+        has_image = bool(re.search(r"!\[[^\]]*\]\([^)]*process_diagram", body, re.I))
+        if has_fence and not has_image:
+            cuts.append((match.start(), end))
+
+    if not cuts:
+        return md
+    parts, cursor = [], 0
+    for start, end in cuts:
+        parts.append(md[cursor:start])
+        cursor = end
+    parts.append(md[cursor:])
+    return "".join(parts)
+
+
+def _section_prose(section: str, drop_titles: Optional[List[str]] = None) -> str:
+    """A section's prose with diagram images, fences and diagram headings removed,
+    so re-embedding never duplicates them and never loses the writer's own text."""
+    wanted = {_normalise_title(t) for t in (drop_titles or []) if t}
+    out, in_fence = [], False
+    for line in section.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            if not in_fence:
+                in_fence = True
+            elif not stripped[3:].strip():
+                in_fence = False
+            continue
+        if in_fence:
+            continue
+        if re.match(r"^!\[[^\]]*\]\([^)]*process_diagram[^)]*\)", stripped):
+            continue
+        if stripped.startswith("%%"):  # Mermaid comment lines are canvas chrome
+            continue
+        heading = _HEADING_RE.match(line)
+        if heading and _normalise_title(heading.group(2)) in wanted:
+            continue
+        out.append(line)
+    return "\n".join(out).strip()
+
+
+def _diagram_png_names(session_dir: Path, fallback: Optional[str] = None) -> List[str]:
+    """Every rendered diagram PNG in the session, main diagram first.
+
+    `process_diagram.png` is the first canvas diagram; the rest are
+    `process_diagram_2.png`, `process_diagram_3.png`, ... One image per canvas
+    diagram is what makes the extra diagrams render instead of appearing as
+    raw Mermaid source.
+    """
+    session_dir = Path(session_dir)
+    names = []
+    if (session_dir / "process_diagram.png").is_file():
+        names.append("process_diagram.png")
+    index = 2
+    while (session_dir / f"process_diagram_{index}.png").is_file():
+        names.append(f"process_diagram_{index}.png")
+        index += 1
+    if not names and fallback:
+        names = [fallback]
+    return names
+
+
+def _diagram_block_from_source(mermaid_source: Optional[str], png_names: List[str]) -> str:
+    return _diagram_block(canvas_diagrams(mermaid_source or ""), png_names)
+
+
+def embed_diagram(md: str, diagram_names, mermaid_source: Optional[str] = None) -> str:
+    """Insert every rendered diagram (and its Mermaid source) into a Markdown document.
+
+    Idempotent and non-destructive: the "Process Diagram" section is rebuilt from
+    the canvas each run, so a diagram is never duplicated and a canvas that grew
+    extra diagrams shows up in the deliverable. This is what makes the .md
+    self-explanatory - the reader sees the PNG and the source that produced it.
+    """
+    if isinstance(diagram_names, str):
+        diagram_names = [diagram_names]
+    diagrams = canvas_diagrams(mermaid_source or "")
+    block = _diagram_block(diagrams, list(diagram_names))
+    canvas_titles = _canvas_heading_titles(mermaid_source or "") | {
+        _normalise_title(d["title"]) for d in diagrams
+    }
+
+    md = _drop_duplicate_diagram_sections(md, canvas_titles)
 
     start, end = find_section(md, "Process Diagram", stop_at_level=2)
     if start != -1:
-        section = md[start:end]
-        if re.search(r"!\[[^\]]*\]\([^)]*process_diagram", section, re.I):
-            # Image is already there; make sure the source fence follows it.
-            if "```mermaid" not in section and mermaid_source:
-                section = re.sub(
-                    r"!\[[^\]]*\]\([^)]*process_diagram[^)]*\)\s*(?:\{[^}]*\})?\s*",
-                    lambda m: m.group(0).rstrip() + "\n\n" + _mermaid_fence(mermaid_source) + "\n",
-                    section,
-                    count=1,
-                )
-            return md[:start] + section + md[end:]
-        return md[:start] + "\n" + block + "\n" + section + md[end:]
+        region_end = _canvas_dump_region_end(md, start, canvas_titles)
+        prose = _section_prose(md[start:region_end], canvas_titles)
+        section = block + ("\n\n### Diagram notes\n\n" + prose if prose else "")
+        return md[:start] + "\n" + section + "\n" + md[region_end:]
 
-    return md.rstrip() + "\n\n## Process Diagram\n\n" + block + "\n"
+    return md.rstrip() + "\n\n## Process Diagram\n\n" + block
 
 
-def ensure_diagram_section(md: str, diagram_name: str, mermaid_source: Optional[str] = None) -> str:
-    rel = diagram_name
-    image_md = f"![Process Diagram]({rel}){{ width=95% }}\n"
-    block = image_md
-    if mermaid_source and mermaid_source.strip():
-        block += "\n" + _mermaid_fence(mermaid_source) + "\n"
-    m = re.search(r"(?im)^##\s*Process Diagram\s*$", md)
-    if m:
-        start, end = find_section(md, "Process Diagram", stop_at_level=2)
-        if start != -1:
-            content = md[:start] + "\n" + block + "\n" + md[end:]
-            return content
-    tail = "\n\n## Process Diagram\n\n" + block + "\n"
-    return md.rstrip() + tail
+def ensure_diagram_section(md: str, diagram_names, mermaid_source: Optional[str] = None) -> str:
+    """Same as embed_diagram: one rendered image plus fence per canvas diagram."""
+    return embed_diagram(md, diagram_names, mermaid_source)
 
 
 def _markdown_to_html(md_text: str, session_dir: Path, keep_mermaid: bool = False,

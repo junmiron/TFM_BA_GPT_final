@@ -37,7 +37,8 @@ After one session, `conversation/<SESSION_ID>/` contains:
 | `interview.jsonl` | every Q&A turn, timestamped |
 | `functional_specification.md` | 9-section FSD: scope, FRs, NFRs, roles, assumptions, use cases, glossary. Carries the rendered diagram and its Mermaid source |
 | `functional_specification.html` | Self-contained HTML: the diagram PNG is inlined as a data URI, so the file opens and prints without the image sitting next to it |
-| `process_diagram.mmd` | Mermaid source of the process flow |
+| `process_diagram.mmd` | Mermaid canvas: every diagram the reviewer produced, one fenced block each |
+| `process_diagram_N.png` | One rendered PNG per canvas diagram (the first is `process_diagram.png`) |
 | `process_diagram.png` | rendered diagram |
 | `functional_specification.formatted.md` | FSD with requirements tables and page breaks |
 | `functional_specification.pdf` | PDF export with a real bookmark outline (`pandoc` + `xelatex` optional; PyMuPDF fallback when they are absent) |

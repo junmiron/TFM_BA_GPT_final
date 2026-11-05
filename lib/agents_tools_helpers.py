@@ -562,45 +562,25 @@ def _mmdc_puppeteer_flags() -> List[str]:
             return ["-p", str(cfg)]
     return []
 
-
-def render_diagram_png(session_dir: Path) -> Optional[Path]:
-    """Render process_diagram.mmd to PNG with mmdc (no model involved).
-
-    If the agent-written diagram is syntactically broken (mmdc exits with a
-    parser error), it is replaced with the status-lifecycle diagram derived
-    from the spec so the deliverable still contains a diagram.
-    """
+def _render_one_mmdc(exe: str, session_dir: Path, source_text: str, png: Path, tag: str) -> bool:
+    """Render one Mermaid body with mmdc. Returns True when the PNG lands."""
     import subprocess
-    session_dir = Path(session_dir)
-    png = session_dir / "process_diagram.png"
-    if png.is_file():
-        return png
-    mmd = ensure_diagram_source(session_dir)
-    if not mmd:
-        return None
-    exe = shutil.which("mmdc")  # resolves to mmdc.cmd on Windows; bare name fails there
-    if not exe:
-        return None
+    clean = session_dir / f"{tag}.clean.mmd"
+    clean.write_text(source_text.strip() + "\n", encoding="utf-8")
+    try:
+        subprocess.run([exe, "-i", str(clean), "-o", str(png)] + _mmdc_puppeteer_flags(),
+                       check=True, timeout=120, capture_output=True, stdin=subprocess.DEVNULL)
+    except Exception:
+        return False
+    return png.is_file()
 
-    def _try(source: Path) -> bool:
-        raw = source.read_text(encoding="utf-8").strip()
-        if raw.startswith("```"):  # mmdc cannot parse ```mermaid fences
-            raw = raw.split("\n", 1)[1] if "\n" in raw else ""
-            if raw.rstrip().endswith("```"):
-                raw = raw.rstrip()[:-3]
-        clean = session_dir / "process_diagram.clean.mmd"
-        clean.write_text(raw.strip() + "\n", encoding="utf-8")
-        try:
-            subprocess.run([exe, "-i", str(clean), "-o", str(png)] + _mmdc_puppeteer_flags(),
-                           check=True, timeout=120, capture_output=True, stdin=subprocess.DEVNULL)
-        except Exception:
-            return False
-        return png.is_file()
 
-    if _try(mmd):
-        return png
-    # The diagram the model wrote does not parse - derive one from the spec.
-    derived = session_dir / "process_diagram.derived.mmd"
+def _derived_lifecycle_source(session_dir: Path) -> str:
+    """A status-lifecycle flowchart derived from the spec.
+
+    Used when nothing in the agent-written canvas parses, so the deliverable
+    still carries a diagram.
+    """
     statuses = []
     spec = session_dir / "functional_specification.md"
     if spec.is_file():
@@ -611,17 +591,73 @@ def render_diagram_png(session_dir: Path) -> Optional[Path]:
             statuses = []
     if len(statuses) < 2:
         statuses = list(_LIFECYCLE_STATUSES)
-    lines = ["flowchart TD"]
+    out = ["flowchart TD"]
     for i, name in enumerate(statuses):
         node = chr(65 + i)
-        lines.append(f"    {node}[{name}]")
+        out.append(f"    {node}[{name}]")
         if i:
-            lines.append(f"    {chr(65 + i - 1)} --> {node}")
-    derived.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    if _try(derived):
+            out.append(f"    {chr(65 + i - 1)} --> {node}")
+    return "\n".join(out) + "\n"
+
+
+def render_diagram_pngs(session_dir: Path) -> List[Path]:
+    """Render every Mermaid diagram in the canvas to its own PNG.
+
+    The canvas is a Markdown document with one fence per diagram, and mmdc
+    renders exactly one diagram per invocation - a ten-diagram canvas needs ten
+    calls. The first is `process_diagram.png` (the one the PDF and HTML call
+    "the process diagram"); the rest are `process_diagram_2.png`,
+    `process_diagram_3.png`, ...
+    """
+    session_dir = Path(session_dir)
+    first = session_dir / "process_diagram.png"
+    exe = shutil.which("mmdc")  # resolves to mmdc.cmd on Windows; bare name fails there
+    if not exe:
+        return [first] if first.is_file() else []
+
+    mmd = ensure_diagram_source(session_dir)
+    if not mmd:
+        return [first] if first.is_file() else []
+
+    diagrams = _pdf_server_module().canvas_diagrams(_mermaid_source(session_dir) or "")
+    if not diagrams:
+        diagrams = [{"title": "Process Diagram", "source": mmd.read_text(encoding="utf-8")}]
+
+    rendered: List[Path] = []
+    for index, diagram in enumerate(diagrams):
+        tag = "process_diagram" if index == 0 else f"process_diagram_{index + 1}"
+        png = session_dir / f"{tag}.png"
+        if png.is_file() or _render_one_mmdc(exe, session_dir, diagram["source"], png, tag):
+            rendered.append(png)
+
+    # A canvas that shrank between runs leaves orphan PNGs behind; the Markdown
+    # embedder walks `process_diagram_2.png`, `process_diagram_3.png`, ... in
+    # order, so an orphan would attach a diagram that is no longer in the canvas.
+    keep = {png.name for png in rendered}
+    if keep:
+        for stale in session_dir.glob("process_diagram*.png"):
+            if stale.name not in keep:
+                stale.unlink()
+
+    if rendered:
+        return rendered
+
+    # Nothing in the canvas parsed - derive a lifecycle diagram instead.
+    derived = session_dir / "process_diagram.derived.mmd"
+    derived.write_text(_derived_lifecycle_source(session_dir), encoding="utf-8")
+    if _render_one_mmdc(exe, session_dir, derived.read_text(encoding="utf-8"), first, "process_diagram"):
         mmd.write_text(derived.read_text(encoding="utf-8"), encoding="utf-8")
-        return png
-    return None
+        return [first]
+    return []
+
+
+def render_diagram_png(session_dir: Path) -> Optional[Path]:
+    """Render the process diagram to PNG with mmdc (no model involved).
+
+    Returns the main diagram only; `render_diagram_pngs` renders them all.
+    """
+    pngs = render_diagram_pngs(session_dir)
+    return pngs[0] if pngs else None
 
 
 def _mermaid_source(session_dir: Path) -> Optional[str]:
@@ -636,24 +672,31 @@ def _mermaid_source(session_dir: Path) -> Optional[str]:
     return None
 
 
-def embed_diagram_in_markdown(session_dir: Path) -> bool:
-    """Put the rendered diagram and its Mermaid source into functional_specification.md.
+def _diagram_png_names(session_dir: Path) -> List[str]:
+    """PNG basenames for every diagram rendered from the canvas, in order."""
+    names = [p.name for p in render_diagram_pngs(session_dir)]
+    return names or ["process_diagram.svg"]
 
-    The specification the agents write never mentions the diagram - only the
-    PDF does - so the .md deliverable used to ship without it. Writing it into
-    the Markdown makes the .md a real deliverable: the PNG inline plus a
+
+def embed_diagram_in_markdown(session_dir: Path) -> bool:
+    """Put every rendered diagram and its Mermaid source into functional_specification.md.
+
+    The specification the agents write never mentions the diagrams - only the
+    PDF does - so the .md deliverable used to ship without them. Writing them
+    into the Markdown makes the .md a real deliverable: the PNG inline plus a
     ```mermaid fence, which GitHub and most Markdown viewers render natively.
     """
     session_dir = Path(session_dir)
     spec = session_dir / "functional_specification.md"
     if not spec.is_file():
         return False
-    diagram = "process_diagram.png" if (session_dir / "process_diagram.png").is_file() else "process_diagram.svg"
     try:
         md = spec.read_text(encoding="utf-8")
-        updated = _pdf_server_module().embed_diagram(md, diagram, _mermaid_source(session_dir))
+        updated = _pdf_server_module().embed_diagram(
+            md, _diagram_png_names(session_dir), _mermaid_source(session_dir)
+        )
         if updated == md:
-            return True  # already embedded
+            return True
         spec.write_text(updated, encoding="utf-8")
         return True
     except Exception:
@@ -781,13 +824,14 @@ def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
     """Ensure the diagram PNG, the Markdown, functional_specification.html and functional_specification.pdf exist."""
     sd = Path(session_dir) if session_dir else _session_dir()
     renamed = migrate_legacy_deliverable_names(sd)
-    png = render_diagram_png(sd)
+    pngs = render_diagram_pngs(sd)
     embed_diagram_in_markdown(sd)
     pdf = export_deliverable_pdf(sd)
     html = export_deliverable_html(sd)
     return {
         "session_dir": str(sd),
-        "diagram_png": str(png) if png else None,
+        "diagram_png": str(pngs[0]) if pngs else None,
+        "diagram_pngs": [str(x) for x in pngs],
         "renamed": renamed,
         "markdown": str(sd / "functional_specification.md"),
         "pdf": str(pdf) if pdf else None,

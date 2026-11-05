@@ -238,3 +238,101 @@ def test_rename_does_not_overwrite_an_existing_deliverable(tmp_path):
     (sd / "functional_specification.pdf").write_text("new", encoding="utf-8")
     assert helpers.migrate_legacy_deliverable_names(sd) == []
     assert (sd / "deliverable.pdf").read_text(encoding="utf-8") == "old"
+
+CANVAS = """%% Two diagrams, one canvas document.
+
+## 1. Order Flow
+```mermaid
+flowchart TD
+    A[Order] --> B[Shipped]
+```
+
+## 2. Return Flow
+```mermaid
+flowchart LR
+    C[Return] --> D[Refund]
+```
+"""
+
+
+def test_every_diagram_in_the_canvas_is_rendered_and_embedded(session):
+    """A canvas holding several diagrams must produce several diagrams, not one
+    rendered image plus raw Mermaid source printed as text further down.
+
+    mmdc renders one diagram per invocation, and the reviewer keeps the canvas as
+    a Markdown document with a heading and a fence per diagram - wrapping that
+    whole document in a single fence nests the inner fences and the source leaks
+    into the PDF.
+    """
+    if not shutil.which("mmdc"):
+        pytest.skip("mmdc (mermaid-cli) is not installed on this machine")
+    (session / "process_diagram.mmd").write_text(CANVAS, encoding="utf-8")
+
+    pngs = helpers.render_diagram_pngs(session)
+    assert len(pngs) == 2, pngs
+    assert all(Path(p).is_file() for p in pngs)
+
+    result = helpers.finalize_deliverables(str(session))
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert md.count("```mermaid") == 2, md.count("```mermaid")
+    assert "![Process Diagram](process_diagram.png)" in md
+    assert "![Return Flow](process_diagram_2.png)" in md
+
+    fitz = pytest.importorskip("pymupdf", reason="PyMuPDF is required for the PDF fallback")
+    doc = fitz.open(result["pdf"])
+    try:
+        images = sum(len(page.get_images(full=True)) for page in doc)
+        text = "".join(page.get_text() for page in doc)
+    finally:
+        doc.close()
+    assert images == 2, images
+    for marker in ("flowchart TD", "flowchart LR", "```mermaid"):
+        assert marker not in text, f"raw Mermaid source reached the PDF: {marker!r}"
+
+
+def test_embed_diagram_repairs_a_canvas_nested_in_one_fence(session):
+    """The pre-fix embedder wrapped a multi-diagram canvas in a single fence.
+
+    Re-running the embedder must collapse that into one diagram per rendered PNG
+    instead of leaving the headings and fences behind as plain text.
+    """
+    nested = (
+        "## Process Diagram\n\n"
+        "![Process Diagram](process_diagram.png)\n\n"
+        "```mermaid\n"
+        "%% canvas\n\n"
+        "## 1. Order Flow\n"
+        "```mermaid\nflowchart TD\n  A-->B\n```\n"
+        "## 2. Return Flow\n"
+        "```mermaid\nflowchart LR\n  C-->D\n```\n"
+        "```\n\n\n## 10. Glossary\n\nA glossary entry.\n"
+    )
+    (session / "functional_specification.md").write_text(nested, encoding="utf-8")
+
+    module = helpers._pdf_server_module()
+    embedded = module.embed_diagram(nested, ["process_diagram.png", "process_diagram_2.png"], CANVAS)
+
+    assert embedded.count("```mermaid") == 2, embedded.count("```mermaid")
+    assert embedded.count("![Process Diagram](process_diagram.png)") == 1
+    assert "![Return Flow](process_diagram_2.png)" in embedded
+    assert "Order Flow" in embedded
+    assert "## 10. Glossary" in embedded
+    assert "A glossary entry." in embedded
+    # Re-running must not grow the section.
+    again = module.embed_diagram(embedded, ["process_diagram.png", "process_diagram_2.png"], CANVAS)
+    assert again.count("```mermaid") == 2
+    assert again.count("![Process Diagram]") == 1
+
+
+def test_strip_mermaid_fences_survives_nested_fences():
+    """A fence opened with a language closes only on a bare ``` line."""
+    module = helpers._pdf_server_module()
+    nested = (
+        "```mermaid\nflowchart TD\n  A-->B\n```mermaid\nsequenceDiagram\n  A->>B: hi\n```\n"
+        "## Real Heading\n\nProse that must survive.\n"
+    )
+    stripped = module._strip_mermaid_fences(nested)
+    assert "flowchart TD" not in stripped
+    assert "sequenceDiagram" not in stripped
+    assert "Prose that must survive." in stripped
+

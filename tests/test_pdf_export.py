@@ -211,7 +211,11 @@ def test_tall_diagram_is_scaled_into_the_page(tmp_path):
     doc.close()
 
     tag = pdf._img_tag("process_diagram.png", "Process Diagram", session)
-    assert f'height="{pdf._CONTENT_H}"' in tag, tag
+    # The cap is below the full content height: Story drops an <img> that
+    # cannot fit in the space left on the page, so the heading above a diagram
+    # has to leave room for it.
+    assert f'height="{pdf._IMAGE_MAX_H}"' in tag, tag
+    assert pdf._IMAGE_MAX_H < pdf._CONTENT_H
     assert 'width="' in tag
 
     pdf.format_document(session, "functional_specification.md",
@@ -377,3 +381,35 @@ def test_pdf_has_a_real_outline_not_just_contents_text(tmp_path):
     doc2.close()
     assert "1.1 Overview" not in {t for _, t, _ in toc2}, toc2
     assert "1. Introduction" in {t for _, t, _ in toc2}, toc2
+
+def test_every_diagram_in_a_multi_diagram_story_survives(tmp_path):
+    """Story silently drops an image that does not fit the remaining page space.
+
+    With ten full-height diagrams in one document, the tenth never made it into
+    the PDF; the height cap in _img_tag is what keeps them all.
+    """
+    pdf = _load_pdf_module()
+    session = _make_session(tmp_path)
+
+    doc = fitz.open()
+    for i in range(10):
+        page = doc.new_page(width=700, height=1800)  # taller than the A4 page
+        page.draw_line((300, 100), (300, 1700))
+        page.get_pixmap().save(session / f"process_diagram_{i + 1}.png")
+    doc.close()
+
+    md = "# Multi diagram\n\n## Process Diagram\n\n" + "\n\n".join(
+        f"![Diagram {i + 1}](process_diagram_{i + 1}.png){{ width=95% }}" for i in range(10)
+    )
+    (session / "functional_specification.formatted.md").write_text(md, encoding="utf-8")
+
+    result = pdf._pymupdf_export(
+        session / "functional_specification.formatted.md",
+        session / "process_diagram.png",
+        session / "functional_specification.pdf",
+        title="Multi diagram",
+        toc=False,
+    )
+    assert result["status"] == "ok", result.get("message")
+    assert result["images"] == 10, result
+

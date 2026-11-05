@@ -70,7 +70,7 @@ Two invariants matter:
 4. `clean_mermaid(...)` on the `.mmd` file
 5. `render_mermaid_png(...)`
 6. `format_and_export(...)` → `functional_specification.formatted.md` and `functional_specification.pdf`
-7. `finalize_deliverables(...)` → embeds the diagram (PNG + Mermaid fence) into `functional_specification.md` and writes the self-contained `functional_specification.html`
+7. `finalize_deliverables(...)` → renders every fence in the canvas (`process_diagram.png`, `process_diagram_2.png`, ...), embeds each PNG plus its Mermaid fence into `functional_specification.md`, and writes the self-contained `functional_specification.html`
 8. `save_experience_chroma(...)` so the session is retrievable later
 9. output `TERMINATE`
 

@@ -819,9 +819,10 @@ async def _present_final_artifacts():
 
     elements = []
     artifacts = agents_tools_helpers.finalize_deliverables(session_dir)
-    diagram_png = os.path.join(session_dir, "process_diagram.png")
-    if os.path.isfile(diagram_png):
-        elements.append(ClImage(path=diagram_png, name="process_diagram.png", display="inline"))
+    # Attach every diagram the canvas produced, not just the first one.
+    for png in artifacts.get("diagram_pngs") or []:
+        if os.path.isfile(png):
+            elements.append(ClImage(path=png, name=os.path.basename(png), display="inline"))
     deliverable_pdf = os.path.join(session_dir, "functional_specification.pdf")
     if os.path.isfile(deliverable_pdf):
         elements.append(ClPdf(path=deliverable_pdf, name="functional_specification.pdf"))

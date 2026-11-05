@@ -59,7 +59,22 @@ self-contained HTML) are produced without pandoc or LaTeX.
 - **Final deliverables are presented in the chat when a run completes.** After "Workflow complete", `app2.py` now renders the full functional specification inline and attaches `process_diagram.png` (inline), `functional_specification.pdf` and a downloadable copy of the `.md`. If `terminate_agent` skipped its file steps, it falls back to `conversation/functional_specification.md` and renders the diagram on the fly from `process_diagram.mmd` via `mmdc` (fences stripped; resolved with `shutil.which`, since bare `mmdc` is not found by Python subprocess on Windows).
 
 ### Fixed
-- **A deliverable from a previous run could satisfy the current one.** `finalize_deliverables()`
+- **Only the first diagram in the Mermaid canvas reached the PDF.** The reviewer keeps the
+  canvas as a Markdown document (a heading plus a ```mermaid fence per diagram). Embedding that
+  whole document in a single fence nested the inner fences, so the first diagram rendered as a
+  PNG and every diagram below it printed as raw Mermaid source. `canvas_diagrams()` now splits
+  the canvas into one entry per fence, `render_diagram_pngs()` renders each with its own `mmdc`
+  invocation (`process_diagram.png`, `process_diagram_2.png`, ...), and `embed_diagram()` writes
+  one image-plus-source block per diagram. Canvas headings that only existed because the canvas
+  was pasted into the spec are dropped; genuine prose in the section is kept.
+- **PyMuPDF Story silently dropped the last diagram.** Story skips an `<img>` that cannot fit in
+  the space left on the page. Diagrams were capped at exactly the page content height, so in a
+  ten-diagram spec the tenth image never made it into the PDF. `_img_tag()` now caps diagrams at
+  `_CONTENT_H - 60` to leave room for the heading above them.
+- **Mermaid fences were stripped with a naive toggle.** A line carrying a language opens a fence
+  and only a bare ``` closes one; treating inner ```mermaid lines as closers mis-paired the fences
+  and let diagram source leak into the PDF as prose.
+ `finalize_deliverables()`
   accepted any existing PDF that embedded an image, so a run that rewrote the spec reported PASS
   against a PDF five hours old. The gate now requires an image *and* a real outline, and treats a
   PDF whose mtime is not newer than the spec as stale. Equality counts as stale, because Windows
