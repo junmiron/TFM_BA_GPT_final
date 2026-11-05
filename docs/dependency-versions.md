@@ -29,7 +29,7 @@ was required.
 | `fastmcp` | `>=2.6,<3` | **3.4.11** | 4.1.6 requires `mcp>=2.3` → conflicts with chainlit. 3.4.11 is the newest that still accepts `mcp<2`, and it also fixes the `authlib.jose` deprecation path. |
 | `chromadb` | `>=1.0,<2` | **1.5.9** | Required by `autogen-ext[chromadb]` (`>=1.0`). Existing `chromadb_storage/` reads fine on 1.5.9. |
 | `sentence-transformers` | `>=5.0` | **6.2.0** | Embedding model `paraphrase-multilingual-mpnet-base-v2` still resolves; embeddings verified (768-dim) after upgrade. |
-| `torch` | unpinned | **>=2.2,<2.9** upper-bounded in the plan, installed 2.15.0 | Pulled by sentence-transformers; CPU wheel, no CUDA needed. |
+| `torch` | unpinned | **>=2.2,<3** | Pulled by sentence-transformers; 2.15.0 CPU wheel installed and verified (768-dim embeddings). Kept open so a CUDA build can be swapped in without touching the pin. |
 | `openai` | unpinned | **>=3.46** | autogen-ext needs `>=1.93`; 3.46 verified against `strata`, `opencode` and `groq` lanes. |
 | `pydantic` | `>=2.11,<3` | **>=2.14,<3** | chainlit/autogen both work on 2.14.2. |
 | `PyMuPDF` | `>=1.24` | **2.1** | PDF Story + bookmarks (`set_toc`) already used; `fitz` alias replaced by `pymupdf`. |

@@ -176,7 +176,7 @@ docs/                   architecture, configuration, troubleshooting + thesis ma
 
 | Requirement | Needed for |
 |---|---|
-| Python 3.11+ (tested on 3.13) | the app |
+| Python 3.11 or 3.13 (both tested in CI) | the app |
 | Node.js + `mermaid-cli` | PNG/SVG diagram rendering |
 | `pandoc` + `xelatex` | nicer PDF export; **optional** - without them the PDF is built with PyMuPDF Story |
 | An LLM (OpenAI / Ollama / LM Studio) | the agents |

@@ -89,6 +89,13 @@ each pin are in `docs/dependency-versions.md`.
 - The web UI Stop action now cancels the workflow, wakes an `ask_user` blocked on
   the answer queue, and retains `stopped` after the run exits; real-uvicorn tests
   cover answer delivery, stop while waiting, and stop during team construction.
+- `StopButton` took focus when it mounted, yanking the caret out of the answer
+  composer every time a run started. `Escape` is handled globally in `App.tsx`, so
+  the button no longer needs focus; the composer keeps the caret.
+- `docs/web-ui.md` documented a `/api/sessions/{id}/events` route that the backend
+  never implements (the session detail endpoint already returns the event log).
+- `docs/dependency-versions.md` claimed torch was bounded at `<2.9`; the actual pin
+  is `>=2.2,<3`. README now says Python 3.11 or 3.13, matching the CI matrix.
 
 ## [1.1.0] - 2026-11-04
 

@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { Badge, type BadgeTone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { DownloadIcon, StopIcon } from './ui/icons';
@@ -87,12 +86,10 @@ export function Header({
 }
 
 function StopButton({ onStop }: { onStop: () => void }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    ref.current?.focus({ preventScroll: true });
-  }, []);
+  // No focus on mount: Escape is handled globally in App.tsx, and stealing
+  // focus from the composer mid-run is worse than a focused button.
   return (
-    <Button ref={ref} variant="danger" size="sm" onClick={onStop} aria-keyshortcuts="Escape">
+    <Button variant="danger" size="sm" onClick={onStop} aria-keyshortcuts="Escape">
       <StopIcon />
       <span>Stop run</span>
     </Button>

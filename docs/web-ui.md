@@ -37,8 +37,7 @@ cd ui && cp .env.example .env && npm run dev
 | GET | `/api/health` | lanes, `simulate_human`, whether the UI is built |
 | GET | `/api/sessions` | recent sessions from `conversation/` + in-memory runs |
 | POST | `/api/sessions` | body `{"task": "..."}`; starts a run, returns `session_id` |
-| GET | `/api/sessions/{id}` | status, stage list, transcript, error |
-| GET | `/api/sessions/{id}/events` | event log only |
+| GET | `/api/sessions/{id}` | status, stage list, transcript, events, error |
 | POST | `/api/sessions/{id}/stop` | cancels the AutoGen token and releases a pending `ask_user` wait |
 | GET | `/api/sessions/{id}/artifacts` | deliverables with size and download URL |
 | GET | `/api/files/{id}/{name}` | download a deliverable (PDF/HTML/MD/PNG) |
