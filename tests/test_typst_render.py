@@ -108,6 +108,114 @@ def test_equal_columns_are_replaced_with_proportional_ones():
     assert "columns: (20%, 20%, 20%, 20%, 20%)" not in fixed
 
 
+def test_markdown_tables_are_chunked_to_page_size():
+    """pandoc wraps every table in an atomic Typst figure, so a table taller
+    than one page overflows past the bottom margin and loses rows. The
+    Markdown pre-pass must split long tables into page-sized chunks, each with
+    its own header, without dropping any row."""
+    mod = _load("typst_render", TYPST_RENDER)
+    rows = [
+        f"| FR-02.{i} | If the scanned tag does not match the bag the staff "
+        f"member intends to update, the app warns the user and requires "
+        f"confirmation before any status change is saved. | Must | "
+        f"Adopted default | Risk R-{i} mitigation |"
+        for i in range(1, 25)
+    ]
+    md = "### 4.2 FR-02\n\n| ID | Requirement | Priority | Status | Source |\n" \
+         "|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
+    chunked = mod._split_markdown_tables(md)
+    tables = chunked.count("| ID | Requirement | Priority | Status | Source |")
+    assert tables >= 2
+    kept = sum(1 for line in chunked.split("\n") if line.startswith("| FR-02."))
+    assert kept == 24
+    for line in chunked.split("\n"):
+        if line.startswith("| FR-02."):
+            assert line.count("|") == 6
+
+
+def test_priority_is_not_wider_than_status_and_source():
+    """The FR tables' Priority column only ever holds Must/Should. Content
+    max-lengths once made it wider than Status/Source, leaving big whitespace
+    next to 'Must' while 'Confirmed' hyphen-wrapped into slivers. Priority
+    must stay the narrow column and Status/Source must get readable room."""
+    mod = _load("typst_render", TYPST_RENDER)
+    typst = (
+        "#table(\n"
+        "  columns: (20%, 20%, 20%, 20%, 20%),\n"
+        "  table.header([ID], [Requirement], [Priority], [Status], [Source],),\n"
+        "  table.hline(),\n"
+        + "".join(
+            "    [FR-03.%d], [Bags belonging to the same customer may hold "
+            "different statuses at the same time, for example one Ready for "
+            "Pickup while another is Washing and a third is Drying.], [Must], "
+            "[Adopted default (R-7)], [Blocked Decisions],\n" % i
+            for i in range(1, 6)
+        )
+        + ")\n"
+    )
+    fixed = mod.fix_table_columns(typst)
+    widths = [int(w) for w in re.findall(r"(\d+)%", fixed)]
+    assert len(widths) == 5 and sum(widths) == 100
+    assert widths[2] <= widths[3] <= widths[1]   # priority < status < requirement
+    assert widths[2] <= widths[4]                # priority not wider than source
+    assert widths[3] >= 12 and widths[4] >= 12   # status/source stay readable
+    # each column must fit its longest single word without hyphenating
+    longest = [7, 11, 6, 9, 10]  # FR-03.1 / different / Must / Confirmed / Decisions
+    for w, word in zip(widths, longest):
+        assert w * _chars_per_100(mod) >= word
+
+
+def _chars_per_100(mod):
+    """Chars that fit in 1% of the content width (the renderer's own metric)."""
+    return (mod._CONTENT_WIDTH_PT / 100 - mod._CELL_PAD_PT / 100) / mod._GLYPH_ADVANCE_PT
+
+
+def test_table_figures_are_unwrapped_and_styled():
+    """Every pandoc table figure must be unwrapped into a bare #table so Typst
+    can split it at row boundaries with the header repeated, instead of
+    clipping an atomic figure past the bottom margin."""
+    mod = _load("typst_render", TYPST_RENDER)
+    short = (
+        "#figure(\n"
+        "  align(center)[#table(\n"
+        "    columns: (20%, 20%, 20%, 20%, 20%),\n"
+        "    table.header([ID], [Requirement], [Priority], [Status], [Source],),\n"
+        "    table.hline(),\n"
+        "    [FR-02.1], [Staff can scan a bag's QR tag.], [Must], [Confirmed], [Overview],\n"
+        "  )]\n"
+        "  , kind: table\n"
+        ")\n"
+    )
+    fixed = mod.fix_table_columns(short)
+    assert "#figure(" not in fixed
+    assert "table(" in fixed and "table.header(" in fixed
+    assert "set text(hyphenate: false)" in fixed  # no mid-word splits in cells
+    widths = [int(w) for w in re.findall(r"(\d+)%", fixed)]
+    assert len(widths) == 5 and sum(widths) == 100
+
+    tall = (
+        "#figure(\n"
+        "  align(center)[#table(\n"
+        "    columns: (20%, 20%, 20%, 20%, 20%),\n"
+        "    table.header([ID], [Requirement], [Priority], [Status], [Source],),\n"
+        "    table.hline(),\n"
+        + "".join(
+            "    [FR-02.%d], [If the scanned tag does not match the bag the staff "
+            "member intends to update, the app warns the user and requires "
+            "confirmation before any status change is saved.], [Must], "
+            "[Adopted default], [Risk R-%d mitigation],\n" % (i, i)
+            for i in range(1, 31)
+        )
+        + "  )]\n"
+        "  , kind: table\n"
+        ")\n"
+    )
+    fixed = mod.fix_table_columns(tall)
+    assert "#figure(" not in fixed
+    assert "table.header(" in fixed
+    assert "[FR-02.30]" in fixed
+
+
 @pytest.mark.skipif(not _load("typst_render", TYPST_RENDER).engines_available(),
                     reason="typst/pandoc not installed (run scripts/install_render_tools.py)")
 def test_typst_render_produces_cover_toc_and_linked_body(tmp_path):

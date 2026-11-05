@@ -203,15 +203,58 @@ def test_finalize_produces_a_self_contained_html(session):
     html = html_path.read_text(encoding="utf-8")
     assert html.startswith("<!DOCTYPE html>")
     assert "</html>" in html
-    # The PNG is inlined, so the file opens correctly when moved or emailed
-    # without the diagram sitting next to it.
-    assert "data:image/png;base64," in html
+    # The diagram is inlined (vector SVG when Mermaid produced one, PNG data
+    # URI otherwise), so the file opens correctly when moved or emailed without
+    # the diagram sitting next to it.
+    assert "data:image/png;base64," in html or "<svg" in html
     assert '<aside class="toc" aria-label="Document contents">' in html
     assert "Diagram source (Mermaid)" in html
     # Every TOC link resolves to a real heading anchor.
     anchors = set(re.findall(r'<h[1-4] id="([^"]+)"', html))
     for link in re.findall(r'<a href="#([^"]+)">', html):
         assert link in anchors, f"TOC link #{link} has no heading"
+
+def test_render_diagram_also_produces_a_vector_svg(session):
+    """mmdc writes process_diagram.svg next to the PNG; the HTML uses it."""
+    if not shutil.which("mmdc"):
+        pytest.skip("mmdc (mermaid-cli) is not installed on this machine")
+    pngs = helpers.render_diagram_pngs(session)
+    assert pngs, "expected at least one rendered diagram"
+    for png in pngs:
+        svg = Path(png).with_suffix(".svg")
+        assert svg.is_file(), f"no vector sibling for {Path(png).name}"
+        assert "<svg" in svg.read_text(encoding="utf-8")
+
+
+def test_html_embeds_inline_svg_when_available(session):
+    if not shutil.which("mmdc"):
+        pytest.skip("mmdc (mermaid-cli) is not installed on this machine")
+    if not helpers.render_diagram_png(session):
+        pytest.skip("mmdc failed to render the diagram")
+    result = helpers.finalize_deliverables(str(session))
+    html = Path(result["html"]).read_text(encoding="utf-8")
+    assert '<figure class="diagram"><svg' in html, "HTML must embed the vector diagram inline"
+    assert "data:image/png;base64," not in html, "the raster PNG should not also be embedded"
+    # mmdc styles are scoped to id "my-svg"; inlining must give each figure a
+    # unique id so multiple diagrams on one page do not share CSS.
+    assert "my-svg" not in html
+
+
+def test_pdf_still_embeds_the_png_diagram(session):
+    """The approved scope: vector diagrams in HTML only; PDF stays on the PNG."""
+    if not shutil.which("mmdc"):
+        pytest.skip("mmdc (mermaid-cli) is not installed on this machine")
+    if not helpers.render_diagram_png(session):
+        pytest.skip("mmdc failed to render the diagram")
+    result = helpers.finalize_deliverables(str(session))
+    fitz = pytest.importorskip("pymupdf", reason="PyMuPDF is required for the PDF fallback")
+    doc = fitz.open(result["pdf"])
+    try:
+        images = sum(len(page.get_images(full=True)) for page in doc)
+    finally:
+        doc.close()
+    assert images >= 1
+
 
 def test_legacy_deliverable_pdf_is_renamed_not_duplicated(tmp_path):
     """A pre-v1.1 session folder must not end up with two PDFs."""

@@ -22,6 +22,7 @@ bundled so the PDF looks identical on Windows and Linux CI.
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 import shutil
@@ -75,6 +76,19 @@ _META_PATTERNS = (
 )
 
 _MERMAID_FENCE_RE = re.compile(r"```mermaid.*?```", re.S)
+
+# A4 page minus the template margins: content box is 469 x 706 pt.
+_CONTENT_WIDTH_PT = 469.0
+_CONTENT_HEIGHT_PT = 706.0
+# Typst figures are atomic, so any #figure(table) taller than the content box
+# spills past the bottom margin and its rows are clipped. Keep table chunks
+# under this height; rows are estimated with a deliberately conservative glyph
+# advance so real render heights stay inside the box.
+_MAX_TABLE_CHUNK_PT = 520.0
+_GLYPH_ADVANCE_PT = 6.5
+_CELL_PAD_PT = 10.0  # typst default column spacing per cell side
+_LINE_PITCH_PT = 16.0
+_ROW_PAD_PT = 12.0
 
 # Typst styling injected into every table pandoc emits: dark header row with
 # white text plus light zebra stripes. Verified against typst 0.15 (the fill
@@ -274,8 +288,9 @@ def _header_line_cells(header_text: str) -> List[str]:
 
 
 def _style_table_block(block: List[str]) -> List[str]:
-    """Rewrite one pandoc #table(...) block: proportional column widths and a
-    dark, white-text header row."""
+    """Rewrite one pandoc #table(...) block: proportional column widths, a
+    dark white-text header row, and hyphenation off so narrow columns wrap at
+    word boundaries instead of splitting "Confirmed" into "Con-firmed"."""
     columns_index = None
     for index, line in enumerate(block):
         match = re.match(r"\s*columns:\s*\((.*)\),?\s*$", line)
@@ -291,25 +306,12 @@ def _style_table_block(block: List[str]) -> List[str]:
     if ncols < 2:
         return block
 
-    header_cells = _header_line_cells(block[header_index])
-    lengths = [len(c) for c in header_cells[:ncols]] + [1] * max(0, ncols - len(header_cells))
-    body_seen = 0
-    for line in block[header_index + 1:]:
-        cells = _header_line_cells(line)
-        if not cells:
-            continue
-        for position, cell in enumerate(cells[:ncols]):
-            lengths[position] = max(lengths[position], len(cell))
-        body_seen += 1
-    if body_seen == 0:
+    rows = _block_rows(block)
+    if len(rows) < 2:
         return block
+    widths = _column_widths(rows)
 
-    total = sum(lengths) or 1
-    widths = [max(8, min(60, round(100 * length / total))) for length in lengths]
-    widths[widths.index(max(widths))] += 100 - sum(widths)
-    widths = [max(4, width) for width in widths]
-
-    styled = block[:1] + ["  " + _TABLE_FILL]
+    styled = ["#{", "  set text(hyphenate: false)", "  table(", "  " + _TABLE_FILL]
     for index, line in enumerate(block[1:]):
         if index + 1 == header_index:
             wrapped = re.sub(r"\[([^\[\]]*)\]", r"text([\1], fill: white)", line)
@@ -318,17 +320,155 @@ def _style_table_block(block: List[str]) -> List[str]:
             styled.append("  columns: (" + ", ".join(f"{w}%" for w in widths) + "),")
         else:
             styled.append(line)
-    styled.append(block[-1])
+    styled.append("}")
     return styled
 
 
+def _table_cells(line: str) -> List[str]:
+    """Extract the plain-text cells of one Markdown table row."""
+    return [c.strip() for c in line.split("|")[1:-1]]
+
+
+def _block_rows(block: List[str]) -> List[List[str]]:
+    """Header and body rows of a pandoc Typst table block as cell lists.
+
+    pandoc wraps long cells over several lines; the bracket regex runs over the
+    joined block so a wrapped cell still counts as one cell in its own column.
+    """
+    header_start = next((i for i, line in enumerate(block) if "table.header(" in line), None)
+    if header_start is None:
+        return []
+    hline = next((i for i, line in enumerate(block) if "table.hline()" in line), header_start + 1)
+    header_cells = re.findall(r"\[([^\[\]]*)\]", "\n".join(block[header_start:hline]), re.S)
+    body_cells = re.findall(r"\[([^\[\]]*)\]", "\n".join(block[hline:]), re.S)
+    ncols = len(header_cells)
+    if ncols < 2:
+        return []
+    rows = [header_cells]
+    for i in range(0, len(body_cells), ncols):
+        row = body_cells[i:i + ncols]
+        if len(row) == ncols:
+            rows.append(row)
+    return rows
+
+
+def _column_widths(rows: List[List[str]]) -> List[int]:
+    """Typst column widths in %.
+
+    Each column gets at least the width of its longest single word, so no cell
+    hyphen-breaks in the middle of a term; the remaining page width is shared
+    in proportion to each column's total content. This keeps short value
+    columns (ID, Priority) narrow and gives Status/Source enough room to read.
+    """
+    cols = list(zip(*rows))
+    mins, weights = [], []
+    for col in cols:
+        words = [len(w) for cell in col for w in cell.replace("<br/>", " ").split()]
+        longest_word = max(words) if words else 4
+        mins.append((longest_word + 1) * _GLYPH_ADVANCE_PT + _CELL_PAD_PT)
+        weights.append(sum(len(cell) for cell in col) or 1)
+    total_min = sum(mins)
+    if total_min >= _CONTENT_WIDTH_PT:
+        fracs = [m / total_min * 100 for m in mins]
+    else:
+        spare = _CONTENT_WIDTH_PT - total_min
+        fracs = [(m + spare * w / sum(weights)) / _CONTENT_WIDTH_PT * 100
+                 for m, w in zip(mins, weights)]
+    widths = [max(6, min(70, round(f))) for f in fracs]
+    widths[widths.index(max(widths))] += 100 - sum(widths)
+    return widths
+
+
+def _chunked_table(table_lines: List[str]) -> List[str]:
+    """Split one Markdown table into chunks that each fit on a single page.
+
+    Pandoc wraps every table in an atomic Typst figure; Typst only repeats
+    table.header for blocks Typst itself can split. Chunking at row boundaries
+    keeps every table short enough to stay unbroken, so no row is ever cut.
+    """
+    if len(table_lines) < 4:
+        return table_lines
+    header, sep, rows = table_lines[0], table_lines[1], table_lines[2:]
+    cells = [_table_cells(line) for line in table_lines if "|" in line]
+    widths = _column_widths(cells)
+    chars_per_line = [(_CONTENT_WIDTH_PT * w / 100 - _CELL_PAD_PT) / _GLYPH_ADVANCE_PT
+                      for w in widths]
+
+    def row_height(cells: List[str]) -> float:
+        nlines = max(
+            math.ceil(max(len(c), 1) / chars_per_line[k]) if k < len(chars_per_line) else 1
+            for k, c in enumerate(cells)
+        )
+        return nlines * _LINE_PITCH_PT + _ROW_PAD_PT
+
+    header_h = row_height(_table_cells(header)) + 2
+    chunks: List[List[str]] = []
+    current: List[str] = []
+    used = 0.0
+    for row in rows:
+        height = row_height(_table_cells(row))
+        if current and used + height > _MAX_TABLE_CHUNK_PT - header_h:
+            chunks.append(current)
+            current, used = [], 0.0
+        current.append(row)
+        used += height
+    if current:
+        chunks.append(current)
+    if len(chunks) == 1:
+        return table_lines
+    out: List[str] = []
+    for chunk in chunks:
+        out.extend([header, sep] + chunk)
+        out.append("")
+    return out
+
+
+def _split_markdown_tables(md_text: str) -> str:
+    """Apply _chunked_table to every Markdown table in the document."""
+    lines = md_text.split("\n")
+    out: List[str] = []
+    index = 0
+    separator = re.compile(r"^\s*\|(\s*:?-+:?\s*\|)+\s*$")
+    while index < len(lines):
+        if (lines[index].lstrip().startswith("|") and index + 1 < len(lines)
+                and separator.match(lines[index + 1])):
+            end = index + 1
+            while end < len(lines) and lines[end].lstrip().startswith("|"):
+                end += 1
+            out.extend(_chunked_table(lines[index:end]))
+            index = end
+        else:
+            out.append(lines[index])
+            index += 1
+    return "\n".join(out)
+
+
 def fix_table_columns(typst_text: str) -> str:
-    """Apply _style_table_block to every pandoc-generated #table( ... ) block."""
+    """Style every pandoc #table block (proportional columns, dark header).
+
+    Pandoc wraps tables in #figure(..., kind: table). Typst figures are atomic:
+    a figure taller than the page is not split - it overflows past the bottom
+    margin and its rows are clipped off the page. Every table figure is
+    unwrapped into a bare #table, which Typst splits at row boundaries with
+    table.header repeated on each page. The Markdown chunker keeps most tables
+    short enough to fit a page, so splits are rare and never lose a row.
+    """
     lines = typst_text.splitlines()
     out: List[str] = []
     index = 0
     while index < len(lines):
         line = lines[index]
+        wrapped = (line.strip() == "#figure(" and index + 1 < len(lines)
+                   and lines[index + 1].strip().startswith("align(center)[#table("))
+        if wrapped:
+            close = index + 2
+            while close < len(lines) and lines[close].strip() != ")]":
+                close += 1
+            if close < len(lines) and close + 1 < len(lines) \
+                    and lines[close + 1].strip().startswith(", kind: table"):
+                out.extend(_style_table_block(["#table("] + lines[index + 2:close] + [")"]))
+                index = close + 3
+                continue
         if line.strip() == "#table(":
             end = index + 1
             while end < len(lines) and lines[end].strip() != ")":
@@ -409,7 +549,7 @@ def render(markdown_path: Path, pdf_path: Path, title: Optional[str] = None) -> 
         return {"status": "error", "engine": "typst", "message": f"Markdown read failed: {exc}"}
 
     meta = extract_metadata(md_text, title or "")
-    body_md = strip_mermaid_fences(md_text)
+    body_md = _split_markdown_tables(strip_mermaid_fences(md_text))
 
     fonts_ready = any(FONT_DIR.glob("*.ttf")) or any(FONT_DIR.glob("*.otf"))
     font = "Inter" if fonts_ready else "Libertinus Serif"

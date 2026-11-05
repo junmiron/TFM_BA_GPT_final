@@ -208,14 +208,26 @@ each pin are in `docs/dependency-versions.md`.
   "12 of 300 turns used" reflects live progress instead of staying at 0.
 
 ### Added - deliverable rendering (Typst PDF, redesigned HTML)
+- **Vector diagrams in the HTML deliverable.** Mermaid now also
+  renders `process_diagram.svg` (best-effort alongside the PNG), and
+  `functional_specification.html` inlines that SVG instead of a raster data URI:
+  labels stay crisp at any zoom or print. Each inlined figure gets a unique id
+  (mmdc scopes its CSS to `my-svg`), and stale SVGs are cleaned up when the
+  canvas shrinks. The PDF still embeds the PNG unchanged.
+  `tests/test_finalize_deliverables.py` covers SVG generation, inline embedding
+  and the PNG fallback.
 - **`mcp_servers/Final_deliverable_MCP_server/typst_render.py`** - a Typst +
   pandoc PDF renderer for `functional_specification.pdf`: cover page with the
   Title Page metadata, a Contents page with clickable links and dotted leaders,
   a running header/footer with "Page N of M", table headers that repeat across
   page breaks, packed page flow, and the bundled Inter font. Pandoc converts
-  Markdown to Typst; a post-processing pass gives each table column a width
-  proportional to its content (pandoc's equal columns nearly doubled the page
-  count). Raw Mermaid fences are stripped from the PDF body; the rendered PNG
+  Markdown to Typst; a post-processing pass chunks tables taller than one page
+  at row boundaries (pandoc wraps tables in atomic `#figure`s that clip) and
+  sizes columns from real cell content - each column gets at least its longest
+  word's width, the rest is distributed by content weight - so short columns
+  like `Priority` stay compact and `Status`/`Source` wrap at word boundaries
+  instead of hyphen-splitting (hyphenation is switched off inside table cells).
+  Raw Mermaid fences are stripped from the PDF body; the rendered PNG
   stays. PyMuPDF reads the finished PDF back for QA (pages, bookmarks, embedded
   fonts, no raw Mermaid). On a full session spec the deliverable went from 26
   plain MuPDF pages to a 29-page typeset document with cover, linked contents

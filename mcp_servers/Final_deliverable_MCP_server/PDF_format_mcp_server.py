@@ -1067,12 +1067,43 @@ _MIME_BY_EXT = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"
                 ".svg": "image/svg+xml", ".gif": "image/gif", ".webp": "image/webp"}
 
 
+def _svg_sibling(path: Path) -> Optional[str]:
+    """Inline vector markup when mmdc produced a .svg next to the PNG.
+
+    mmdc scopes its CSS to id="my-svg"; a page with several diagrams would share
+    one id, so each figure gets a unique id. The hard-coded max-width from the
+    render viewport is dropped - the figure CSS sizes the drawing instead.
+    """
+    svg = path.with_suffix(".svg")
+    if not svg.is_file():
+        return None
+    try:
+        text = svg.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    if "<svg" not in text:
+        return None
+    uid = "tfm-" + re.sub(r"[^A-Za-z0-9_-]+", "-", path.stem).strip("-")
+    text = text.replace("my-svg", uid)
+    text = re.sub(r'(?i)\s*style="max-width:[^"]*"', "", text)
+    return text
+
+
 def _inline_img_tag(src: str, alt: str, session_dir: Path) -> str:
-    """<img> with the diagram inlined as a data URI, so the HTML stands alone."""
+    """Embed the diagram in the HTML so the file stands alone.
+
+    Vector SVG (when Mermaid rendered one) beats the raster PNG: labels stay
+    crisp at any zoom and browsers print them at full detail. The PDF keeps
+    using the PNG unchanged.
+    """
     name = _resolve_image_src(src, session_dir)
     if not name:
         return f"<p>[missing image: {src}]</p>"
     path = Path(name) if Path(name).is_absolute() else session_dir / name
+    svg = _svg_sibling(path)
+    if svg:
+        # Scrollable figure: a flowchart can be several thousand pixels tall.
+        return f'<figure class="diagram">{svg}</figure>'
     try:
         import base64
         raw = path.read_bytes()
@@ -1155,6 +1186,7 @@ article blockquote { border-left: 3px solid var(--accent); margin: 1rem 0;
 figure.diagram { max-height: 760px; overflow: auto; border: 1px solid var(--line);
                  border-radius: 8px; padding: 12px; margin: 16px 0; }
 figure.diagram img { border: none; }
+figure.diagram svg { max-width: 100%; height: auto; border: none; }
 
 /* ---------- tables: dark sticky header, zebra rows ---------- */
 article table { border-collapse: collapse; width: 100%; font-size: 0.9rem; line-height: 1.5; margin: 1.1rem 0; }

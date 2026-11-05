@@ -602,16 +602,30 @@ def _run_mmdc(exe: str, clean: Path, png: Path) -> bool:
 
 
 def _render_one_mmdc(exe: str, session_dir: Path, source_text: str, png: Path, tag: str) -> bool:
-    """Render one Mermaid body with mmdc. Returns True when the PNG lands."""
+    """Render one Mermaid body with mmdc. Returns True when the PNG lands.
+
+    A vector sibling (process_diagram.svg) is rendered best-effort for the HTML
+    deliverable; the PDF keeps the PNG, so an SVG failure never fails the diagram.
+    """
     clean = session_dir / f"{tag}.clean.mmd"
     clean.write_text(source_text.strip() + "\n", encoding="utf-8")
     if _run_mmdc(exe, clean, png):
+        try:
+            _run_mmdc(exe, clean, png.with_suffix(".svg"))
+        except Exception:
+            pass
         return True
     repaired = _mermaid_repair(source_text)
     if repaired.strip() == source_text.strip():
         return False
     clean.write_text(repaired.strip() + "\n", encoding="utf-8")
-    return _run_mmdc(exe, clean, png)
+    ok = _run_mmdc(exe, clean, png)
+    if ok:
+        try:
+            _run_mmdc(exe, clean, png.with_suffix(".svg"))
+        except Exception:
+            pass
+    return ok
 
 
 def _derived_lifecycle_source(session_dir: Path) -> str:
@@ -666,7 +680,10 @@ def render_diagram_pngs(session_dir: Path) -> List[Path]:
     for index, diagram in enumerate(diagrams):
         tag = "process_diagram" if index == 0 else f"process_diagram_{index + 1}"
         png = session_dir / f"{tag}.png"
-        if png.is_file() or _render_one_mmdc(exe, session_dir, diagram["source"], png, tag):
+        svg = png.with_suffix(".svg")
+        # A PNG from an older run without a vector sibling must be re-rendered
+        # so the HTML can use the SVG.
+        if (png.is_file() and svg.is_file()) or _render_one_mmdc(exe, session_dir, diagram["source"], png, tag):
             rendered.append(png)
 
     # A canvas that shrank between runs leaves orphan PNGs behind; the Markdown
@@ -676,6 +693,9 @@ def render_diagram_pngs(session_dir: Path) -> List[Path]:
     if keep:
         for stale in session_dir.glob("process_diagram*.png"):
             if stale.name not in keep:
+                stale.unlink()
+        for stale in session_dir.glob("process_diagram*.svg"):
+            if stale.with_suffix(".png").name not in keep:
                 stale.unlink()
 
     if rendered:
@@ -768,7 +788,13 @@ def export_deliverable_html(session_dir: Path) -> Optional[Path]:
     if not spec.is_file():
         return html if html.is_file() else None
     if html.is_file():
-        complete = not diagram.is_file() or _html_has_image(html)
+        html_text = html.read_text(encoding="utf-8", errors="ignore")
+        has_diagram = "<svg" in html_text or _html_has_image(html)
+        # Mermaid produced a vector sibling after this HTML was built: rebuild
+        # so the page carries the crisp SVG instead of the raster PNG.
+        upgrade = "<svg" not in html_text and any(
+            svg.is_file() for svg in session_dir.glob("process_diagram*.svg"))
+        complete = not diagram.is_file() or (has_diagram and not upgrade)
         stale = spec.stat().st_mtime >= html.stat().st_mtime
         if complete and not stale:
             return html
