@@ -398,3 +398,41 @@ def test_deliverables_land_in_the_folder_the_ui_serves(fake_run, monkeypatch):
     arts = c.get(f"/api/sessions/{sid}/artifacts").json()["artifacts"]
     assert any(a["name"] == "functional_specification.md" for a in arts), arts
     assert not (fake_run / "sess-invented").exists(), "the run wrote to a folder the UI cannot read"
+
+def test_finalize_closes_the_template_and_flags_hollow_sections(fake_run, monkeypatch):
+    """A completed run must export a structurally complete document.
+
+    Sections the writer skipped are assembled from the spec's own material; a
+    section with nothing to say gets a fill-in marker and is reported in the
+    transcript as an advisory, not as a failed run.
+    """
+
+    async def run_with_spec(workflow, task_text, sink):
+        # _start_run pins workflow["session_id"] to the id the API tracks.
+        sess = fake_run / workflow["session_id"]
+        sess.mkdir(parents=True, exist_ok=True)
+        (sess / "functional_specification.md").write_text(
+            "# Order App\n\n## 1. Introduction\nTrack orders.\n\n"
+            "## 2. Scope\nOnly intake is in scope.\n\n"
+            "## 3. Functional Requirements\n"
+            "**FR-001: Accept an order**\n"
+            "Staff take an order at the counter and mark it Received.\n",
+            encoding="utf-8",
+        )
+        workflow["messages"] = 1
+        return {"session_id": workflow["session_id"], "stop_reason": "text_mention", "error": None}
+
+    monkeypatch.setattr(api, "run_workflow", run_with_spec)
+    c = client()
+    sid = c.post("/api/sessions", json={"task": "Order app"}).json()["session_id"]
+    _await_finished(c, sid)
+
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["status"] == "done"
+    notices = [e["content"] for e in detail["events"] if e["type"] == "info"]
+    assert any("Template completeness" in n for n in notices)
+
+    md = (fake_run / sid / "functional_specification.md").read_text(encoding="utf-8")
+    assert "## 8. Glossary" in md
+    assert "FR-001 Accept an order" in md
+    assert "Fill it in before sign-off" in md

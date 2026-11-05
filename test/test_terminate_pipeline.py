@@ -59,7 +59,10 @@ async def main():
         print(f"[{getattr(msg, 'source', '?')}] {str(content)[:300]}")
     # Same deterministic completion the app runs after the agent, so the test
     # measures the pipeline, not whether the local model obeyed step 2.
-    print("finalize:", helpers.finalize_deliverables(str(sess)))
+    final = helpers.finalize_deliverables(str(sess))
+    print("finalize:", final)
+    print("template gaps after auto-fill:", final["missing_sections"])
+    print("placeholder sections (need a human):", final["placeholder_sections"])
     print("\n=== ARTIFACTS ===")
     for f in ["process_diagram.png", "functional_specification.formatted.md",
               "functional_specification.pdf", "functional_specification.html"]:
@@ -73,7 +76,7 @@ async def main():
         ok_html = html.exists() and "data:image/png;base64," in html.read_text(encoding="utf-8")
         ok_md = md.exists() and "![Process Diagram]" in md.read_text(encoding="utf-8")
         print("html self-contained:", ok_html, "| md carries diagram:", ok_md)
-        if ok_html and ok_md:
+        if ok_html and ok_md and not final["missing_sections"]:
             print("RESULT: PASS")
             return 0
     print("RESULT: FAIL")

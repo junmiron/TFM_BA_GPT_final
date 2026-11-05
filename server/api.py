@@ -277,7 +277,28 @@ async def _start_run(session: Session) -> None:
     if session.status == "done":
         # Make sure the PDF/HTML actually exist before the UI offers them.
         try:
-            agents_tools_helpers.finalize_deliverables(str(session.session_dir()))
+            final = agents_tools_helpers.finalize_deliverables(str(session.session_dir()))
+            filled = final.get("auto_filled_sections") or []
+            hollow = final.get("placeholder_sections") or []
+            gaps = final.get("missing_sections") or []
+            if filled:
+                session.record({
+                    "type": "info",
+                    "content": "Completed " + ", ".join(filled) + " from material already "
+                               "in the document; the writer did not produce it in "
+                               + str(agents_tools_helpers.MAX_CHECKER_ROUNDS) + " passes.",
+                })
+            # Advisory, not a failure: the run produced its deliverables, these
+            # are sections a human still owes. An "error" event would flip the
+            # UI run state to failed and hide the download list.
+            if hollow or gaps:
+                parts = []
+                if hollow:
+                    parts.append("no material for: " + ", ".join(hollow)
+                                 + " (written with a fill-in marker)")
+                if gaps:
+                    parts.append("still absent after the fallback filler: " + ", ".join(gaps))
+                session.record({"type": "info", "content": "Template completeness: " + "; ".join(parts) + "."})
         except Exception as e:
             session.record({"type": "error", "content": f"Deliverables incomplete: {type(e).__name__}: {e}"})
     session.record({"type": "artifacts", "artifacts": session.artifacts()})

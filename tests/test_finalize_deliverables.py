@@ -432,7 +432,10 @@ Scenarios.
 def test_finalize_result_carries_the_missing_section_report(session):
     result = helpers.finalize_deliverables(str(session))
     assert isinstance(result["missing_sections"], list)
-    assert "Glossary" in result["missing_sections"]
+    assert isinstance(result["auto_filled_sections"], list)
+    # Anything the filler wrote is no longer reported as a gap.
+    for name in result["auto_filled_sections"]:
+        assert name not in result["missing_sections"]
 
 
 def test_a_failed_render_keeps_diagrams_in_the_right_place(session):
@@ -471,3 +474,108 @@ def test_a_failed_render_keeps_diagrams_in_the_right_place(session):
     ]
     assert "![Bag lifecycle]" not in md
     assert md.count(fence + "mermaid") == 3
+
+
+GAPPED_SPEC = """# Laundry Shop Staff App
+
+## 1. Overview
+The app tracks orders through Received, In Cleaning and Ready for Pickup.
+
+## 2. Scope
+In scope: QR tagging and status tracking. Out of scope: customer billing.
+
+## 3. Functional Requirements
+**FR-001: Scan the QR tag**
+Counter Staff scan the tag with the Android app before the item moves.
+
+**FR-002: Print the label**
+The PC app prints a QR label at check-in.
+
+## 4. Non-Functional Requirements
+Status updates must arrive in under two seconds.
+
+## 5. User Roles & Personas
+Counter Staff and Supervisors use the PC application.
+
+## 6. Assumptions & Constraints
+Printers may be shared, so the app cannot assume a dedicated device.
+"""
+
+
+def test_finalize_fills_a_missing_glossary_from_the_document(session):
+    """The writer never merged the glossary; the section is built from the spec.
+
+    The filler must use text already in the document, not invent definitions.
+    """
+    (session / "functional_specification.md").write_text(GAPPED_SPEC, encoding="utf-8")
+    assert "Glossary" in helpers.missing_template_sections(session)
+
+    result = helpers.finalize_deliverables(str(session))
+    assert "Glossary" in result["auto_filled_sections"]
+    assert helpers.missing_template_sections(session) == []
+
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert "## 8. Glossary" in md
+    assert "## 7. Use Cases" in md
+    assert "FR-001 Scan the QR tag" in md
+    assert "Ready for Pickup" in md
+
+
+def test_auto_fill_is_idempotent(session):
+    """Running finalize twice must not append the section twice."""
+    (session / "functional_specification.md").write_text(GAPPED_SPEC, encoding="utf-8")
+    first = helpers.finalize_deliverables(str(session))
+    second = helpers.finalize_deliverables(str(session))
+    assert first["auto_filled_sections"]
+    assert second["auto_filled_sections"] == []
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert md.count("## 8. Glossary") == 1
+    assert md.count("## 7. Use Cases") == 1
+
+
+def test_the_filler_does_not_invent_a_section_with_no_material(session):
+    """A section the document gives no basis for stays missing rather than
+    being filled with fabricated content."""
+    thin = """# Tiny Spec
+
+## 1. Introduction
+A short document.
+
+## 2. Scope
+Only intake is in scope.
+
+## 3. Functional Requirements
+FR-001: Accept an order.
+"""
+    (session / "functional_specification.md").write_text(thin, encoding="utf-8")
+    result = helpers.finalize_deliverables(str(session))
+    md = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert "User Roles & Personas" in result["placeholder_sections"]
+    assert "Responsibilities in this specification" not in md
+    # The heading exists so the document is structurally complete, but it
+    # carries an explicit marker rather than invented content.
+    assert "User Roles & Personas" in md
+    assert "Fill it in before sign-off" in md
+    assert result["missing_sections"] == []
+
+def test_glossary_filler_skips_document_metadata(session):
+    """A glossary of "Date", "Author(s)" and "Sponsor" is metadata, not domain
+    vocabulary, so the filler leaves those table rows out."""
+    spec = """# Order App
+
+## 1. Introduction
+Track orders.
+
+| Field | Value |
+|---|---|
+| Date | 2026-06-17 |
+| Author(s) | Business Analysis Team |
+| Sponsor | Operations |
+
+**Wash cycle**: the interval between receiving an item and marking it ready.
+"""
+    (session / "functional_specification.md").write_text(spec, encoding="utf-8")
+    rows = helpers._glossary_rows(spec)
+    terms = {row[0].lower() for row in rows}
+    assert "wash cycle" in terms
+    assert not {"date", "author(s)", "sponsor"} & terms

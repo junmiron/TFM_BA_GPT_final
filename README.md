@@ -102,6 +102,13 @@ Eleven agents in one `SelectorGroupChat`. Hand-offs are driven by the planner's
 `[ASSIGNMENT]` markers and `READY` signals. The run is capped by `MAX_MESSAGES`
 (default 300) and ends when `terminate_agent` emits `TERMINATE`.
 
+The checker can bounce a missing template section back to the writer
+`MAX_CHECKER_ROUNDS` times (default 3). Past that the gate closes and
+`finalize_deliverables` completes the document itself: a missing section is
+assembled from material already in the spec, and a section the interview gave no
+material for is written with an explicit fill-in marker. Every PDF, HTML and
+Markdown export therefore contains all nine template sections.
+
 ## Model backends
 
 Three lanes are selectable in `.env`: `MODEL_CLIENT` (reasoning agents),

@@ -22,6 +22,7 @@ from agents_tools_helpers import (  # noqa: E402
     move_file_tool,
     ensure_dir_tool,
     selector_func,
+    MAX_CHECKER_ROUNDS,
     PLANNING,
     INTERVIEWER,
     WRITER,
@@ -124,15 +125,27 @@ def test_selector_routing_after_question_and_ready():
 
 
 def test_checker_needs_info_loop_is_bounded():
-    """A checker that keeps flagging the same gap must not loop forever."""
-    round_one = _msg(CHECKER, "Not complete. NEEDS_INFO: missing Use Cases")
-    assert asyncio.run(selector_func([round_one])) == WRITER
+    """The writer gets MAX_CHECKER_ROUNDS passes on a section gap, then the gate
+    closes and finalize's fallback filler writes the section from the document.
 
-    # Second round still gives the writer a chance.
-    assert asyncio.run(selector_func([round_one, _msg(WRITER, "READY"), round_one])) == WRITER
+    Three is the number that keeps a real writer fixing a real gap without
+    letting a checker that keeps re-flagging the same thing run the team in
+    circles: each pass costs a full writer turn, and a writer that has failed
+    three times on the same section is not going to produce it on the fourth.
+    """
+    gap = _msg(CHECKER, "Not complete. NEEDS_INFO: missing Use Cases")
+    for attempt in range(1, MAX_CHECKER_ROUNDS + 1):
+        history = []
+        for _ in range(attempt):
+            history.extend([gap, _msg(WRITER, "READY")])
+        history.pop()  # the writer has not answered the last flag yet
+        assert asyncio.run(selector_func(history)) == WRITER, f"pass {attempt} skipped the writer"
 
-    # Third round: the writer is no longer re-run, the pipeline moves to the diagram.
-    history = [round_one, _msg(WRITER, "READY"), round_one, _msg(WRITER, "READY"), round_one]
+    # One more flag past the cap: the writer is no longer re-run.
+    history = []
+    for _ in range(MAX_CHECKER_ROUNDS + 1):
+        history.extend([gap, _msg(WRITER, "READY")])
+    history.pop()
     assert asyncio.run(selector_func(history)) == DIAGRAM
 
 

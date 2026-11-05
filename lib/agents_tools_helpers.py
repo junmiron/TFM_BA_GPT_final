@@ -924,11 +924,195 @@ def missing_template_sections(session_dir: Path) -> List[str]:
     return missing
 
 
+def _sentences(text: str) -> List[str]:
+    """Split a Markdown run into sentences, ignoring markup noise."""
+    text = re.sub(r"[|*_#]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.strip()) > 12]
+
+
+def _glossary_rows(md: str) -> List[List[str]]:
+    """Terms the document defines itself: requirement titles, explicit
+    `**Term**: definition` lines, two-column term tables and status names."""
+    rows: List[List[str]] = []
+    seen: set = set()
+
+    document_metadata = {
+        "date", "author", "authors", "author(s)", "sponsor", "version",
+        "document status", "owner", "related area", "requirements source", "status",
+    }
+
+    def add(term: str, definition: str) -> None:
+        term = term.strip().strip("*: ").strip()
+        definition = " ".join(definition.split()).lstrip("- ").strip()
+        key = term.lower()
+        if not term or len(definition) < 10 or key in seen or key in document_metadata:
+            return
+        seen.add(key)
+        rows.append([term, definition[:220]])
+
+    lines = md.splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(r"^\s*(?:\*\*)?((?:FR|BR|NFR|UC)-\d+):\s*([^*\n]+)", line)
+        if match:
+            definition = ""
+            for follow in lines[index + 1:]:
+                if follow.strip().startswith(("|", "#", "```")):
+                    break
+                if follow.strip():
+                    definition = follow.strip()
+                    break
+            add(f"{match.group(1)} {match.group(2).strip()}", definition)
+            continue
+        match = re.match(r"^\s*\*\*([^*]{3,40})\*\*:\s*(.+)$", line)
+        if match:
+            add(match.group(1), match.group(2))
+            continue
+        cells = [c.strip() for c in re.split(r"\s*\|\s*", line.strip("|")) if c.strip()]
+        if len(cells) == 2 and not set(cells[0]) <= {"-", " "} and cells[0].lower() != "term":
+            add(cells[0], cells[1])
+
+    sentences = _sentences(md)
+    for status in _LIFECYCLE_STATUSES:
+        if re.search(rf"\b{re.escape(status)}\b", md, re.I):
+            for sentence in sentences:
+                if re.search(rf"\b{re.escape(status)}\b", sentence, re.I):
+                    add(status, sentence)
+                    break
+    return rows
+
+
+def _role_rows(md: str) -> List[List[str]]:
+    """Roles named in the requirements, with what the document says they do."""
+    roles = {}
+    for sentence in _sentences(md):
+        for match in re.findall(
+            r"\b((?:Counter|Floor|Shop|Shift|Senior|Junior)?\s?(?:Staff|Supervisor|Manager|"
+            r"Administrator|Operator|Cashier|Technician|Cleaner|Driver|Customer))\b", sentence):
+            role = " ".join(match.split())
+            if role.lower() not in roles:
+                roles[role.lower()] = (role, [])
+            if len(roles[role.lower()][1]) < 3:
+                roles[role.lower()][1].append(sentence[:200])
+    return [[role, "; ".join(citations)] for role, citations in roles.values()]
+
+
+def _assumption_lines(md: str) -> List[str]:
+    markers = re.compile(
+        r"(?i)\b(assume|assumes|constraint|limitation|must not|cannot|unable to|no internet|"
+        r"offline|only when|requires? that|is not available|depends on)\b"
+    )
+    lines = []
+    for sentence in _sentences(md):
+        if markers.search(sentence) and len(lines) < 15:
+            lines.append(sentence)
+    return lines
+
+
+def _section_filler(name: str, md: str) -> Optional[str]:
+    """Build the section from text already in the document. Returns None when
+    there is nothing grounded to say - inventing content is worse than a gap."""
+    if name == "Introduction":
+        body = md.split("\n", 1)[1] if md.startswith("#") else md
+        paragraphs = [p.strip() for p in body.split("\n\n") if p.strip() and not p.strip().startswith("#")]
+        if not paragraphs:
+            return None
+        return "\n\n".join(paragraphs[:2])
+
+    if name == "Scope":
+        hits = [s for s in _sentences(md) if re.search(r"(?i)\b(in scope|out of scope|scope)\b", s)]
+        return "\n".join(f"- {s}" for s in hits[:10]) if hits else None
+
+    if name in ("Functional Requirements", "Non-Functional Requirements"):
+        ids = "FR" if name == "Functional Requirements" else "NFR|BR"
+        pattern = rf"^\s*(?:\*\*)?(({ids})-\d+):\s*([^*\n]+)"
+        items = [f"- **{m.group(1)}: {m.group(2).strip()}**" for m in re.finditer(pattern, md, re.M)]
+        return "\n".join(items[:20]) if items else None
+
+    if name == "User Roles & Personas":
+        rows = _role_rows(md)
+        if not rows:
+            return None
+        table = ["| Role | Responsibilities in this specification |", "|---|---|"]
+        table += [f"| {role} | {citations} |" for role, citations in rows]
+        return "\n".join(table)
+
+    if name == "Assumptions & Constraints":
+        lines = _assumption_lines(md)
+        return "\n".join(f"- {s}" for s in lines) if lines else None
+
+    if name == "Use Cases":
+        items = re.findall(r"^\s*(?:\*\*)?((?:UC|US)-\d+[^*\n]*?)(?:\*\*)?\s*$", md, re.M)
+        if not items:
+            items = [f"{m.group(1)} {m.group(2).strip()}"
+                    for m in re.finditer(r"^\s*(?:\*\*)?(FR-\d+):\s*([^*\n]+)", md, re.M)]
+        if not items:
+            return None
+        return "\n".join(f"- {item.strip()}" for item in items[:15])
+
+    if name == "Glossary":
+        rows = _glossary_rows(md)
+        if not rows:
+            return None
+        table = ["| Term | Definition |", "|---|---|"]
+        table += [f"| {term} | {definition} |" for term, definition in rows]
+        return "\n".join(table)
+
+    return None
+
+
+def ensure_template_sections(session_dir: Path) -> Dict[str, List[str]]:
+    """Close the template: every section of the document exists when we export.
+
+    The checker gives the writer MAX_CHECKER_ROUNDS passes to fill a gap. When a
+    section is still missing afterwards it is assembled from text already in the
+    document - never invented by a model. If there is genuinely nothing to say,
+    the heading is still written with an explicit 'fill this in' marker so the
+    deliverable is structurally complete and the hole is visible to a human
+    instead of silently absent.
+
+    Returns {"grounded": [...], "placeholder": [...]}.
+    """
+    session_dir = Path(session_dir)
+    spec = session_dir / "functional_specification.md"
+    if not spec.is_file():
+        return {"grounded": [], "placeholder": []}
+    md = spec.read_text(encoding="utf-8")
+    missing = missing_template_sections(session_dir)
+    grounded: List[str] = []
+    placeholder: List[str] = []
+    number = max([int(m.group(1)) for m in re.finditer(r"^##\s+(\d+)\.", md, re.M)] or [0])
+    blocks = []
+    for name in missing:
+        number += 1
+        body = _section_filler(name, md)
+        if body:
+            grounded.append(name)
+            blocks.append(f"## {number}. {name}\n\n_{name} derived from the material already "
+                         f"in this document; the writer did not produce it._\n\n{body}\n")
+        else:
+            placeholder.append(name)
+            blocks.append(f"## {number}. {name}\n\n_No material for this section in this run - "
+                         f"the interview and the writer produced nothing that belongs here. "
+                         f"Fill it in before sign-off.\n")
+    if not blocks:
+        return {"grounded": grounded, "placeholder": placeholder}
+    block = "\n".join(blocks)
+    diagram = md.find("\n## Process Diagram")
+    if diagram != -1:
+        md = md[:diagram].rstrip() + "\n\n" + block + md[diagram:]
+    else:
+        md = md.rstrip() + "\n\n" + block
+    spec.write_text(md, encoding="utf-8")
+    return {"grounded": grounded, "placeholder": placeholder}
+
+
 def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
     """Ensure the diagram PNG, the Markdown, functional_specification.html and functional_specification.pdf exist."""
     sd = Path(session_dir) if session_dir else _session_dir()
     renamed = migrate_legacy_deliverable_names(sd)
     glued = normalize_markdown_headings(sd)
+    fill = ensure_template_sections(sd)
     pngs = render_diagram_pngs(sd)
     embed_diagram_in_markdown(sd)
     pdf = export_deliverable_pdf(sd)
@@ -939,6 +1123,8 @@ def finalize_deliverables(session_dir: Optional[str] = None) -> Dict[str, Any]:
         "diagram_pngs": [str(x) for x in pngs],
         "renamed": renamed,
         "glued_headings_split": glued,
+        "auto_filled_sections": fill["grounded"],
+        "placeholder_sections": fill["placeholder"],
         "missing_sections": missing_template_sections(sd),
         "markdown": str(sd / "functional_specification.md"),
         "pdf": str(pdf) if pdf else None,
@@ -1153,7 +1339,9 @@ async def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]):
             # forever and the run dies on MAX_MESSAGES instead of finishing.
             rounds = sum(1 for m in messages
                          if _src(m) == CHECKER and "NEEDS_INFO" in _txt(m))
-            if rounds >= MAX_CHECKER_ROUNDS:
+            # rounds counts the flags already raised; the writer gets one pass
+            # per flag up to the cap, and the cap closes the loop after that.
+            if rounds > MAX_CHECKER_ROUNDS:
                 return DIAGRAM
             if checker_flags_missing_section(last_txt):
                 return WRITER

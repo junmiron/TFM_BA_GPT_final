@@ -147,6 +147,17 @@ each pin are in `docs/dependency-versions.md`.
   repeated questions the document already answered. Checker gaps for all required
   sections now return to the writer, the retry loop is capped, and finalization
   reports any still-missing template headings.
+- The template gate is now enforced at export rather than only reported. The
+  checker gets `MAX_CHECKER_ROUNDS` (3, configurable) writer passes on a missing
+  section; past that the loop closes and `ensure_template_sections` writes the
+  section from material already in the document (requirement titles, the status
+  lifecycle, explicit `**Term**: definition` lines and two-column tables) - never
+  from a model guessing. A section the interview gave no material for is still
+  written, but with an explicit "fill this in before sign-off" marker, so every
+  PDF/HTML/Markdown deliverable structurally contains all nine template sections
+  and the hole is visible. `finalize_deliverables` reports
+  `auto_filled_sections` and `placeholder_sections`, and the API posts both to
+  the session transcript.
 - `/api/sessions` could time out while synchronous model setup started in the
   background; clients retrying the POST then created duplicate runs. Session runs
   now start as Starlette background tasks after the response is flushed, with a

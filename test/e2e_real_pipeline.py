@@ -194,7 +194,10 @@ async def main():
     print("session dir:", sess_dir)
     # Deterministic completion: the pipeline must end with a PNG and a PDF even
     # if a local model stopped before calling the render/export tools.
-    print("finalize:", helpers.finalize_deliverables(str(sess_dir)))
+    final = helpers.finalize_deliverables(str(sess_dir))
+    print("finalize:", final)
+    print("template gaps after auto-fill:", final["missing_sections"])
+    print("placeholder sections (need a human):", final["placeholder_sections"])
     spec = sess_dir / "functional_specification.md"
     print("spec exists:", spec.exists())
     if spec.exists():
@@ -220,7 +223,8 @@ async def main():
     md_has_diagram = spec.exists() and "![Process Diagram]" in spec.read_text(encoding="utf-8")
     print("markdown carries the diagram:", md_has_diagram)
 
-    ok = spec.exists() and pdf.exists() and png.exists() and html.exists() and md_has_diagram
+    ok = (spec.exists() and pdf.exists() and png.exists() and html.exists()
+          and md_has_diagram and not final["missing_sections"])
     print("\nRESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
