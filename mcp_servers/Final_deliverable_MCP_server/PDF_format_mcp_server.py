@@ -35,9 +35,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List, Optional, Dict
 from fastmcp import FastMCP
-from autogen_core.memory import MemoryContent, MemoryMimeType
-from autogen_ext.memory.chromadb import (ChromaDBVectorMemory,
-    PersistentChromaDBVectorMemoryConfig)
+
+# The Autogen ChromaDB memory wrapper and the embedding model are imported lazily,
+# inside the tools that use them. This file is also loaded as a plain library by
+# lib/agents_tools_helpers to build the PDF/HTML deliverables, so a top-level
+# autogen_ext.memory.chromadb import (seconds) or sentence_transformers import
+# (~40s) made every finalize slow for no reason.
 
 # The embedding model is imported lazily inside _make_chroma_memory: this file
 # is also loaded as a plain library by lib/agents_tools_helpers to build the
@@ -304,7 +307,8 @@ def build_payload(session_dir: Path, session_id: str) -> dict:
 # === CREATE CHROMA MEMORY (Autogen wrapper) ===
 def _make_chroma_memory(collection: str, persistence_path: Path,
                         k: int = 12, score_threshold: float = 0.15):
-
+    from autogen_ext.memory.chromadb import (ChromaDBVectorMemory,
+        PersistentChromaDBVectorMemoryConfig)
     from sentence_transformers import SentenceTransformer
 
     model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -1564,6 +1568,8 @@ def create_server(allowed_dirs: List[Path], project_root: Optional[Path] = None)
         - Chunked MARKDOWN for *.md and *.mmd
         - interview.jsonl as JSON + a TEXT synopsis (RAG-friendly)
         """
+        from autogen_core.memory import MemoryContent, MemoryMimeType
+
         sd = Path(session_dir).expanduser().resolve()
         resolve_under_allowed(sd, allowed_dirs)
 

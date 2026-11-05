@@ -147,6 +147,14 @@ each pin are in `docs/dependency-versions.md`.
   repeated questions the document already answered. Checker gaps for all required
   sections now return to the writer, the retry loop is capped, and finalization
   reports any still-missing template headings.
+- `faulthandler` caught the old finalize stall inside the import chain of
+  `sentence_transformers` -> `transformers` -> `importlib.metadata.packages_distributions`,
+  not inside MuPDF: the PDF MCP server is exec'd as a plain library by
+  `finalize_deliverables`, so its top-level `sentence_transformers` import cost
+  ~40s on every export. It is now lazy, and `autogen_ext.memory.chromadb` moved
+  into the two tools that actually use it. Cold load of the module: 1.14 s with
+  `torch`, `transformers`, `sentence_transformers` and `chromadb` all absent. A
+  test asserts none of them is imported at module scope.
 - The template gate is now enforced at export rather than only reported. The
   checker gets `MAX_CHECKER_ROUNDS` (3, configurable) writer passes on a missing
   section; past that the loop closes and `ensure_template_sections` writes the

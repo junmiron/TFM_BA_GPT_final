@@ -194,3 +194,20 @@ def test_mermaid_check_flags_semicolon_messages():
     cleaned, _ = mermaid.clean_mermaid_text(raw)
     assert "Open bag record, same actions allowed as after a scan" in cleaned
     assert ";" not in cleaned
+
+def test_pdf_server_defers_the_ml_imports_until_a_tool_needs_them():
+    """lib/agents_tools_helpers exec_module's this file to build the deliverables.
+
+    A top-level autogen_ext.memory.chromadb or sentence_transformers import made
+    every export pay for libraries the PDF/HTML path never uses - the embedding
+    model alone measured 43s cold, and faulthandler caught finalize stuck inside
+    transformers' import chain.
+    """
+    src = SERVERS["pdf"].read_text(encoding="utf-8")
+    top_level = [line for line in src.splitlines() if line[:6] in ("import", "from ")]
+    offenders = [line for line in top_level
+                 if "chromadb" in line or "sentence_transformers" in line]
+    assert not offenders, f"heavy imports still at module scope: {offenders}"
+
+    module = _load_module(SERVERS["pdf"], "pdf_mcp_lazy")
+    assert callable(module._make_chroma_memory)
