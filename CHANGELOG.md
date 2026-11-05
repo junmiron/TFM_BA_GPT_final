@@ -105,9 +105,10 @@ each pin are in `docs/dependency-versions.md`.
 - Mermaid reads `;` as a statement separator, so a semicolon inside a sequence
   message ("Open bag record; same actions allowed...") makes mmdc exit 1 with a
   parse error and the diagram silently disappears. `_render_one_mmdc` now retries
-  once with message-line semicolons rewritten as commas. Verified end to end: the
-  session that lost diagram 5 now renders all eleven (`pdf images 11`,
-  `html imgs 11`, `md images 11`).
+  once with message-line semicolons rewritten as commas, and the Mermaid MCP
+  `check_mermaid`/`clean_mermaid` tools report and fix the same pattern. Verified
+  end to end: the session that lost diagram 5 now renders all eleven
+  (`pdf images 11`, `html imgs 11`, `md images 11`).
 
 ## [1.1.0] - 2026-11-04
 

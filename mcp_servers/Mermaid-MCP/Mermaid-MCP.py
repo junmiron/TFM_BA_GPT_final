@@ -265,15 +265,39 @@ def _tidy_whitespace(s: str):
         issues.append(Issue("info","DEDENTED","Common left indent removed.","None",1))
     return s2, issues
 
+def _fix_semicolon_messages(s: str):
+    """Rewrite semicolons inside diagram messages.
+
+    Mermaid reads ';' as a statement separator, so "PC-->>S: Open record; same
+    actions allowed" parses as a message followed by a dangling statement and the
+    render fails with a parse error. Only lines whose text before the colon
+    contains an arrow are touched, so classDef separators survive.
+    """
+    out, fixed = [], 0
+    for line in s.splitlines():
+        head, colon, tail = line.partition(":")
+        if colon and ";" in tail and re.search(r"->|>>|<-|\.\.", head):
+            line = head + colon + tail.replace(";", ",")
+            fixed += 1
+        out.append(line)
+    return "\n".join(out), fixed
+
+
 def check_mermaid_text(raw: str) -> dict:
     issues = []
     text = _strip_bom(raw)
     text1, fence_issues = _strip_code_fences(text); issues += fence_issues
     text2, init_issues = _extract_init_block(text1); issues += init_issues
     text3, ws_issues    = _tidy_whitespace(text2);   issues += ws_issues
-    dtype, line = _detect_diagram_type(text3)
+    text4, semicolons  = _fix_semicolon_messages(text3)
+    if semicolons:
+        issues.append(Issue("error", "MESSAGE_SEMICOLON",
+                            f"{semicolons} message line(s) contain ';' which Mermaid "
+                            "reads as a statement separator - the diagram will not render.",
+                            "Replace ';' with ',' inside the message text.", 1))
+    dtype, line = _detect_diagram_type(text4)
     if not dtype:
-        issues.append(Issue("error","NO_DIAGRAM_DETECTED",
+        issues.append(Issue("error", "NO_DIAGRAM_DETECTED",
                             "No Mermaid diagram type found at start of file.",
                             "Begin the file with e.g. 'flowchart TD' or 'sequenceDiagram'.", line))
     return {"detected_type": dtype, "issues": [asdict(i) for i in issues]}
@@ -317,6 +341,7 @@ def clean_mermaid_text(raw: str):
     text, _ = _strip_code_fences(text)
     text, _ = _extract_init_block(text)
     text, _ = _tidy_whitespace(text)
+    text, _ = _fix_semicolon_messages(text)
     return text, report
 
 # ---------- MCP server ----------

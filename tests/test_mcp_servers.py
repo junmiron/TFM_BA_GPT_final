@@ -182,3 +182,15 @@ def test_pdf_export_html_tool_is_callable_through_the_server(tmp_path):
     assert out.name == "functional_specification.html" and out.is_file()
     body = out.read_text(encoding="utf-8")
     assert "<!DOCTYPE html>" in body and "</html>" in body
+
+def test_mermaid_check_flags_semicolon_messages():
+    mermaid = _load_module(SERVERS["mermaid"], "mermaid_mcp_semicolon")
+    raw = (
+        "sequenceDiagram\n"
+        "    PC-->>S: Open bag record; same actions allowed as after a scan\n"
+    )
+    report = mermaid.check_mermaid_text(raw)
+    assert "MESSAGE_SEMICOLON" in {i["code"] for i in report["issues"]}
+    cleaned, _ = mermaid.clean_mermaid_text(raw)
+    assert "Open bag record, same actions allowed as after a scan" in cleaned
+    assert ";" not in cleaned
