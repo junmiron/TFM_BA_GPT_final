@@ -4,7 +4,7 @@ import { Badge, type BadgeTone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { DownloadIcon, FileIcon } from './ui/icons';
 import { STAGES, type StageId, type StageState } from '../lib/workflow';
-import { formatBytes } from '../lib/format';
+import { formatBytes, formatTurnBudget } from '../lib/format';
 import { downloadArtifact } from '../lib/api';
 import { sortArtifacts } from '../lib/artifacts';
 import { errorMessage } from '../lib/format';
@@ -17,15 +17,26 @@ export interface RunPanelProps {
   artifacts: Artifact[] | null;
   artifactsError: string | null;
   onRetryArtifacts: () => void;
+  turns: number;
+  turnBudget: number | null;
 }
 
 const STAGE_TONE: Record<StageState, BadgeTone> = { done: 'success', active: 'info', pending: 'neutral' };
 const STAGE_TEXT: Record<StageState, string> = { done: 'Done', active: 'In progress', pending: 'Not started' };
 
 /** Right rail: workflow progress and downloadable artifacts. */
-export function RunPanel({ sessionId, stages, runActive, artifacts, artifactsError, onRetryArtifacts }: RunPanelProps) {
+export function RunPanel({
+  sessionId,
+  stages,
+  runActive,
+  artifacts,
+  artifactsError,
+  onRetryArtifacts,
+  turns,
+  turnBudget,
+}: RunPanelProps) {
   return (
-    <aside aria-label="Run progress" className="flex min-h-0 flex-col gap-4">
+    <aside aria-label="Run progress" className="flex min-h-0 flex-col gap-4 lg:sticky lg:top-6">
       <Panel title="Workflow" headingId="workflow-heading">
         <ol aria-labelledby="workflow-heading" className="space-y-2 p-4">
           {STAGES.map((stage) => {
@@ -47,6 +58,11 @@ export function RunPanel({ sessionId, stages, runActive, artifacts, artifactsErr
         <p className="px-4 pb-4 text-xs text-muted-foreground">
           {sessionId ? (runActive ? 'Stages update as each agent speaks.' : 'Run is not active.') : 'Stages light up once a run starts.'}
         </p>
+        {sessionId && (
+          <p className="px-4 pb-4 text-xs text-muted-foreground" aria-live="polite">
+            {formatTurnBudget(turns, turnBudget)}
+          </p>
+        )}
       </Panel>
 
       <Panel title="Artifacts" headingId="artifacts-heading">

@@ -2,14 +2,15 @@
 
 A local-first AI business analyst that runs a budgeted, deterministic requirements
 interview with a human and produces a traceable **Functional Specification
-Document (FSD)**, a Mermaid process diagram, and a PDF deliverable.
+Document (FSD)**, Mermaid process diagrams, and PDF, HTML and Markdown deliverables.
 
-Built on **AutoGen 0.7** (selector group chat), **Chainlit** (web UI), and two
-stdio **MCP servers** for diagram rendering and document export.
+Built on **AutoGen 0.7.5** (selector group chat), a React/Vite web UI over a
+FastAPI adapter (Chainlit remains the operator view), and two stdio **MCP
+servers** for diagram rendering and document export.
 
 > ## ⚠️ Technical preview
 >
-> This is a **technical preview** release (v1.1.0). The agent team, pipeline
+> This is a **technical preview** release (v1.2.0). The agent team, pipeline
 > and deliverable formats are stable enough for evaluation, but the project
 > is still under active development and details may change.
 >
@@ -22,7 +23,7 @@ stdio **MCP servers** for diagram rendering and document export.
 > final product would show.
 
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue)
-![AutoGen](https://img.shields.io/badge/autogen--agentchat-0.7.4-red)
+![AutoGen](https://img.shields.io/badge/autogen--agentchat-0.7.5-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![CI](https://github.com/junmiron/TFM_BA_GPT_final/actions/workflows/ci.yml/badge.svg)
 

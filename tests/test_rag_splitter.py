@@ -6,11 +6,13 @@ now lives in rag_helpers itself. These tests keep that true and check that the
 replacement splitter behaves like the one it replaced.
 """
 from pathlib import Path
+import sys
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RAG = PROJECT_ROOT / "lib" / "rag_helpers.py"
+sys.path.insert(0, str(PROJECT_ROOT / "lib"))
 
 
 def test_rag_helpers_does_not_import_langchain():

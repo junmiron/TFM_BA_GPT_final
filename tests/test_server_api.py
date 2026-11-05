@@ -110,6 +110,7 @@ def test_health_reports_lanes():
     assert body["status"] == "ok"
     assert set(body["lanes"]) == {"model_client", "model_client_tools", "human_model"}
     assert isinstance(body["simulate_human"], bool)
+    assert body["max_messages"] == int(os.getenv("MAX_MESSAGES", "300"))
 
 
 def test_local_vite_dev_origin_has_cors_access_only():

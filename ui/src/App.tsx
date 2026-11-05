@@ -90,6 +90,15 @@ export default function App() {
     downloadArtifact(activeId, specArtifact).catch((error: unknown) => setDownloadError(errorMessage(error)));
   }, [activeId, specArtifact]);
 
+  // A question is the moment that needs attention: bring the composer into view.
+  const answerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = answerRef.current;
+    if (!el) return;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+  }, [question]);
+
   // Escape stops an active run (keyboard shortcut from the spec).
   useEffect(() => {
     if (!runActive) return undefined;
@@ -155,7 +164,11 @@ export default function App() {
             />
           </section>
 
-          {question && <AnswerBox question={question} connected={connected} onSend={send} />}
+          {question && (
+            <div ref={answerRef}>
+              <AnswerBox question={question} connected={connected} onSend={send} />
+            </div>
+          )}
         </main>
 
         <RunPanel
@@ -165,6 +178,8 @@ export default function App() {
           artifacts={thread.artifacts}
           artifactsError={thread.artifactsError}
           onRetryArtifacts={retryArtifacts}
+          turns={activeSession?.messages ?? 0}
+          turnBudget={state.health?.max_messages ?? null}
         />
       </div>
     </div>

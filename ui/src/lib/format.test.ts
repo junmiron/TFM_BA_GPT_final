@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { extractQuestion, formatBytes, formatRelativeTime, sessionCountLabel, sessionTitle, statusLabel } from './format';
+import {
+  extractQuestion,
+  formatBytes,
+  formatRelativeTime,
+  formatTurnBudget,
+  sessionCountLabel,
+  sessionTitle,
+  statusLabel,
+} from './format';
 import { deriveStageStates } from './workflow';
 import { parseServerEvent } from './api';
 
@@ -61,5 +69,17 @@ describe('parseServerEvent', () => {
     expect(parseServerEvent('{"type":"nope"}')).toBeNull();
     expect(parseServerEvent('not json')).toBeNull();
     expect(parseServerEvent(42)).toBeNull();
+  });
+});
+
+describe('formatTurnBudget', () => {
+  it('shows the cap the run will stop at', () => {
+    expect(formatTurnBudget(12, 300)).toBe('12 of 300 turns used.');
+  });
+  it('singularises one turn', () => {
+    expect(formatTurnBudget(1, null)).toBe('1 turn used.');
+  });
+  it('says nothing is used before the run starts', () => {
+    expect(formatTurnBudget(0, 300)).toBe('No turns used yet.');
   });
 });

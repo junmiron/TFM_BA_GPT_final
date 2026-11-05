@@ -185,6 +185,7 @@ def health() -> dict:
             "human_model": os.getenv("HUMAN_MODEL", "opencode"),
         },
         "simulate_human": os.getenv("SIMULATE_HUMAN", "").strip().lower() in ("1", "true", "yes"),
+        "max_messages": int(os.getenv("MAX_MESSAGES", "300")),
         "ui_build": UI_DIST.is_dir(),
     }
 

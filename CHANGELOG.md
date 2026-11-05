@@ -72,8 +72,18 @@ each pin are in `docs/dependency-versions.md`.
   ordering, reducer transitions).
 - FastAPI 0.162.0 and Uvicorn 0.54.0 are pinned as the React UI server stack.
 - `docs/web-ui.md` - architecture, run commands, API contract and UI design rationale.
+- **Turn budget is visible.** `/api/health` reports `max_messages`, and the run panel
+  shows "12 of 300 turns used", so a long interview is never an unbounded scroll.
+- Session rail and run panel are sticky on desktop, and the answer box scrolls into
+  view the moment the interviewer asks a question (honouring `prefers-reduced-motion`).
 
 ### Fixed
+- `tests/test_rag_splitter.py` imported `rag_helpers` without putting `lib/` on
+  `sys.path`; it only worked when another test module had already inserted it, so
+  running the file alone failed with `ModuleNotFoundError`.
+- `run_mmdc` in the Mermaid MCP server had no subprocess timeout. A puppeteer render
+  that hung would hold the MCP session open until the client's read timeout killed
+  it; each render is now capped at 180s and raises a readable error.
 - Local Vite development now passes API preflight requests only from the two
   default localhost origins; credentials and other origins remain disallowed.
 - The web UI Stop action now cancels the workflow, wakes an `ask_user` blocked on

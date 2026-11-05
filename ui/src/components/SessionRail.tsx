@@ -45,7 +45,7 @@ export function SessionRail({
   onRetry,
 }: SessionRailProps) {
   return (
-    <aside aria-label="Sessions" className="flex min-h-0 flex-col gap-4">
+    <aside aria-label="Sessions" className="flex min-h-0 flex-col gap-4 lg:sticky lg:top-6">
       <Composer error={composerError} starting={starting} onStart={onStart} />
 
       <section aria-labelledby="sessions-heading" className="flex min-h-0 flex-1 flex-col">

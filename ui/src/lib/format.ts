@@ -103,6 +103,13 @@ export function formatLanes(lanes: HealthResponse['lanes']): string[] {
   return out;
 }
 
+/** "12 of 300 turns used." — the interview budget, so a long run never looks unbounded. */
+export function formatTurnBudget(used: number, max: number | null): string {
+  if (!Number.isFinite(used) || used <= 0) return 'No turns used yet.';
+  if (!max) return `${used} ${used === 1 ? 'turn' : 'turns'} used.`;
+  return `${used} of ${max} turns used.`;
+}
+
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong.';
 }

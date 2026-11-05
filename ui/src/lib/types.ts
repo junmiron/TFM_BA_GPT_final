@@ -5,6 +5,8 @@ export interface HealthResponse {
   /** Lane names (array) or a map of lane name to its model/config value. */
   lanes: Record<string, unknown> | string[];
   simulate_human: boolean;
+  /** Turn cap the pipeline will hard-stop at (MAX_MESSAGES). */
+  max_messages?: number;
 }
 
 export interface SessionSummary {

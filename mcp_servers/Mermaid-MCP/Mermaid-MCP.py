@@ -47,6 +47,9 @@ def resolve_under_allowed(path: str | Path,
 
     raise ValueError(f"Path not in allowed directories:\n{p}")
 
+_MMDC_TIMEOUT_S = 180  # a hung puppeteer render must not hang the MCP session
+
+
 def _mmdc_command() -> list[str]:
     """Resolve the mermaid-cli executable.
 
@@ -138,9 +141,13 @@ def run_mmdc(input_path: Path, output_path: Path, fmt: str,
         # never exits cleanly on Windows, so the tool call hangs until the MCP
         # client's read timeout kills the session.
         proc = subprocess.run(cmd, check=True, capture_output=True, text=True,
-                              stdin=subprocess.DEVNULL)
+                              stdin=subprocess.DEVNULL, timeout=_MMDC_TIMEOUT_S)
     except FileNotFoundError:
         raise RuntimeError("mmdc not found. Install with: npm i -g @mermaid-js/mermaid-cli")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(
+            f"mmdc did not finish within {_MMDC_TIMEOUT_S}s rendering {input_path.name}"
+        )
     except subprocess.CalledProcessError as e:
         # Older/newer mmdc flag incompatibility (e.g. an old CLI without
         # --size): retry once without any size flags so the diagram still
@@ -149,7 +156,7 @@ def run_mmdc(input_path: Path, output_path: Path, fmt: str,
             retry = [c for c in cmd if c not in ("--size", str(max(width or 0, height or 0)))]
             try:
                 proc = subprocess.run(retry, check=True, capture_output=True, text=True,
-                                      stdin=subprocess.DEVNULL)
+                                      stdin=subprocess.DEVNULL, timeout=_MMDC_TIMEOUT_S)
             except subprocess.CalledProcessError as e2:
                 raise RuntimeError(
                     f"mmdc failed (exit {e2.returncode}): "
