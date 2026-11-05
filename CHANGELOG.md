@@ -96,6 +96,18 @@ each pin are in `docs/dependency-versions.md`.
   never implements (the session detail endpoint already returns the event log).
 - `docs/dependency-versions.md` claimed torch was bounded at `<2.9`; the actual pin
   is `>=2.2,<3`. README now says Python 3.11 or 3.13, matching the CI matrix.
+- **A single unparsable diagram used to delete every diagram after it.** The
+  embedded PNG list walked `process_diagram.png`, `_2.png`, `_3.png` ... and
+  stopped at the first gap, so an eleven-diagram canvas whose fifth render failed
+  ended up with four images in the PDF and HTML. `_diagram_png_names` now returns
+  one positional slot per canvas diagram (`None` where the render failed), which
+  also stops the sixth PNG being attached to the fifth diagram.
+- Mermaid reads `;` as a statement separator, so a semicolon inside a sequence
+  message ("Open bag record; same actions allowed...") makes mmdc exit 1 with a
+  parse error and the diagram silently disappears. `_render_one_mmdc` now retries
+  once with message-line semicolons rewritten as commas. Verified end to end: the
+  session that lost diagram 5 now renders all eleven (`pdf images 11`,
+  `html imgs 11`, `md images 11`).
 
 ## [1.1.0] - 2026-11-04
 

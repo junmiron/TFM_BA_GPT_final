@@ -336,3 +336,13 @@ def test_strip_mermaid_fences_survives_nested_fences():
     assert "sequenceDiagram" not in stripped
     assert "Prose that must survive." in stripped
 
+def test_mermaid_repair_rescues_semicolon_messages():
+    source = (
+        "sequenceDiagram\n"
+        "    PC-->>S: Open bag record; same actions allowed as after a scan\n"
+        "    classDef hot fill:#f9f,stroke:#333;\n"
+    )
+    fixed = helpers._mermaid_repair(source)
+    assert "Open bag record, same actions allowed as after a scan" in fixed
+    assert "stroke:#333;" in fixed, "classDef separators must survive"
+    assert helpers._mermaid_repair("flowchart TD\n    A --> B\n") == "flowchart TD\n    A --> B\n"

@@ -868,23 +868,27 @@ def _section_prose(section: str, drop_titles: Optional[List[str]] = None) -> str
     return "\n".join(out).strip()
 
 
-def _diagram_png_names(session_dir: Path, fallback: Optional[str] = None) -> List[str]:
-    """Every rendered diagram PNG in the session, main diagram first.
+def _diagram_png_names(session_dir: Path, fallback: Optional[str] = None) -> List[Optional[str]]:
+    """Every rendered diagram PNG, one slot per canvas diagram, in canvas order.
 
-    `process_diagram.png` is the first canvas diagram; the rest are
-    `process_diagram_2.png`, `process_diagram_3.png`, ... One image per canvas
-    diagram is what makes the extra diagrams render instead of appearing as
-    raw Mermaid source.
+    `process_diagram.png` is canvas diagram 1, `process_diagram_2.png` is diagram
+    2, and so on. The list is positional on purpose: if diagram 5 fails to render
+    the slot is `None` rather than absent. Compacting the list would attach
+    `process_diagram_6.png` to the fifth diagram and, worse, the old
+    walk-until-a-gap loop truncated every diagram after the first failure - a
+    ten-diagram canvas ended up with four images in the PDF and HTML.
     """
     session_dir = Path(session_dir)
-    names = []
-    if (session_dir / "process_diagram.png").is_file():
-        names.append("process_diagram.png")
-    index = 2
-    while (session_dir / f"process_diagram_{index}.png").is_file():
-        names.append(f"process_diagram_{index}.png")
-        index += 1
-    if not names and fallback:
+    highest = 1 if (session_dir / "process_diagram.png").is_file() else 0
+    for png in session_dir.glob("process_diagram_*.png"):
+        match = re.fullmatch(r"process_diagram_(\d+)\.png", png.name)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    names: List[Optional[str]] = []
+    for index in range(1, highest + 1):
+        name = "process_diagram.png" if index == 1 else f"process_diagram_{index}.png"
+        names.append(name if (session_dir / name).is_file() else None)
+    if not any(names) and fallback:
         names = [fallback]
     return names
 

@@ -562,17 +562,45 @@ def _mmdc_puppeteer_flags() -> List[str]:
             return ["-p", str(cfg)]
     return []
 
-def _render_one_mmdc(exe: str, session_dir: Path, source_text: str, png: Path, tag: str) -> bool:
-    """Render one Mermaid body with mmdc. Returns True when the PNG lands."""
+def _mermaid_repair(source: str) -> str:
+    """Second chance for a diagram mmdc rejects.
+
+    Mermaid reads ';' as a statement separator, so a semicolon inside a
+    sequence-diagram message - "Open bag record; same actions allowed as after a
+    scan" - parses as a second, dangling statement and the whole diagram fails.
+    A comma keeps the text as one message. Only message lines (arrow + colon)
+    are touched, so classDef and flowchart separators survive.
+    """
+    out = []
+    for line in source.splitlines():
+        head, colon, tail = line.partition(":")
+        if colon and ";" in tail and re.search(r"->|>>|<-|\.\.", head):
+            line = head + colon + tail.replace(";", ",")
+        out.append(line)
+    return "\n".join(out) + "\n"
+
+
+def _run_mmdc(exe: str, clean: Path, png: Path) -> bool:
     import subprocess
-    clean = session_dir / f"{tag}.clean.mmd"
-    clean.write_text(source_text.strip() + "\n", encoding="utf-8")
     try:
         subprocess.run([exe, "-i", str(clean), "-o", str(png)] + _mmdc_puppeteer_flags(),
                        check=True, timeout=120, capture_output=True, stdin=subprocess.DEVNULL)
     except Exception:
         return False
     return png.is_file()
+
+
+def _render_one_mmdc(exe: str, session_dir: Path, source_text: str, png: Path, tag: str) -> bool:
+    """Render one Mermaid body with mmdc. Returns True when the PNG lands."""
+    clean = session_dir / f"{tag}.clean.mmd"
+    clean.write_text(source_text.strip() + "\n", encoding="utf-8")
+    if _run_mmdc(exe, clean, png):
+        return True
+    repaired = _mermaid_repair(source_text)
+    if repaired.strip() == source_text.strip():
+        return False
+    clean.write_text(repaired.strip() + "\n", encoding="utf-8")
+    return _run_mmdc(exe, clean, png)
 
 
 def _derived_lifecycle_source(session_dir: Path) -> str:

@@ -413,3 +413,80 @@ def test_every_diagram_in_a_multi_diagram_story_survives(tmp_path):
     assert result["status"] == "ok", result.get("message")
     assert result["images"] == 10, result
 
+CANVAS = """## System Context
+```mermaid
+flowchart LR
+    A[Shop PC] --> B[Android app]
+```
+
+### End-to-End Workflow
+```mermaid
+flowchart TD
+    B --> C[Ready for pickup]
+```
+
+### Bag Status Lifecycle
+```mermaid
+stateDiagram-v2
+    [*] --> Received
+```
+
+### Derived Order Rules
+```mermaid
+flowchart TD
+    C --> D[Collected]
+```
+
+### QR Scanning Fallback
+```mermaid
+sequenceDiagram
+    S->>PC: Open bag record; same actions as after a scan
+```
+
+### Domain Model
+```mermaid
+flowchart TD
+    D --> E[Audit trail]
+```
+"""
+
+
+def _gap_session(tmp_path):
+    session = tmp_path / "sess-gap"
+    session.mkdir(parents=True, exist_ok=True)
+    for name in ("process_diagram.png", "process_diagram_2.png", "process_diagram_4.png",
+                 "process_diagram_6.png"):
+        (session / name).write_bytes(b"\x89PNG")
+    return session
+
+
+def test_diagram_png_names_is_positional_across_a_missing_render(tmp_path):
+    pdf = _load_pdf_module()
+    session = _gap_session(tmp_path)
+    assert pdf._diagram_png_names(session) == [
+        "process_diagram.png",
+        "process_diagram_2.png",
+        None,
+        "process_diagram_4.png",
+        None,
+        "process_diagram_6.png",
+    ]
+
+
+def test_a_failed_diagram_render_does_not_truncate_the_rest(tmp_path):
+    pdf = _load_pdf_module()
+    session = _gap_session(tmp_path)
+    names = pdf._diagram_png_names(session, "process_diagram.png")
+    md = "# Laundry Shop\n\n## Process Diagram\n\nplaceholder\n"
+    out = pdf.embed_diagram(md, names, CANVAS)
+
+    assert out.count("```mermaid") == 6, "every canvas diagram keeps its source"
+    assert out.count("![") == 4, "only the four diagrams that rendered get an image"
+    for png in ("process_diagram.png", "process_diagram_2.png", "process_diagram_4.png",
+                "process_diagram_6.png"):
+        assert f"({png})" in out, f"{png} was dropped from the deliverable"
+
+    lines = out.splitlines()
+    qr = next(i for i, line in enumerate(lines) if "QR Scanning Fallback" in line)
+    nearby = [line for line in lines[qr:qr + 4] if line.startswith("![")]
+    assert not nearby, "the sixth PNG was attached to the fifth diagram after the gap"
