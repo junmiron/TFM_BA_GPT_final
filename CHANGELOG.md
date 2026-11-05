@@ -72,6 +72,10 @@ each pin are in `docs/dependency-versions.md`.
   ordering, reducer transitions).
 - FastAPI 0.162.0 and Uvicorn 0.54.0 are pinned as the React UI server stack.
 - `docs/web-ui.md` - architecture, run commands, API contract and UI design rationale.
+- `test/ui_backend_e2e.py` - full-stack harness that drives a real uvicorn with a real
+  simulated-stakeholder interview, asserts all seven stages finish, the deliverables land
+  in the folder the API tracks, the PDF has images/bookmarks and no raw Mermaid, and the
+  interview has at least three rounds with no verbatim repeated answers.
 - **Turn budget is visible.** `/api/health` reports `max_messages`, and the run panel
   shows "12 of 300 turns used", so a long interview is never an unbounded scroll.
 - Session rail and run panel are sticky on desktop, and the answer box scrolls into
@@ -179,6 +183,29 @@ each pin are in `docs/dependency-versions.md`.
   background; clients retrying the POST then created duplicate runs. Session runs
   now start as Starlette background tasks after the response is flushed, with a
   real-uvicorn regression test for the slow-start path.
+- **The simulated stakeholder answered questions from previous rounds.** `latest_question`
+  scanned the whole transcript, and in rounds where the interviewer emitted only its
+  subject-status table there was no `QUESTION:` in the current round, so the persona
+  re-answered an old question verbatim. `current_round()` now bounds the search to turns
+  after the stakeholder's last answer, `question_from_planner()` recovers the question from
+  the planner's assignment text, `question_from_coverage()` derives the next question from
+  the interviewer's coverage table, and `question_for_user()` never feeds a status line to
+  the persona. `tests/test_interview_routing.py` (24 cases) covers every path.
+- **A finished run still showed an empty Artifacts panel and a greyed Download button.**
+  The UI's WebSocket whitelist silently dropped the server's `artifacts` event, and the
+  reducer's `complete` case reset the list to `[]` even when a partial list had already
+  been fetched. The `complete` event now carries an artifact snapshot, `artifacts` is
+  accepted over the socket and installs the final list after finalization, and `App.tsx`
+  refetches once if a terminal run ends with an empty panel. Verified live: 18 artifacts
+  listed, Download enabled, `/api/files/...` serves the 437 KB PDF.
+- **The interviewer's tool calls invented a session folder** (e.g.
+  `sess-20260624080000` - a date that never existed), because the prompt told the model to
+  generate a session id when none was provided. `create_workflow` now receives the run's
+  id from the API and substitutes it into the tool spec; the transcript and the
+  `interview.jsonl` `_meta` header record the folder that actually exists.
+- **The turn counter stayed at zero while a run was in progress.** `record()` increments
+  `session.messages` on `message` and `answer` events, so the run panel's
+  "12 of 300 turns used" reflects live progress instead of staying at 0.
 
 ## [1.1.0] - 2026-11-04
 
