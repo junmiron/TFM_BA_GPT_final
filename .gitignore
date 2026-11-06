@@ -27,6 +27,8 @@ mcp_servers/*/.venv_win
 
 # runtime / generated artifacts
 /chromadb_storage
+/feedback/
+/experiences/fine_tune/
 /.experiences
 /experiences
 /experience

@@ -3,6 +3,30 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Reinforcement learning from approved sessions** (`lib/experience_indexer.py`):
+  after a run completes the user is asked whether they are happy with the
+  deliverables. "Yes" indexes them into a dedicated `approved_experiences`
+  ChromaDB collection (queried by the interview/writer agents alongside the
+  web RAG), appends the session to `experiences/reinforcement_learning.md`
+  and writes a task -> spec JSONL example under `experiences/fine_tune/`.
+  "No" captures the critique in `feedback/<session_id>.md`; silence indexes
+  nothing. Controlled by `FEEDBACK_ENABLED` / `FEEDBACK_TIMEOUT_S`.
+- **UI visibility switches**: `UI_SHOW_ARTIFACTS` hides the Artifacts panel;
+  `UI_SHOW_INTERNAL_MESSAGES=false` shows only the interviewer/user
+  conversation (the full event log stays in the backend for audit).
+- **Session continuation**: select an existing session and add information -
+  `POST /api/sessions/{id}/continue` merges the supplement into the spec
+  (heading-preserving guard with an Addendum fallback), bumps the version
+  and re-renders PDF/HTML/MD in place. Supplements are audited in
+  `supplements.jsonl`.
+- **Meeting transcript to spec**: attach a `.txt/.md/.docx/.pdf/.vtt/.srt`
+  transcript when creating a session (`lib/transcript_loader.py`). The
+  transcript is saved as `source_transcript.txt` and seeds the run so the
+  interview only fills gaps.
+
 ## [1.2.0] - 2026-11-05
 
 Dependency upgrade anchored on AutoGen 0.7.5 (the final release of the archived

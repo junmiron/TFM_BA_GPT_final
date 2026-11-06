@@ -94,15 +94,28 @@ export function SessionRail({
   );
 }
 
-function Composer({ error, starting, onStart }: { error: string | null; starting: boolean; onStart: (task: string) => void }) {
+function toBase64(data: ArrayBuffer): string {
+  const bytes = new Uint8Array(data);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function Composer({ error, starting, onStart }: { error: string | null; starting: boolean; onStart: (task: string, transcript?: { name: string; base64: string }) => void }) {
   const [task, setTask] = useState('');
+  const [transcript, setTranscript] = useState<{ name: string; base64: string } | null>(null);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
   const canStart = task.trim().length > 0 && !starting;
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
     if (!canStart) return;
-    onStart(task.trim());
+    onStart(task.trim(), transcript ?? undefined);
     setTask('');
+    setTranscript(null);
+    setTranscriptError(null);
   };
 
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -132,6 +145,33 @@ function Composer({ error, starting, onStart }: { error: string | null; starting
         placeholder="Describe the product, users and interview goal"
         className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
+      <label htmlFor="transcript-input" className="mt-2 block text-xs font-medium text-muted-foreground">
+        Meeting transcript (optional) - txt, md, docx, pdf, vtt, srt
+      </label>
+      <input
+        id="transcript-input"
+        type="file"
+        accept=".txt,.md,.docx,.pdf,.vtt,.srt"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          if (file.size > 2_000_000) {
+            setTranscriptError('Transcript is larger than 2 MB.');
+            return;
+          }
+          file.arrayBuffer().then((data) => {
+            setTranscript({ name: file.name, base64: toBase64(data) });
+            setTranscriptError(null);
+          });
+        }}
+        className="w-full rounded-md border border-input bg-secondary px-3 py-2 text-sm text-foreground"
+      />
+      {transcript && (
+        <p className="mt-1 text-xs text-muted-foreground">Attached: {transcript.name}</p>
+      )}
+      {transcriptError && (
+        <p role="alert" className="mt-1 text-xs text-rose-800">{transcriptError}</p>
+      )}
             <button
         type="submit"
         className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-glow disabled:opacity-60"

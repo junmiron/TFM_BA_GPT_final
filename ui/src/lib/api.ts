@@ -41,13 +41,23 @@ export const api = {
     return body.sessions;
   },
 
-  async createSession(task: string): Promise<string> {
+  async createSession(task: string, transcript?: { name: string; base64: string }): Promise<string> {
     const body = await request<{ session_id: string }>('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task }),
+      body: JSON.stringify({
+        task,
+        ...(transcript ? { transcript_base64: transcript.base64, transcript_name: transcript.name } : {}),
+      }),
     });
     return body.session_id;
+  },
+
+  async continueSession(sessionId: string, supplement: string): Promise<{ session_id: string; version: string; merged: string }> {
+    return request<{ session_id: string; version: string; merged: string }>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/continue`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ supplement }) },
+    );
   },
 
   async stopSession(sessionId: string): Promise<void> {
@@ -102,7 +112,7 @@ export function sessionSocketUrl(sessionId: string): string {
   return `${WS_BASE_URL}/ws/sessions/${encodeURIComponent(sessionId)}`;
 }
 
-const SERVER_EVENT_TYPES = new Set(['info', 'answer', 'message', 'chunk', 'complete', 'error', 'artifacts']);
+const SERVER_EVENT_TYPES = new Set(['info', 'answer', 'message', 'chunk', 'complete', 'error', 'artifacts', 'feedback_request']);
 
 /** Validates an incoming WebSocket frame. Returns null for anything off-contract. */
 export function parseServerEvent(raw: unknown): ServerEvent | null {
@@ -125,4 +135,16 @@ export function answerEvent(content: string): ClientAnswerEvent {
 
 export function stopEvent(): { type: 'stop' } {
   return { type: 'stop' };
+}
+/** REST satisfaction feedback - works for live and persisted sessions alike. */
+export async function postFeedback(sessionId: string, satisfied: boolean, comment: string): Promise<boolean> {
+  try {
+    await request<{ session_id: string; status: string }>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/feedback`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ satisfied, comment }) },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }

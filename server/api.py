@@ -26,7 +26,7 @@ from lib.quiet_deprecations import suppress_third_party_deprecations
 
 suppress_third_party_deprecations()
 
-from lib import agents_tools_helpers
+from lib import agents_tools_helpers, continuation, experience_indexer, transcript_loader
 from lib.pipeline import PROJECT_ROOT, STAGES, create_workflow, run_workflow
 
 CONV_ROOT = Path(PROJECT_ROOT) / "conversation"
@@ -66,6 +66,9 @@ def _kind(name: str) -> str:
 
 _STOP_ANSWER = object()
 
+def _flag(name: str, default: str = "true") -> bool:
+    return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
+
 
 class Session:
     """One workflow run plus the event log the UI replays on reconnect."""
@@ -81,6 +84,7 @@ class Session:
         self.answers: asyncio.Queue = asyncio.Queue()
         self.messages: int = 0
         self.error: Optional[str] = None
+        self.feedback_future: Optional[asyncio.Future] = None
 
     def record(self, event: dict) -> None:
         event.setdefault("ts", datetime.now(timezone.utc).isoformat())
@@ -193,6 +197,12 @@ def health() -> dict:
         },
         "simulate_human": simulate_human,
         "max_messages": int(os.getenv("MAX_MESSAGES", "300")),
+        # UI visibility switches (Feature 2) and the feedback loop (Feature 1).
+        "feedback_enabled": experience_indexer.feedback_enabled(),
+        "ui": {
+            "show_artifacts": _flag("UI_SHOW_ARTIFACTS", "true"),
+            "show_internal": _flag("UI_SHOW_INTERNAL_MESSAGES", "true"),
+        },
         "ui_build": UI_DIST.is_dir(),
     }
 
@@ -209,6 +219,28 @@ def get_session(session_id: str) -> dict:
     if s is None:
         raise HTTPException(status_code=404, detail="session not found")
     return {**s.to_summary(), "events": s.events, "stages": s.stages(), "artifacts": s.artifacts()}
+
+
+def _apply_feedback(session: Session, satisfied: bool, comment: str) -> None:
+    """Route a satisfaction answer: happy -> RAG/ledger/fine-tune, unhappy -> feedback folder."""
+    try:
+        result = experience_indexer.process_feedback(
+            session.session_dir(), session.id, session.task, satisfied, comment
+        )
+    except Exception as e:
+        session.record({"type": "info", "content": f"Feedback recorded, but indexing failed ({type(e).__name__}: {e})."})
+        return
+    action = result.get("action")
+    if action == "indexed":
+        session.record({"type": "info", "content": (
+            f"Thanks! {result.get('indexed', 0)} deliverable chunks added to the learning library "
+            f"(collection `{result.get('collection')}`)."
+        )})
+    elif action == "feedback_saved":
+        session.record({"type": "info", "content": (
+            "Thanks for the feedback - saved to the feedback folder so the system can improve. "
+            "Nothing was added to the learning library."
+        )})
 
 
 async def _start_run(session: Session) -> None:
@@ -273,8 +305,18 @@ async def _start_run(session: Session) -> None:
         async def error(self, content: str) -> None:
             session.record({"type": "error", "content": content})
 
+    task_text = session.task
+    transcript_path = session.session_dir() / "source_transcript.txt"
+    if transcript_path.is_file():
+        try:
+            task_text = transcript_loader.build_task_with_transcript(
+                session.task, transcript_path.read_text(encoding="utf-8", errors="ignore")
+            )
+        except Exception as e:
+            session.record({"type": "info", "content": f"Transcript could not be seeded ({type(e).__name__}: {e})."})
+
     try:
-        result = await run_workflow(session.workflow, session.task, Sink())
+        result = await run_workflow(session.workflow, task_text, Sink())
     except Exception as e:  # a crash inside the run must surface in the UI, not vanish
         result = {"error": f"{type(e).__name__}: {e}", "stop_reason": None}
     session.error = result.get("error")
@@ -310,6 +352,23 @@ async def _start_run(session: Session) -> None:
             session.record({"type": "error", "content": f"Deliverables incomplete: {type(e).__name__}: {e}"})
     session.record({"type": "artifacts", "artifacts": session.artifacts()})
 
+    if experience_indexer.feedback_enabled() and session.status == "done":
+        # Feature 1: the satisfaction gate. Silence is NOT satisfaction - only an
+        # explicit "yes" feeds the deliverables into the approved RAG collection.
+        session.feedback_future = asyncio.Future()
+        session.record({"type": "feedback_request",
+                        "question": "Are you happy with the quality of the deliverables?"})
+        try:
+            feedback = await asyncio.wait_for(session.feedback_future,
+                                             timeout=experience_indexer.feedback_timeout_s())
+            _apply_feedback(session, bool(feedback.get("satisfied")), str(feedback.get("comment", "")))
+        except asyncio.TimeoutError:
+            session.record({"type": "info", "content": "No feedback received within the time limit; "
+                            "this run was not added to the learning library."})
+        except Exception as e:
+            session.record({"type": "info", "content": f"Feedback could not be collected ({type(e).__name__}: {e})."})
+        return
+
 
 @app.post("/api/sessions")
 async def create_session(payload: dict, background_tasks: BackgroundTasks) -> dict:
@@ -318,6 +377,26 @@ async def create_session(payload: dict, background_tasks: BackgroundTasks) -> di
         raise HTTPException(status_code=400, detail="task is required")
 
     session_id = "sess-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+
+    # Feature 4: an optional meeting transcript becomes the source of truth
+    # for the spec. It is persisted before the run starts so _start_run can
+    # seed the task text from it.
+    if payload.get("transcript_base64"):
+        import base64
+
+        try:
+            data = base64.b64decode(payload["transcript_base64"])
+            text = transcript_loader.extract_trans_text(
+                payload.get("transcript_name", "transcript.txt"), data
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not read transcript: {e}")
+        if not text:
+            raise HTTPException(status_code=400, detail="Transcript is empty after extraction.")
+        session_dir = CONV_ROOT / session_id
+        session_dir.mkdir(parents=True, exist_ok=True)
+        (session_dir / "source_transcript.txt").write_text(text, encoding="utf-8")
+
     session = Session(session_id, task)
     SESSIONS[session_id] = session
     # Starlette sends the HTTP response before awaiting these tasks. Starting
@@ -333,6 +412,10 @@ def _handle_client_message(session: Session, msg: dict) -> None:
     kind = msg.get("type")
     if kind == "answer":
         session.answers.put_nowait(str(msg.get("content", "")))
+    elif kind == "feedback":
+        if session.feedback_future is not None and not session.feedback_future.done():
+            session.feedback_future.set_result({"satisfied": bool(msg.get("satisfied", False)),
+                                                "comment": str(msg.get("comment", ""))})
     elif kind == "stop":
         token = (session.workflow or {}).get("cancellation_token")
         if token is not None:
@@ -367,6 +450,49 @@ def session_artifacts(session_id: str) -> dict:
                   "url": f"/api/files/{session_id}/{f.name}"}
                  for f in sorted(d.iterdir()) if f.is_file()] if d.is_dir() else []
     return {"artifacts": files}
+
+
+@app.post("/api/sessions/{session_id}/continue")
+async def continue_session(session_id: str, payload: dict) -> dict:
+    """Feature 3: add information to an existing session's spec and re-render."""
+    supplement = (payload.get("supplement") or "").strip()
+    if not supplement:
+        raise HTTPException(status_code=400, detail="supplement is required")
+    safe_id = "".join(c for c in session_id if c.isalnum() or c in "-_")
+    session_dir = CONV_ROOT / safe_id
+    if not session_dir.is_dir():
+        raise HTTPException(status_code=404, detail="session not found")
+    try:
+        result = await continuation.apply_supplement(session_dir, supplement)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"continuation failed: {e}")
+    session = SESSIONS.get(safe_id)
+    if session is not None:
+        session.record({"type": "info", "content": f"Specification updated to {result['version']} "
+                                                  f"({result['merged']} merge); deliverables re-rendered."})
+        session.artifacts()
+    return {"session_id": safe_id, **result}
+
+
+@app.post("/api/sessions/{session_id}/feedback")
+async def session_feedback(session_id: str, payload: dict) -> dict:
+    satisfied = bool(payload.get("satisfied"))
+    comment = str(payload.get("comment", ""))
+    session = SESSIONS.get(session_id)
+    if session is not None:
+        if session.feedback_future is not None and not session.feedback_future.done():
+            session.feedback_future.set_result({"satisfied": satisfied, "comment": comment})
+            return {"session_id": session_id, "status": "queued"}
+        _apply_feedback(session, satisfied, comment)
+        return {"session_id": session_id, "status": "saved"}
+    safe_id = "".join(c for c in session_id if c.isalnum() or c in "-_")
+    d = CONV_ROOT / safe_id
+    if not d.is_dir():
+        raise HTTPException(status_code=404, detail="session not found")
+    spec = d / "functional_specification.md"
+    task = _title_of(spec.read_text(encoding="utf-8", errors="ignore")) if spec.is_file() else safe_id
+    result = experience_indexer.process_feedback(d, safe_id, task, satisfied, comment)
+    return {"session_id": safe_id, "result": result}
 
 
 @app.get("/api/files/{session_id}/{name}")

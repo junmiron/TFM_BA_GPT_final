@@ -9,7 +9,7 @@ export type RunStatus = 'idle' | 'starting' | 'running' | 'finished' | 'failed' 
 
 export interface Turn {
   id: number;
-  kind: 'agent' | 'user' | 'info' | 'error';
+  kind: 'agent' | 'user' | 'info' | 'error' | 'feedback';
   source: string;
   content: string;
   /** True while chunk events are still arriving for this turn. */
@@ -131,6 +131,18 @@ function applyEvent(state: RunState, id: string, event: ServerEvent): RunState {
   const running: RunStatus = starting ? 'running' : thread.run;
 
   switch (event.type) {
+    case 'feedback_request':
+      return withThread(state, id, {
+        ...thread,
+        turns: pushTurn(settle(thread.turns), {
+          kind: 'feedback',
+          source: 'system',
+          content: event.question,
+          streaming: false,
+          pending: false,
+        }),
+      });
+
     case 'info':
       return withThread(state, id, {
         ...thread,

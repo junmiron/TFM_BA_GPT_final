@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
+import { Button } from './ui/Button';
 import { ROLE_STYLE } from './roleStyles';
 import { Badge } from './ui/Badge';
 import { roleForSource, ROLE_LABEL, type RoleId } from '../lib/roles';
@@ -10,10 +11,13 @@ export interface TranscriptProps {
   hasSession: boolean;
   busy: boolean;
   historical: boolean;
+  /** Feature 2: when false, only interviewer/user conversation is rendered. */
+  showInternal: boolean;
+  onFeedback: (satisfied: boolean, comment: string) => void;
 }
 
 /** Live transcript. The log is aria-live so new turns and streamed chunks are announced. */
-export function Transcript({ turns, hasSession, busy, historical }: TranscriptProps) {
+export function Transcript({ turns, hasSession, busy, historical, showInternal, onFeedback }: TranscriptProps) {
   if (!hasSession) {
     return (
       <EmptyState
@@ -47,18 +51,30 @@ export function Transcript({ turns, hasSession, busy, historical }: TranscriptPr
         aria-label="Agent transcript"
         className="space-y-4"
       >
-        {turns.map((turn) => (
-          <li key={turn.id} className="animate-fade-in">
-            <TurnBubble turn={turn} />
-          </li>
-        ))}
+        {turns
+          .filter((turn) => showInternal || isConversationTurn(turn))
+          .map((turn) => (
+            <li key={turn.id} className="animate-fade-in">
+              <TurnBubble turn={turn} onFeedback={onFeedback} />
+            </li>
+          ))}
       </ol>
       {busy && <p className="text-xs text-muted-foreground">Agents are working…</p>}
     </div>
   );
 }
 
-const TurnBubble = memo(function TurnBubble({ turn }: { turn: Turn }) {
+const INTERNAL_SOURCES = new Set(['planner', 'planning_agent', 'summarizer', 'writer', 'checker', 'use_case_generator']);
+
+function isConversationTurn(turn: Turn): boolean {
+  if (turn.kind !== 'agent') return true;
+  return !INTERNAL_SOURCES.has(turn.source);
+}
+
+const TurnBubble = memo(function TurnBubble({ turn, onFeedback }: { turn: Turn; onFeedback: (satisfied: boolean, comment: string) => void }) {
+  if (turn.kind === 'feedback') {
+    return <FeedbackBubble question={turn.content} onFeedback={onFeedback} />;
+  }
   if (turn.kind === 'info' || turn.kind === 'error') {
     const isError = turn.kind === 'error';
     return (
@@ -100,6 +116,58 @@ const TurnBubble = memo(function TurnBubble({ turn }: { turn: Turn }) {
     </article>
   );
 });
+
+function FeedbackBubble({ question, onFeedback }: { question: string; onFeedback: (satisfied: boolean, comment: string) => void }) {
+  const [answered, setAnswered] = useState<string | null>(null);
+  const [showComment, setShowComment] = useState(false);
+  const [comment, setComment] = useState('');
+
+  const submit = (satisfied: boolean, note: string) => {
+    if (answered) return;
+    setAnswered(satisfied ? 'yes' : 'no');
+    onFeedback(satisfied, note);
+  };
+
+  return (
+    <article className="rounded-lg border border-primary bg-accent p-4">
+      <p className="text-sm font-semibold text-foreground">{question}</p>
+      {answered ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {answered === 'yes'
+            ? 'Thanks! This run was added to the learning library.'
+            : 'Thanks - your critique was saved for system improvement.'}
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button variant="primary" size="sm" onClick={() => submit(true, '')}>
+              Yes, deliverables are good
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowComment(true)}>
+              Not quite...
+            </Button>
+          </div>
+          {showComment && answered === null && (
+          <div className="mt-2">
+            <textarea
+              aria-label="What did you dislike about the deliverables?"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={3}
+              maxLength={4000}
+              className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground"
+              placeholder="What was wrong with the deliverables?"
+            />
+            <Button variant="primary" size="sm" className="mt-2" onClick={() => submit(false, comment.trim())}>
+              Send feedback
+            </Button>
+          </div>
+          )}
+        </>
+      )}
+    </article>
+  );
+}
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (

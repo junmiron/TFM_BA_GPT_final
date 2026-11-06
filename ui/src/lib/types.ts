@@ -2,6 +2,10 @@
 
 export interface HealthResponse {
   status: string;
+  /** Feature 1: satisfaction gate on/off (FEEDBACK_ENABLED). */
+  feedback_enabled?: boolean;
+  /** Feature 2: UI visibility switches from .env. */
+  ui?: { show_artifacts?: boolean; show_internal?: boolean };
   /** Lane names (array) or a map of lane name to its model/config value. */
   lanes: Record<string, unknown> | string[];
   simulate_human: boolean;
@@ -59,6 +63,10 @@ export interface ServerErrorEvent {
   type: 'error';
   content: string;
 }
+export interface ServerFeedbackRequestEvent {
+  type: 'feedback_request';
+  question: string;
+}
 
 export type ServerEvent =
   | ServerInfoEvent
@@ -67,9 +75,15 @@ export type ServerEvent =
   | ServerChunkEvent
   | ServerCompleteEvent
   | ServerArtifactsEvent
-  | ServerErrorEvent;
+  | ServerErrorEvent
+  | ServerFeedbackRequestEvent;
 
 export interface ClientAnswerEvent {
   type: 'answer';
   content: string;
+}
+export interface ClientFeedbackEvent {
+  type: 'feedback';
+  satisfied: boolean;
+  comment?: string;
 }

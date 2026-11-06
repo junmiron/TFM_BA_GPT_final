@@ -97,6 +97,7 @@ def fake_run(monkeypatch, tmp_path):
     monkeypatch.setattr(api, "create_workflow", fake_create_workflow)
     monkeypatch.setattr(api, "run_workflow", fake_run_workflow)
     monkeypatch.setattr(api, "CONV_ROOT", tmp_path)
+    monkeypatch.setenv("FEEDBACK_ENABLED", "false")
     api.SESSIONS.clear()
     yield tmp_path
 
@@ -492,3 +493,138 @@ def test_finalize_closes_the_template_and_flags_hollow_sections(fake_run, monkey
     assert "## 8. Glossary" in md
     assert "FR-001 Accept an order" in md
     assert "Fill it in before sign-off" in md
+
+def test_health_reports_ui_visibility_flags(monkeypatch):
+    monkeypatch.setenv("UI_SHOW_ARTIFACTS", "false")
+    monkeypatch.setenv("UI_SHOW_INTERNAL_MESSAGES", "false")
+    body = client().get("/api/health").json()
+    assert body["ui"]["show_artifacts"] is False
+    assert body["ui"]["show_internal"] is False
+
+    monkeypatch.setenv("UI_SHOW_ARTIFACTS", "true")
+    body = client().get("/api/health").json()
+    assert body["ui"]["show_artifacts"] is True
+
+
+def test_feedback_gate_indexes_when_user_is_happy(fake_run, monkeypatch, tmp_path):
+    from lib import experience_indexer
+
+    monkeypatch.setenv("FEEDBACK_ENABLED", "true")
+    monkeypatch.setenv("FEEDBACK_TIMEOUT_S", "10")
+    monkeypatch.setattr(experience_indexer, "_LEDGER", tmp_path / "ledger.md")
+    monkeypatch.setattr(experience_indexer, "_FINE_TUNE_DIR", tmp_path / "fine_tune")
+    monkeypatch.setattr(experience_indexer, "_FEEDBACK_DIR", tmp_path / "fb")
+    monkeypatch.setattr(experience_indexer, "chroma_dir", lambda: tmp_path / "chroma")
+    monkeypatch.setattr(experience_indexer, "_default_embedder", lambda: experience_indexer.HashEmbedder())
+
+    c = client()
+    sid = c.post("/api/sessions", json={"task": "Cold chain monitoring"}).json()["session_id"]
+    _await_finished(c, sid)
+
+    events = c.get(f"/api/sessions/{sid}").json()["events"]
+    assert any(e["type"] == "feedback_request" for e in events)
+
+    resp = c.post(f"/api/sessions/{sid}/feedback", json={"satisfied": True, "comment": "great"})
+    assert resp.status_code == 200
+
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        events = c.get(f"/api/sessions/{sid}").json()["events"]
+        if any("learning library" in e.get("content", "") for e in events):
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("indexing confirmation never arrived")
+    assert (tmp_path / "ledger.md").is_file()
+    assert sid in (tmp_path / "ledger.md").read_text(encoding="utf-8")
+    assert not (tmp_path / "fb").exists()
+
+
+def test_unhappy_feedback_goes_to_the_feedback_folder(fake_run, monkeypatch, tmp_path):
+    from lib import experience_indexer
+
+    monkeypatch.setenv("FEEDBACK_ENABLED", "true")
+    monkeypatch.setenv("FEEDBACK_TIMEOUT_S", "10")
+    monkeypatch.setattr(experience_indexer, "_LEDGER", tmp_path / "ledger.md")
+    monkeypatch.setattr(experience_indexer, "_FINE_TUNE_DIR", tmp_path / "fine_tune")
+    monkeypatch.setattr(experience_indexer, "_FEEDBACK_DIR", tmp_path / "fb")
+    monkeypatch.setattr(experience_indexer, "chroma_dir", lambda: tmp_path / "chroma")
+    monkeypatch.setattr(experience_indexer, "_default_embedder", lambda: experience_indexer.HashEmbedder())
+
+    c = client()
+    sid = c.post("/api/sessions", json={"task": "Cold chain monitoring"}).json()["session_id"]
+    _await_finished(c, sid)
+    c.post(f"/api/sessions/{sid}/feedback", json={"satisfied": False, "comment": "tables overflow"})
+
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        events = c.get(f"/api/sessions/{sid}").json()["events"]
+        if any("feedback folder" in e.get("content", "") for e in events):
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("feedback confirmation never arrived")
+    fb = tmp_path / "fb" / f"{sid}.md"
+    assert fb.is_file() and "tables overflow" in fb.read_text(encoding="utf-8")
+    assert not (tmp_path / "ledger.md").exists()
+
+
+def test_no_feedback_means_no_indexing(fake_run, monkeypatch, tmp_path):
+    from lib import experience_indexer
+
+    monkeypatch.setenv("FEEDBACK_ENABLED", "true")
+    monkeypatch.setenv("FEEDBACK_TIMEOUT_S", "3")
+    monkeypatch.setattr(experience_indexer, "_LEDGER", tmp_path / "ledger.md")
+    monkeypatch.setattr(experience_indexer, "_FEEDBACK_DIR", tmp_path / "fb")
+    monkeypatch.setattr(experience_indexer, "chroma_dir", lambda: tmp_path / "chroma")
+
+    c = client()
+    sid = c.post("/api/sessions", json={"task": "Cold chain monitoring"}).json()["session_id"]
+    _await_finished(c, sid)
+    deadline = time.time() + 8
+    while time.time() < deadline:
+        events = c.get(f"/api/sessions/{sid}").json()["events"]
+        if any("not added to the learning library" in e.get("content", "") for e in events):
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("timeout message never recorded")
+    assert not (tmp_path / "ledger.md").exists()
+    assert not (tmp_path / "fb").exists()
+
+def test_ws_feedback_event_indexes_the_session(fake_run, live_server, monkeypatch, tmp_path):
+    from lib import experience_indexer
+
+    monkeypatch.setenv("FEEDBACK_ENABLED", "true")
+    monkeypatch.setenv("FEEDBACK_TIMEOUT_S", "10")
+    monkeypatch.setattr(experience_indexer, "_LEDGER", tmp_path / "ledger.md")
+    monkeypatch.setattr(experience_indexer, "_FINE_TUNE_DIR", tmp_path / "fine_tune")
+    monkeypatch.setattr(experience_indexer, "_FEEDBACK_DIR", tmp_path / "fb")
+    monkeypatch.setattr(experience_indexer, "chroma_dir", lambda: tmp_path / "chroma")
+    monkeypatch.setattr(experience_indexer, "_default_embedder", lambda: experience_indexer.HashEmbedder())
+
+    base, port = live_server
+    sid = httpx.post(f"{base}/api/sessions", json={"task": "Gate scanning"}).json()["session_id"]
+
+    deadline = time.time() + 10
+    sid_real = sid
+    while time.time() < deadline:
+        detail = httpx.get(f"{base}/api/sessions/{sid_real}").json()
+        if any(e["type"] == "feedback_request" for e in detail["events"]):
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("feedback_request never arrived")
+
+    with ws_connect(f"ws://127.0.0.1:{port}/ws/sessions/{sid_real}") as ws:
+        ws.send(json.dumps({"type": "feedback", "satisfied": True, "comment": "solid spec"}))
+
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        detail = httpx.get(f"{base}/api/sessions/{sid_real}").json()
+        if any("learning library" in e.get("content", "") for e in detail["events"]):
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("indexing confirmation never arrived")
+    assert (tmp_path / "ledger.md").is_file()

@@ -126,3 +126,12 @@ describe('runState reducer', () => {
     expect(state.sessions[0].artifact_count).toBe(2);
   });
 });
+
+  it('a feedback_request creates a satisfaction turn that is not a question', () => {
+    let state = startedSession();
+    state = apply(state, event({ type: 'feedback_request', question: 'Are you happy with the deliverables?' }));
+    const turns = state.threads['s1'].turns;
+    const turn = turns[turns.length - 1];
+    expect(turn.kind).toBe('feedback');
+    expect(awaitingQuestion(state.threads['s1'])).toBeNull();
+  });

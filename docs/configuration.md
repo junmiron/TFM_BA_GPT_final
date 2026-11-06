@@ -16,6 +16,11 @@ model configs directly - `src/model_loader.py` loads it and injects the key.
 | `HUMAN_MODEL` | `opencode` | profile for the simulated stakeholder lane |
 | `SIMULATE_HUMAN` | `false` | run the interview against `HUMAN_MODEL` instead of a human |
 | `MAX_MESSAGES` | `300` | hard cap on team turns |
+| `FEEDBACK_ENABLED` | `true` | ask the user for satisfaction after a run; yes -> approved RAG + ledger + fine-tune corpus, no -> `feedback/` folder |
+| `FEEDBACK_TIMEOUT_S` | `300` | seconds to wait for the satisfaction answer |
+| `RAG_APPROVED_COLLECTION` | `approved_experiences` | ChromaDB collection holding approved deliverables |
+| `UI_SHOW_ARTIFACTS` | `true` | show/hide the Artifacts panel in the web UI |
+| `UI_SHOW_INTERNAL_MESSAGES` | `true` | when false, the transcript shows only the interviewer/user conversation |
 | `OPENAI_API_KEY` | - | required for `openai` / `openai_npt` |
 | `AZURE_OPENAI_API_KEY` | - | for the `azure` profile |
 | `GROQ_API_KEY` | - | for the `groq` profile |

@@ -19,6 +19,8 @@ export interface RunPanelProps {
   onRetryArtifacts: () => void;
   turns: number;
   turnBudget: number | null;
+  /** Feature 2: UI_SHOW_ARTIFACTS. */
+  showArtifacts: boolean;
 }
 
 const STAGE_TONE: Record<StageState, BadgeTone> = { done: 'success', active: 'info', pending: 'neutral' };
@@ -34,18 +36,21 @@ export function RunPanel({
   onRetryArtifacts,
   turns,
   turnBudget,
+  showArtifacts,
 }: RunPanelProps) {
   return (
     <aside aria-label="Run progress" className="flex min-h-0 flex-col gap-4 lg:sticky lg:top-6">
-      <Panel title="Artifacts" headingId="artifacts-heading">
-        <ArtifactsBody
-          sessionId={sessionId}
-          artifacts={artifacts}
-          error={artifactsError}
-          runActive={runActive}
-          onRetry={onRetryArtifacts}
-        />
-      </Panel>
+      {showArtifacts && (
+        <Panel title="Artifacts" headingId="artifacts-heading">
+          <ArtifactsBody
+            sessionId={sessionId}
+            artifacts={artifacts}
+            error={artifactsError}
+            runActive={runActive}
+            onRetry={onRetryArtifacts}
+          />
+        </Panel>
+      )}
       <Panel title="Workflow" headingId="workflow-heading">
         <ol aria-labelledby="workflow-heading" className="space-y-2 p-4">
           {STAGES.map((stage) => {

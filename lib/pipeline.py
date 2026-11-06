@@ -24,7 +24,8 @@ from autogen_agentchat.base import TaskResult
 
 from lib import mcp_boot
 from lib import agents_tools_helpers
-from lib.rag_helpers import rag_indexer_runner, TemplateSafeTextCanvasMemory
+from lib import experience_indexer
+from lib.rag_helpers import rag_indexer_runner, TemplateSafeTextCanvasMemory, create_chromadb_memory
 from src.model_loader import load_model_client
 # Bound to the SAME module object that ``set_session`` mutates: a bare
 # ``import agents_tools_helpers`` re-executes the file as a second module with
@@ -134,6 +135,19 @@ async def create_workflow(ask_user: Callable, notify: Callable, session_id: Opti
         print(f"⚠️  RAG vector memory unavailable ({type(e).__name__}: {e}); continuing without it.")
         rag_vector_memory = None
     rag_memories = [rag_vector_memory] if rag_vector_memory else []
+    # Reinforcement loop (Feature 1): previously user-approved deliverables are
+    # queryable alongside the web RAG, so new runs can imitate what already
+    # worked. A missing or empty collection degrades silently.
+    if experience_indexer.feedback_enabled():
+        try:
+            approved_memory = await create_chromadb_memory(
+                str(experience_indexer.chroma_dir()),
+                experience_indexer.approved_collection(),
+            )
+            await asyncio.wait_for(approved_memory.query("functional requirement"), timeout=120)
+            rag_memories.append(approved_memory)
+        except Exception as e:
+            print(f"⚠️  Approved-experiences memory unavailable ({type(e).__name__}: {e}); continuing without it.")
     text_canvas_memory = TemplateSafeTextCanvasMemory()
     update_file_tool = agents_tools_helpers.mirror_canvas_to_disk(
         text_canvas_memory.get_update_file_tool()

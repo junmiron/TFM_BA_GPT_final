@@ -3,11 +3,12 @@ import { SessionRail } from './components/SessionRail';
 import { Transcript } from './components/Transcript';
 import { AnswerBox } from './components/AnswerBox';
 import { RunPanel } from './components/RunPanel';
+import { ContinueBox } from './components/ContinueBox';
 import { Header } from './components/Header';
 import { useHealth } from './hooks/useHealth';
 import { useSessions } from './hooks/useSessions';
 import { useSessionSocket } from './hooks/useSessionSocket';
-import { api, downloadArtifact } from './lib/api';
+import { api, downloadArtifact, postFeedback } from './lib/api';
 import { errorMessage, formatLanes, sessionTitle } from './lib/format';
 import { findSpecArtifact } from './lib/artifacts';
 import { shouldFollowLatest } from './lib/scroll';
@@ -28,6 +29,15 @@ export default function App() {
   const getRun = useCallback((id: string): RunStatus => threadsRef.current[id]?.run ?? 'idle', []);
 
   const { send, stop } = useSessionSocket(activeId, dispatch, getRun);
+
+  /** Feature 1: satisfaction gate. REST works for live and persisted sessions alike. */
+  const sendFeedback = useCallback(
+    (satisfied: boolean, comment: string) => {
+      if (!activeId || activeId.startsWith(PENDING_PREFIX)) return;
+      void postFeedback(activeId, satisfied, comment);
+    },
+    [activeId],
+  );
 
   // Debounced refresh: when the active run reaches a terminal state, refresh the session list once.
   const terminal = isTerminalRun(thread.run);
@@ -77,11 +87,11 @@ export default function App() {
   }, [activeId]);
 
   const startSession = useCallback(
-    async (task: string) => {
+    async (task: string, transcript?: { name: string; base64: string }) => {
       const tempId = `${PENDING_PREFIX}${Date.now()}`;
       dispatch({ type: 'session/createStart', tempId, task });
       try {
-        const id = await api.createSession(task);
+        const id = await api.createSession(task, transcript);
         dispatch({ type: 'session/created', tempId, id });
         scheduleRefresh();
       } catch (error) {
@@ -186,6 +196,8 @@ export default function App() {
                 hasSession={activeId !== null}
                 busy={runActive}
                 historical={activeId !== null && thread.turns.length === 0 && !runActive}
+                showInternal={state.health?.ui?.show_internal !== false}
+                onFeedback={sendFeedback}
               />
             </div>
           </section>
@@ -193,6 +205,20 @@ export default function App() {
           {question && (
             <div className="sticky bottom-0 shrink-0">
               <AnswerBox question={question} connected={connected} onSend={send} />
+            </div>
+          )}
+
+          {!runActive && activeId && !activeId.startsWith(PENDING_PREFIX) && thread.artifacts && thread.artifacts.length > 0 && (
+            <div className="px-4 pb-4">
+              <ContinueBox
+                sessionId={activeId}
+                onInfo={(message) => {
+                  dispatch({ type: 'socket/event', id: activeId, event: { type: 'info', content: message } });
+                  api.listArtifacts(activeId)
+                    .then((artifacts) => dispatch({ type: 'artifacts/loaded', id: activeId, artifacts }))
+                    .catch(() => undefined);
+                }}
+              />
             </div>
           )}
         </main>
@@ -206,6 +232,7 @@ export default function App() {
           onRetryArtifacts={retryArtifacts}
           turns={activeSession?.messages ?? 0}
           turnBudget={state.health?.max_messages ?? null}
+          showArtifacts={state.health?.ui?.show_artifacts !== false}
         />
       </div>
     </div>

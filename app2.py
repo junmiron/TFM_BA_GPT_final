@@ -162,6 +162,36 @@ async def _present_final_artifacts():
     ).send()
 
 
+async def _collect_feedback(session_dir, task_text: str) -> None:
+    """Feature 1 satisfaction gate (Chainlit lane): happy -> approved RAG +
+    ledger + fine-tune corpus; unhappy -> feedback folder. Silence indexes
+    nothing."""
+    from lib import experience_indexer
+    if not experience_indexer.feedback_enabled() or not session_dir:
+        return
+    try:
+        resp = await cl.AskUserMessage(
+            content="How are you satisfied with the deliverables? Reply 'yes' to add this run to the "
+                    "learning library, or describe what needs improvement.",
+            timeout=1800,
+        ).send()
+        text = ""
+        if isinstance(resp, dict):
+            text = (resp.get("output") or resp.get("content") or "").strip()
+        satisfied = text.lower() in {"yes", "y", "happy", "ok", "good", "great"}
+        result = experience_indexer.process_feedback(
+            Path(session_dir), Path(session_dir).name, task_text, satisfied,
+            "" if satisfied else text,
+        )
+        if result.get("action") == "indexed":
+            await cl.Message(content=f"Thanks! {result.get('indexed', 0)} deliverable chunks added to the learning library.")
+        elif result.get("action") == "feedback_saved":
+            await cl.Message(content="Thanks for the feedback - recorded in the feedback folder for system improvement. "
+                                     "Nothing was added to the learning library.")
+    except Exception as e:
+        print(f"feedback collection failed ({type(e).__name__}: {e})")
+
+
 @cl.on_chat_start
 async def on_chat_start():
     try:
@@ -188,6 +218,7 @@ async def on_chat_start():
     workflow["running"] = True
     try:
         await run_workflow(workflow, task_text.strip(), ChainlitSink())
+        await _collect_feedback(_find_latest_session_dir(), task_text.strip())
     finally:
         workflow["running"] = False
 
@@ -211,5 +242,6 @@ async def on_message(msg: cl.Message):
     workflow["running"] = True
     try:
         await run_workflow(workflow, task_text, ChainlitSink())
+        await _collect_feedback(_find_latest_session_dir(), task_text)
     finally:
         workflow["running"] = False
