@@ -31,6 +31,7 @@ from lib import agents_tools_helpers, continuation, experience_indexer, transcri
 from lib.pipeline import PROJECT_ROOT, STAGES, create_workflow, run_workflow
 from src.model_loader import PROFILES, PROFILE_ALIASES
 
+MAX_TRANSCRIPT_B64 = 10 * 1024 * 1024 * 4 // 3  # 10 MB raw, base64-encoded
 CONV_ROOT = Path(PROJECT_ROOT) / "conversation"
 UI_DIST = Path(PROJECT_ROOT) / "ui" / "dist"
 
@@ -508,6 +509,8 @@ async def create_session(payload: dict, background_tasks: BackgroundTasks) -> di
     if payload.get("transcript_base64"):
         import base64
 
+        if len(payload["transcript_base64"]) > MAX_TRANSCRIPT_B64:
+            raise HTTPException(status_code=413, detail="transcript exceeds 10 MB")
         try:
             data = base64.b64decode(payload["transcript_base64"])
             text = transcript_loader.extract_trans_text(

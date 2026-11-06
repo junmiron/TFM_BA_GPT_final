@@ -73,13 +73,28 @@ class HashEmbedder:
     token-count histogram - good enough for smoke tests, not for production
     retrieval quality."""
 
-    def name(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         return "hash-embedder"
 
     def dimension(self) -> int:
         return 64
 
-    is_legacy = False
+    def is_legacy(self) -> bool:
+        return False
+
+    def default_space(self) -> str:
+        return "cosine"
+
+    def supported_spaces(self) -> list:
+        return ["cosine", "l2", "ip"]
+
+    @staticmethod
+    def build_from_config(config: dict):
+        return HashEmbedder()
+
+    def get_config(self) -> dict:
+        return {"name": "hash-embedder"}
 
     def embed(self, documents: List[str]) -> List[List[float]]:
         out = []

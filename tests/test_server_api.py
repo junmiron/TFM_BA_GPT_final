@@ -652,3 +652,17 @@ def test_ws_feedback_event_indexes_the_session(fake_run, live_server, monkeypatc
     else:
         raise AssertionError("indexing confirmation never arrived")
     assert (tmp_path / "ledger.md").is_file()
+
+
+
+
+
+def test_transcript_upload_size_limit():
+    """Feature 4 hardening: oversized transcripts are rejected before any
+    session folder or run is created."""
+    import base64
+
+    big = base64.b64encode(b"x" * (11 * 1024 * 1024)).decode()
+    response = client().post("/api/sessions", json={"task": "t", "transcript_base64": big})
+    assert response.status_code == 413
+    assert "10 MB" in response.json()["detail"]

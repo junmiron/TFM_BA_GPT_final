@@ -28,9 +28,10 @@ def test_no_profile_yaml_carries_a_secret():
             config = yaml.safe_load(f)["config"]
         assert "api_key" not in config, f"{name} profile must not contain api_key"
         if key_env:
-            assert key_env in open(os.path.join(_SRC_DIR, filename), encoding="utf-8").read(), (
-                f"{name} profile should name its key env var ({key_env})"
-            )
+            with open(os.path.join(_SRC_DIR, filename), encoding="utf-8") as fh:
+                assert key_env in fh.read(), (
+                    f"{name} profile should name its key env var ({key_env})"
+                )
 
 
 def test_groq_model_is_not_decommissioned():
