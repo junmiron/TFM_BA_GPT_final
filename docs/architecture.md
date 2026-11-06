@@ -117,8 +117,9 @@ conversation/     working files while a session runs (gitignored)
 conversation/<id>/  final deliverables per session (gitignored)
 ```
 
-`docs/Conversation/` contains archived examples of finished sessions so you can
-see the expected output shape without running the app.
+A live example session lives in `conversation/` while the app runs; finished
+deliverables (`functional_specification.*`, diagrams) land in
+`conversation/<SESSION_ID>/`.
 
 ## Where the design is fragile
 
