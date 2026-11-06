@@ -10,7 +10,7 @@ servers** for diagram rendering and document export.
 
 > ## ⚠️ Technical preview
 >
-> This is a **technical preview** release (v1.2.0). The agent team, pipeline
+> This is a **technical preview** release (v1.3.0). The agent team, pipeline
 > and deliverable formats are stable enough for evaluation, but the project
 > is still under active development and details may change.
 >
