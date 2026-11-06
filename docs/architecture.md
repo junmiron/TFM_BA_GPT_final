@@ -70,8 +70,8 @@ Two invariants matter:
 4. `clean_mermaid(...)` on the `.mmd` file
 5. `render_mermaid_png(...)`
 6. `format_and_export(...)` → `functional_specification.formatted.md` and `functional_specification.pdf`
-7. `finalize_deliverables(...)` → renders every fence in the canvas (`process_diagram.png`, `process_diagram_2.png`, ...), embeds each PNG plus its Mermaid fence into `functional_specification.md`, and writes the self-contained `functional_specification.html`
-8. `save_experience_chroma(...)` so the session is retrievable later
+7. `finalize_deliverables(...)` → renders every fence in the canvas (`process_diagram.png`, `process_diagram_2.png`, ...), embeds each PNG plus its Mermaid fence into `functional_specification.md`, and writes the self-contained `functional_specification.html` (diagram inlined as SVG when available)
+8. **feedback gate** → asks whether the user is happy with the deliverables; "yes" indexes the session into the `approved_experiences` ChromaDB collection via `lib/experience_indexer.py`, a critique goes to `feedback/<session_id>.md`, silence indexes nothing
 9. output `TERMINATE`
 
 The team also has a hard stop: `MaxMessageTermination(MAX_MESSAGES)` (default 300),
@@ -83,17 +83,15 @@ Two stdio servers ship in `mcp_servers/` and are launched by `lib/mcp_boot.py`
 with the project root as their only allowed directory.
 
 **`mcp_servers/Mermaid-MCP/Mermaid-MCP.py`** - `check_mermaid`, `clean_mermaid`,
-`render_mermaid_png`, `check_mermaid`, `clean_mermaid`. Requires the
+`render_mermaid_png`. Requires the
 `mmdc` binary (mermaid-cli).
 On Windows it resolves `mmdc.cmd`. Subprocess output is captured so it cannot
 corrupt the JSON-RPC stream.
 
 **`mcp_servers/Final_deliverable_MCP_server/PDF_format_mcp_server.py`** -
-`format_spec`, `export_pdf`, `format_and_export`, `save_experience_chroma`,
-`recall_experience_chroma`. Formatting is pure Python; the PDF step uses the Typst renderer
-(`typst_render.py`: pandoc Markdown to Typst, cover page, linked Contents, bundled Inter font)
-when the binaries are installed - otherwise PyMuPDF Story. Embeddings use `paraphrase-multilingual-mpnet-base-v2`, GPU if available,
-otherwise CPU.
+`format_spec`, `export_pdf`, `export_html`, `format_and_export`. Formatting is pure Python; the PDF step uses the Typst renderer
+(`typst_render.py`: pandoc Markdown to Typst, cover page, linked Contents, bundled Inter font, tall-diagram band splitting)
+when the binaries are installed - otherwise PyMuPDF Story.
 
 ## RAG memory
 
@@ -101,6 +99,9 @@ otherwise CPU.
 SentenceTransformer embedding function, indexes everything under `data/`, and
 optionally scrapes the `SITES` list in `lib/rag_config.yaml`. `index_state.json`
 records which documents were already indexed so re-runs do not re-embed.
+When `FEEDBACK_ENABLED=true`, a second ChromaDB collection (`approved_experiences`,
+managed by `lib/experience_indexer.py`) holds only sessions the user approved,
+and the interview/writer agents query both memories.
 
 Two memory types are exposed to agents:
 
