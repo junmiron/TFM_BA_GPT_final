@@ -13,7 +13,7 @@ import { api, downloadArtifact, postFeedback, viewUrl } from './lib/api';
 import { errorMessage, formatLanes, sessionTitle } from './lib/format';
 import { findHtmlArtifact, findPdfArtifact } from './lib/artifacts';
 import { shouldFollowLatest } from './lib/scroll';
-import { isActiveRun, reducer, initialState, EMPTY_THREAD, awaitingQuestion, stageStates, PENDING_PREFIX, isTerminalRun, type RunStatus, type Thread } from './state/runState';
+import { isActiveRun, reducer, initialState, EMPTY_THREAD, awaitingQuestion, pendingFeedback, stageStates, PENDING_PREFIX, isTerminalRun, type RunStatus, type Thread } from './state/runState';
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -108,6 +108,7 @@ export default function App() {
 
   const runActive = isActiveRun(thread.run);
   const question = useMemo(() => awaitingQuestion(thread), [thread]);
+  const feedback = useMemo(() => pendingFeedback(thread), [thread]);
   const stages = useMemo(() => stageStates(thread), [thread]);
   const pdfArtifact = thread.artifacts ? findPdfArtifact(thread.artifacts) : undefined;
   const webArtifact = thread.artifacts ? findHtmlArtifact(thread.artifacts) : undefined;
@@ -128,10 +129,10 @@ export default function App() {
   useEffect(() => {
     const el = transcriptRef.current;
     if (!el) return;
-    if (shouldFollowLatest(el.scrollHeight, el.scrollTop, el.clientHeight, Boolean(question))) {
+    if (shouldFollowLatest(el.scrollHeight, el.scrollTop, el.clientHeight, Boolean(question) || Boolean(feedback))) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [thread.turns, question]);
+  }, [thread.turns, question, feedback]);
 
   // Escape stops an active run (keyboard shortcut from the spec).
   useEffect(() => {
@@ -217,8 +218,7 @@ export default function App() {
                 busy={runActive}
                 historical={activeId !== null && thread.turns.length === 0 && !runActive}
                 showInternal={state.health?.ui?.show_internal !== false}
-                onFeedback={sendFeedback}
-              />
+                              />
             </div>
           </section>
 
@@ -232,6 +232,8 @@ export default function App() {
                   : 'Start or select a session to begin the interview.'}
               connected={connected}
               onSend={send}
+            feedback={feedback}
+            onFeedback={sendFeedback}
             />
           </div>
 

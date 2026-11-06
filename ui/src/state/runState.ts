@@ -415,6 +415,12 @@ export function reducer(state: RunState, action: Action): RunState {
 }
 
 /** Question text when the interviewer's latest message asks for a human answer, otherwise null. */
+/** A satisfaction request that is still waiting for an answer (Feature 12). */
+export function pendingFeedback(thread: Thread): string | null {
+  const last = thread.turns[thread.turns.length - 1];
+  return last && last.kind === 'feedback' ? last.content : null;
+}
+
 export function awaitingQuestion(thread: Thread): string | null {
   if (isTerminalRun(thread.run)) return null;
   for (let i = thread.turns.length - 1; i >= 0; i -= 1) {

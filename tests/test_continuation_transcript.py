@@ -189,3 +189,47 @@ def test_continue_requires_supplement(fake_api):
     client = TestClient(api.app)
     assert client.post("/api/sessions/sess-X/continue", json={"supplement": ""}).status_code == 400
     assert client.post("/api/sessions/does-not-exist/continue", json={"supplement": "y"}).status_code == 404
+
+
+def test_model_complete_uses_autogen_create_api(monkeypatch, tmp_path):
+    """Regression for the HTTP 500: AutoGen 0.7.5 clients expose create(),
+    not create_completion(); the merge must use the real client interface."""
+
+    class StubClient:
+        def __init__(self):
+            self.calls = 0
+
+        async def create(self, messages, **kwargs):
+            self.calls += 1
+            from types import SimpleNamespace
+            return SimpleNamespace(content="merged spec")
+
+        def create_completion(self, *args, **kwargs):  # deliberately absent in real autogen
+            raise AssertionError("wrong method used")
+
+    stub = StubClient()
+    import src.model_loader as model_loader
+    monkeypatch.setattr(model_loader, "load_model_client", lambda name: stub)
+
+    out = asyncio.run(continuation._model_complete("prompt"))
+    assert out == "merged spec"
+    assert stub.calls == 1
+
+
+def test_apply_supplement_falls_back_when_model_raises(tmp_path):
+    session = tmp_path
+    (session / "functional_specification.md").write_text(
+        "# Spec\n\n## Scope\n\nBody.\n", encoding="utf-8"
+    )
+
+    def broken_complete(prompt):
+        raise RuntimeError("model lane unreachable")
+
+    result = asyncio.run(continuation.apply_supplement(
+        session, "Add gate scanning.", complete=broken_complete
+    ))
+    spec = (session / "functional_specification.md").read_text(encoding="utf-8")
+    assert result["merged"] == "fallback"
+    assert "Addendum (client supplement)" in spec
+    assert "Add gate scanning." in spec
+    assert "v1.1" in spec

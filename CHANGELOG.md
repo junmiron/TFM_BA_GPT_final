@@ -41,6 +41,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transcript when creating a session (`lib/transcript_loader.py`). The
   transcript is saved as `source_transcript.txt` and seeds the run so the
   interview only fills gaps.
+
+### Fixed
+- Session continuation returned HTTP 500: the merge call used a non-existent
+  AutoGen method (`create_completion`); it now uses `create()` and falls back to
+  a deterministic Addendum merge when the model lane is unreachable.
+- Process diagrams taller than one page were clipped in the PDF; the Typst
+  renderer now splits them into full-width page-sized bands ("part k of N").
+- The satisfaction/feedback request was easy to miss: it now appears in the
+  pinned composer box and forces the transcript to scroll to it.
+
+### Changed
+- Header web link now reads "Open Functional Spec in browser".
 
 ## [1.2.0] - 2026-11-05
 

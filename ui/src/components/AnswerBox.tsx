@@ -9,14 +9,20 @@ export interface AnswerBoxProps {
   caption: string;
   connected: boolean;
   onSend: (answer: string) => boolean;
+  /** Satisfaction request awaiting an answer (Feature 12); null when none. */
+  feedback: string | null;
+  onFeedback: (satisfied: boolean, comment: string) => void;
 }
 
 /**
  * Interview answer box. Always on screen (never appears/disappears):
  * active when a question is pending, greyed out and disabled otherwise.
  */
-export function AnswerBox({ question, caption, connected, onSend }: AnswerBoxProps) {
+export function AnswerBox({ question, caption, connected, onSend, feedback, onFeedback }: AnswerBoxProps) {
   const [answer, setAnswer] = useState('');
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [comment, setComment] = useState('');
+  const [feedbackSent, setFeedbackSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const id = useId().replace(/:/g, '-');
@@ -48,6 +54,63 @@ export function AnswerBox({ question, caption, connected, onSend }: AnswerBoxPro
       submit();
     }
   };
+
+  if (!question && feedback && !feedbackSent) {
+    const submitFeedback = (satisfied: boolean, note: string) => {
+      if (!connected) {
+        setSendError('Not connected to the run. The feedback was not sent.');
+        return;
+      }
+      onFeedback(satisfied, note);
+      setFeedbackSent(true);
+      setCommentOpen(false);
+      setComment('');
+    };
+    return (
+      <section aria-labelledby={`${id}-feedback-title`} className="rounded-lg border-2 border-primary bg-accent p-4 shadow-glow">
+        <div className="mb-2 flex items-center gap-2">
+          <span aria-hidden="true" className="h-2.5 w-2.5 animate-pulse-dot rounded-full bg-primary" />
+          <h3 id={`${id}-feedback-title`} className="text-sm font-semibold text-accent-foreground">
+            Before you close this session
+          </h3>
+        </div>
+        <p className="mb-3 whitespace-pre-wrap text-sm text-foreground">{feedback}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" size="sm" onClick={() => submitFeedback(true, '')}>
+            Yes, deliverables are good
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setCommentOpen(true)}>
+            Not quite — tell us what to fix
+          </Button>
+        </div>
+        {commentOpen && (
+          <div className="mt-3">
+            <label htmlFor={`${id}-comment`} className="mb-1 block text-xs font-medium text-foreground">
+              What needs improvement?
+            </label>
+            <textarea
+              id={`${id}-comment`}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={3}
+              maxLength={4000}
+              className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="Describe what is missing or wrong with the deliverables…"
+            />
+            <div className="mt-2 flex justify-between gap-2">
+              <span className="text-xs text-foreground/80">Your feedback tunes the learning library.</span>
+              <Button variant="primary" size="sm" onClick={() => submitFeedback(false, comment.trim())}>
+                Send feedback
+              </Button>
+            </div>
+          </div>
+        )}
+        {sendError && (
+          <p role="alert" className="mt-2 text-sm text-rose-800">{sendError}</p>
+        )}
+      </section>
+    );
+  }
 
   if (!question) {
     return (

@@ -90,6 +90,13 @@ _CELL_PAD_PT = 10.0  # typst default column spacing per cell side
 _LINE_PITCH_PT = 16.0
 _ROW_PAD_PT = 12.0
 
+# Diagram images are atomic figures too: a tall Mermaid PNG is clipped at the
+# page bottom. Bands keep each figure under the content box minus room for its
+# caption; consecutive bands overlap slightly so a node label never sits
+# exactly on the cut line.
+_DIAGRAM_CAP_ALLOW_PT = 40.0
+_DIAGRAM_OVERLAP_PT = 30.0
+
 # Typst styling injected into every table pandoc emits: dark header row with
 # white text plus light zebra stripes. Verified against typst 0.15 (the fill
 # function takes (x, y); typst has no % operator, so even rows are detected
@@ -443,6 +450,65 @@ def _split_markdown_tables(md_text: str) -> str:
     return "\n".join(out)
 
 
+def _fit_diagram_images(md_text: str, session_dir: Path) -> str:
+    """Split diagram PNGs taller than one page into page-sized bands.
+
+    Typst never splits a #figure across pages, so a tall process diagram is
+    clipped. Each band is cropped at full width with a small vertical overlap
+    and emitted as its own captioned figure, "(part k of N)". Images that
+    already fit a page are left untouched.
+    """
+    image_re = re.compile(r"!\[([^\]]*)\]\(([^)\s]+\.png)\)(?:\{\s*width=(\d+)%\s*\})?")
+
+    def replace(match):
+        caption, src, width_pct = match.group(1), match.group(2), match.group(3)
+        path = session_dir / src
+        if not path.is_file():
+            return match.group(0)
+        try:
+            from PIL import Image
+            with Image.open(path) as img:
+                width, height = img.size
+        except Exception:
+            return match.group(0)
+        pct = int(width_pct) if width_pct else 100
+        rendered_width_pt = _CONTENT_WIDTH_PT * pct / 100
+        max_band_pt = _CONTENT_HEIGHT_PT - _DIAGRAM_CAP_ALLOW_PT
+        if height * rendered_width_pt / width <= max_band_pt:
+            return match.group(0)
+
+        # stale bands from a previous render would otherwise linger in the
+        # session folder and show up in the artifacts list
+        for stale in session_dir.glob(f"{path.stem}_band*{path.suffix}"):
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+
+        px_per_pt = width / rendered_width_pt
+        band_px = int(max_band_pt * px_per_pt)
+        overlap_px = int(_DIAGRAM_OVERLAP_PT * px_per_pt)
+        bands = []
+        y = 0
+        while y < height:
+            end = min(height, y + band_px)
+            band_path = session_dir / f"{path.stem}_band{len(bands) + 1}{path.suffix}"
+            with Image.open(path) as img:
+                img.crop((0, y, width, end)).save(band_path)
+            bands.append(band_path.name)
+            if end == height:
+                break
+            y = end - overlap_px
+
+        total = len(bands)
+        return "\n\n".join(
+            f"![{caption} (part {i} of {total})]({name}){{ width={pct}% }}"
+            for i, name in enumerate(bands, 1)
+        )
+
+    return image_re.sub(replace, md_text)
+
+
 def fix_table_columns(typst_text: str) -> str:
     """Style every pandoc #table block (proportional columns, dark header).
 
@@ -502,7 +568,7 @@ def _markdown_to_typst(md_text: str, session_dir: Path, pandoc_bin: str) -> str:
 def qa_pdf(pdf_path: Path) -> Dict[str, object]:
     """Read the finished PDF back with PyMuPDF: pages, images, bookmarks,
     embedded font names, and a raw-Mermaid leak check."""
-    qa: Dict[str, object] = {"pages": 0, "images": 0, "toc_entries": 0, "fonts": [], "raw_mermaid": 0}
+    qa: Dict[str, object] = {"pages": 0, "images": 0, "toc_entries": 0, "fonts": [], "raw_mermaid": 0, "oversized_images": 0}
     try:
         import pymupdf as fitz
     except Exception:
@@ -520,6 +586,11 @@ def qa_pdf(pdf_path: Path) -> Dict[str, object]:
             text = page.get_text()
             if "graph TD" in text or "flowchart TD" in text or "sequenceDiagram" in text:
                 raw_mermaid += 1
+        for page in doc:
+            for info in page.get_image_info():
+                bbox = info.get("bbox")
+                if bbox and (bbox[3] - bbox[1]) > _CONTENT_HEIGHT_PT + 10:
+                    qa["oversized_images"] += 1
         qa["fonts"] = sorted(fonts)
         qa["raw_mermaid"] = raw_mermaid
     finally:
@@ -549,7 +620,7 @@ def render(markdown_path: Path, pdf_path: Path, title: Optional[str] = None) -> 
         return {"status": "error", "engine": "typst", "message": f"Markdown read failed: {exc}"}
 
     meta = extract_metadata(md_text, title or "")
-    body_md = _split_markdown_tables(strip_mermaid_fences(md_text))
+    body_md = _fit_diagram_images(_split_markdown_tables(strip_mermaid_fences(md_text)), session_dir)
 
     fonts_ready = any(FONT_DIR.glob("*.ttf")) or any(FONT_DIR.glob("*.otf"))
     font = "Inter" if fonts_ready else "Libertinus Serif"

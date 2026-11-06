@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   awaitingQuestion,
+  pendingFeedback,
   initialState,
   isTerminalRun,
   reducer,
@@ -134,4 +135,11 @@ describe('runState reducer', () => {
     const turn = turns[turns.length - 1];
     expect(turn.kind).toBe('feedback');
     expect(awaitingQuestion(state.threads['s1'])).toBeNull();
+  });
+  it('pendingFeedback is true while the satisfaction request is the latest turn', () => {
+    let state = reducer(initialState, { type: 'session/select', id: 's1' });
+    state = apply(state, event({ type: 'feedback_request', question: 'Are you happy with the deliverables?' }));
+    expect(pendingFeedback(state.threads['s1'])).toBe('Are you happy with the deliverables?');
+    state = apply(state, event({ type: 'info', content: 'Thanks! 12 chunks added to the learning library.' }));
+    expect(pendingFeedback(state.threads['s1'])).toBeNull();
   });

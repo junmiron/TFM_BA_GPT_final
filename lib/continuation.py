@@ -9,6 +9,7 @@ deliverables (PDF/HTML/MD) are re-rendered in place.
 
 import inspect
 import json
+import logging
 import os
 import re
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+logger = logging.getLogger(__name__)
 
 _VERSION_ROW = re.compile(r"^\|\s*Version\s*\|\s*(v?\d+(?:\.\d+)?)\s*(.*?)\|\s*$", re.M | re.I)
 _VERSION_BOLD = re.compile(r"\*\*Version:\*\*\s*(v?\d+(?:\.\d+)?)", re.I)
@@ -56,7 +58,7 @@ async def _model_complete(prompt: str) -> str:
     from src.model_loader import load_model_client
 
     client = load_model_client(os.getenv("MODEL_CLIENT", "openai"))
-    response = await client.create_completion(
+    response = await client.create(
         [
             SystemMessage(
                 content=(
@@ -66,7 +68,7 @@ async def _model_complete(prompt: str) -> str:
                     "complete updated Markdown document only."
                 )
             ),
-            UserMessage(content=prompt),
+            UserMessage(content=prompt, source="continuation"),
         ]
     )
     return str(response.content)
@@ -93,13 +95,17 @@ async def apply_supplement(session_dir: Path, supplement: str,
 
     spec = spec_path.read_text(encoding="utf-8", errors="ignore")
     func = complete or _model_complete
-    result = func(
-        f"CURRENT SPECIFICATION:\n\n{spec}\n\n"
-        f"NEW INFORMATION FROM THE CLIENT:\n\n{supplement}\n\n"
-        "Return the complete updated specification as Markdown."
-    )
-    if inspect.isawaitable(result):
-        result = await result
+    try:
+        result = func(
+            f"CURRENT SPECIFICATION:\n\n{spec}\n\n"
+            f"NEW INFORMATION FROM THE CLIENT:\n\n{supplement}\n\n"
+            "Return the complete updated specification as Markdown."
+        )
+        if inspect.isawaitable(result):
+            result = await result
+    except Exception as exc:
+        logger.warning("model merge failed, using deterministic addendum: %s", exc)
+        result = ""
     updated = str(result or "").strip()
 
     original_headings = _headings(spec)

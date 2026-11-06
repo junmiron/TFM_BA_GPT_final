@@ -279,3 +279,60 @@ def test_html_deliverable_has_sidebar_cover_and_dark_table_headers(tmp_path):
     # The H1 title lives in the cover header, not twice in the document.
     assert body.count('<h1 id=') <= 1
     assert "<details>" in body  # Mermaid source kept collapsed for the web version
+
+
+def _tall_diagram_png(session: Path) -> Path:
+    from PIL import Image
+    png = session / "process_diagram.png"
+    Image.new("RGB", (511, 2096), "white").save(png)
+    return png
+
+
+def test_tall_diagram_is_split_into_page_sized_bands(tmp_path):
+    mod = _load("typst_render_unit", TYPST_RENDER)
+    session = tmp_path / "sess-bands"
+    session.mkdir()
+    _tall_diagram_png(session)
+    md = "## 3. Process Diagram\n\n![Process Diagram](process_diagram.png){ width=95% }\n"
+
+    fixed = mod._fit_diagram_images(md, session)
+    band_names = re.findall(r"\((process_diagram_band\d+\.png)\)", fixed)
+    assert band_names, "tall diagram was not split into bands"
+    assert "(part 1 of " in fixed
+    for name in band_names:
+        from PIL import Image
+        with Image.open(session / name) as img:
+            w, h = img.size
+        rendered_pt = h * (469.0 * 95 / 100) / w
+        assert rendered_pt <= 706.0 - 40.0, f"band {name} still exceeds the page box"
+    # bands must cover the whole original height (overlap allowed, gaps not)
+    heights = []
+    from PIL import Image
+    for name in band_names:
+        with Image.open(session / name) as img:
+            heights.append(img.size[1])
+    assert sum(heights) >= 2096
+
+
+def test_diagram_that_fits_one_page_is_left_alone(tmp_path):
+    mod = _load("typst_render_unit2", TYPST_RENDER)
+    session = tmp_path / "sess-fit"
+    session.mkdir()
+    from PIL import Image
+    Image.new("RGB", (600, 400), "white").save(session / "process_diagram.png")
+    md = "![Process Diagram](process_diagram.png){ width=95% }"
+    assert mod._fit_diagram_images(md, session) == md
+
+
+def test_rendered_pdf_has_no_clipped_diagram_images(tmp_path):
+    session = _make_session(tmp_path)
+    _tall_diagram_png(session)  # replace the small fixture diagram with a tall one
+    result = _load("typst_render_it", TYPST_RENDER).render(
+        session / "functional_specification.formatted.md",
+        session / "functional_specification.pdf",
+        title="Laundry Shop Staff App v1",
+    )
+    if result.get("status") != "ok":
+        pytest.skip(f"typst toolchain unavailable: {result.get('message')}")
+    assert result["oversized_images"] == 0, f"images taller than the page box: {result['oversized_images']}"
+    assert result["images"] >= 1

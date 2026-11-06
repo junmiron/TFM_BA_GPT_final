@@ -83,11 +83,11 @@ export function Header({
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
           >
-            View web version
+            Open Functional Spec in browser
           </a>
         ) : (
           <span aria-disabled="true" title="The web version appears once a run finishes." className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-            View web version
+            Open Functional Spec in browser
           </span>
         )}
       </div>
