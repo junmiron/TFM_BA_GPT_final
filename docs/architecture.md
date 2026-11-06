@@ -83,8 +83,8 @@ Two stdio servers ship in `mcp_servers/` and are launched by `lib/mcp_boot.py`
 with the project root as their only allowed directory.
 
 **`mcp_servers/Mermaid-MCP/Mermaid-MCP.py`** - `check_mermaid`, `clean_mermaid`,
-`render_mermaid_svg`, `render_mermaid_png`, `render_mermaid_pdf`,
-`render_mermaid_all`, `png_to_jpg`. Requires the `mmdc` binary (mermaid-cli).
+`render_mermaid_png`, `check_mermaid`, `clean_mermaid`. Requires the
+`mmdc` binary (mermaid-cli).
 On Windows it resolves `mmdc.cmd`. Subprocess output is captured so it cannot
 corrupt the JSON-RPC stream.
 
