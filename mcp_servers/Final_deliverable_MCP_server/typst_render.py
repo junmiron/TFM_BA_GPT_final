@@ -290,10 +290,6 @@ def strip_mermaid_fences(md_text: str) -> str:
     return _MERMAID_FENCE_RE.sub("", md_text)
 
 
-def _header_line_cells(header_text: str) -> List[str]:
-    return re.findall(r"\[([^\[\]]*)\]", header_text)
-
-
 def _style_table_block(block: List[str]) -> List[str]:
     """Rewrite one pandoc #table(...) block: proportional column widths, a
     dark white-text header row, and hyphenation off so narrow columns wrap at

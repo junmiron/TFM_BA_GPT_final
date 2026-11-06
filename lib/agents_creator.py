@@ -1,9 +1,8 @@
 import yaml
 import importlib
-from typing import Any, Iterable, List, Dict, Tuple
+from typing import Any, Iterable, List, Dict
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 from autogen_agentchat.tools import AgentTool  # <-- NEW
-from autogen_ext.tools.mcp import StdioServerParams, mcp_server_tools
 from inspect import isawaitable
 
 def import_from_string(dotted_path: str):

@@ -9,7 +9,6 @@ returns a vector memory object for use in RAG-enabled applications.
 import asyncio
 import json
 import os
-import re
 import zipfile
 import xml.etree.ElementTree as ET
 import yaml  # Requires pyyaml

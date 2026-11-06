@@ -109,9 +109,6 @@ def default_mermaid_path() -> str:
     return str((_session_dir() / "process_diagram.mmd").resolve())
 
 
-def default_summary_path() -> str:
-    return str((_session_dir() / "final_summary.md").resolve())
-
 ISO8601 = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 PLANNING = "planning_agent"
@@ -219,48 +216,6 @@ def save_records(
             if attempt > retries:
                 raise
             time.sleep(backoff_seconds * attempt)
-
-
-def save_conversation_pair(
-    path: str | Path,
-    question_text: str,
-    answer_text: str,
-    subject: str,
-    q_index: int,
-    session_id: Optional[str] = None,
-    extra_question_fields: Optional[Dict[str, Any]] = None,
-    extra_answer_fields: Optional[Dict[str, Any]] = None,
-    retries: int = 2,
-    backoff_seconds: float = 0.2,
-) -> None:
-    """
-    Convenience wrapper to log a Q&A pair with a shared q_index.
-    Writes exactly two JSONL records: one for the interviewer, one for the user.
-    """
-    q = {
-        "speaker": "interviewer",
-        "message": question_text,
-        "subject": subject,
-        "q_index": int(q_index),
-    }
-    a = {
-        "speaker": "user",
-        "message": answer_text,
-        "subject": subject,
-        "q_index": int(q_index),
-    }
-    if extra_question_fields:
-        q.update(extra_question_fields)
-    if extra_answer_fields:
-        a.update(extra_answer_fields)
-
-    save_records(
-        path=path,
-        records=[q, a],
-        session_id=session_id,
-        retries=retries,
-        backoff_seconds=backoff_seconds,
-    )
 
 
 # --- replace the function signature + a tiny return tweak ---
@@ -1386,13 +1341,6 @@ def _phase(messages: Sequence) -> int:
     if not _agent_has_ready(messages, WRITER):
         return 2
     return 3
-
-def _prev_agent_question(messages: Sequence, agent: str) -> bool:
-    for m in reversed(messages):
-        s = _src(m)
-        if s == agent:
-            return _txt(m).startswith(QUESTION_PREFIX)
-    return False
 
 def _is_question(text: str) -> bool:
     if not text:

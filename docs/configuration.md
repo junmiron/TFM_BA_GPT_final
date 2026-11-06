@@ -88,7 +88,8 @@ interviewer_agent:
 ```
 
 Tool names are dotted import paths resolved by `lib/agents_creator.py`.
-`lib/old/` keeps previous revisions of this file for reference; they are not used.
+Historical revisions of this file lived in `lib/old/`; they have been removed
+from the repo (git history keeps them if ever needed).
 
 ## `lib/rag_config.yaml`
 

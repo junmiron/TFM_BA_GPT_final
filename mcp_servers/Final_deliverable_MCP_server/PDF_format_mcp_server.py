@@ -18,8 +18,6 @@ Tools:
 from __future__ import annotations
 import os
 import threading 
-import asyncio
-import json
 import datetime
 
 import argparse
@@ -860,10 +858,6 @@ def _diagram_png_names(session_dir: Path, fallback: Optional[str] = None) -> Lis
     if not any(names) and fallback:
         names = [fallback]
     return names
-
-
-def _diagram_block_from_source(mermaid_source: Optional[str], png_names: List[str]) -> str:
-    return _diagram_block(canvas_diagrams(mermaid_source or ""), png_names)
 
 
 def embed_diagram(md: str, diagram_names, mermaid_source: Optional[str] = None) -> str:

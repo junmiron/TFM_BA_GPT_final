@@ -7,7 +7,7 @@ scoped to the project root, so no absolute machine paths are hard-coded.
 import os
 import sys
 from pathlib import Path
-from typing import List
+
 
 from autogen_ext.tools.mcp import StdioServerParams, mcp_server_tools
 
