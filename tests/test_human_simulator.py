@@ -7,9 +7,14 @@ import sys
 
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_ROOT, "test"))
+sys.path.insert(0, _ROOT)
 
-from human_simulator import HumanSimulator, PERSONA, TASK_BRIEF
+from lib.human_simulator import HumanSimulator, DEFAULT_PERSONA as PERSONA
+
+TASK_BRIEF = (
+    "A laundry shop wants an app to track orders with QR code check-in, "
+    "assign staff roles, and notify customers when a load is ready."
+)
 
 
 class _FakeResult:

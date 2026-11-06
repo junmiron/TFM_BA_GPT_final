@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Removed
+
+- Technical-debt cleanup: deleted the unreferenced legacy files (`app.py`, `lib/old/`, `src/old/`, `PDF_format_mcp_server_v0/v1.py`, `Mermaid-MCP_old.py`, `chainlit_en-US.md`, unused `public/` logos) and the archived `docs/Conversation/` example sessions.
+- Dead functions with no callers: `default_summary_path`, `save_conversation_pair`, `_prev_agent_question`, `_diagram_block_from_source`, `_header_line_cells`; plus unused imports across `lib/` and the MCP servers.
+- Unused Mermaid MCP tools (`render_mermaid_svg`, `render_mermaid_pdf`, `render_mermaid_all`, `png_to_jpg`) - the pipeline only uses `clean_mermaid`, `check_mermaid`, `render_mermaid_png`.
+- Redundant `onnxruntime` pin in requirements (provided transitively by chromadb).
+- Legacy dev notebooks and duplicates under `test/`; the four manual e2e harnesses moved to `e2e/`.
+
 ### Added
 - Interview answer box is always visible: active when a question is pending,
   greyed and disabled otherwise (Feature 5).
@@ -41,7 +49,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transcript when creating a session (`lib/transcript_loader.py`). The
   transcript is saved as `source_transcript.txt` and seeds the run so the
   interview only fills gaps.
-
+
+
 ### Fixed
 - Session continuation returned HTTP 500: the merge call used a non-existent
   AutoGen method (`create_completion`); it now uses `create()` and falls back to
