@@ -8,11 +8,14 @@ export interface HeaderProps {
   /** null while health is unknown; false when the backend is unreachable. */
   healthOk: boolean | null;
   healthError: string | null;
-  specArtifact: Artifact | undefined;
+  pdfArtifact: Artifact | undefined;
+  webArtifact: Artifact | undefined;
+  webSpecUrl: string | null;
   onDownloadSpec: () => void;
   downloadError: string | null;
   canStop: boolean;
   onStop: () => void;
+  onOpenSettings: () => void;
 }
 
 /** App header: name, lane in use, spec download and stop control. */
@@ -20,11 +23,14 @@ export function Header({
   lanes,
   healthOk,
   healthError,
-  specArtifact,
+  pdfArtifact,
+  webArtifact,
+  webSpecUrl,
   onDownloadSpec,
   downloadError,
   canStop,
   onStop,
+  onOpenSettings,
 }: HeaderProps) {
   const laneTone: BadgeTone = healthOk === false ? 'danger' : 'success';
   let laneText = 'Checking backend…';
@@ -49,22 +55,41 @@ export function Header({
 
         <div className="flex flex-wrap items-center gap-2">
           {canStop && <StopButton onStop={onStop} />}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onDownloadSpec}
-            disabled={!specArtifact}
-            aria-label={
-              specArtifact
-                ? `Download the specification for the selected session (${specArtifact.name})`
-                : 'Download specification: none available yet'
-            }
-            title={specArtifact ? undefined : 'The specification appears once a run finishes.'}
-          >
-            <DownloadIcon />
-            <span>Download spec</span>
+          <Button variant="secondary" size="sm" onClick={onOpenSettings} aria-label="Open configuration">
+            <span aria-hidden="true">&#9881;</span>
+            <span>Configuration</span>
           </Button>
         </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+        <Button
+          variant="primary"
+          onClick={onDownloadSpec}
+          disabled={!pdfArtifact}
+          aria-label={
+            pdfArtifact
+              ? 'Download the functional specification PDF for the selected session'
+              : 'Download specification PDF: none available yet'
+          }
+          title={pdfArtifact ? undefined : 'The PDF appears once a run finishes.'}
+        >
+          <DownloadIcon />
+          <span>Download Functional Spec PDF</span>
+        </Button>
+        {webSpecUrl && webArtifact ? (
+          <a
+            href={webSpecUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+          >
+            View web version
+          </a>
+        ) : (
+          <span aria-disabled="true" title="The web version appears once a run finishes." className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+            View web version
+          </span>
+        )}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <span role="status" aria-live="polite" className="flex items-center gap-2">

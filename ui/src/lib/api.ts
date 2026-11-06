@@ -2,6 +2,7 @@ import { API_BASE_URL, WS_BASE_URL } from './config';
 import type {
   Artifact,
   ClientAnswerEvent,
+  ConfigResponse,
   HealthResponse,
   ServerEvent,
   SessionSummary,
@@ -35,6 +36,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<HealthResponse>('/api/health'),
+  config: () => request<ConfigResponse>('/api/config'),
+  saveConfig: (values: Record<string, string | boolean | number>) =>
+    request<ConfigResponse>('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    }),
 
   async listSessions(): Promise<SessionSummary[]> {
     const body = await request<{ sessions: SessionSummary[] }>('/api/sessions');
@@ -78,6 +86,11 @@ export const api = {
 /** Download URL for an artifact (contract path /api/files/SESSION_ID/NAME). */
 export function artifactUrl(sessionId: string, artifact: Artifact): string {
   return `${API_BASE_URL}/api/files/${encodeURIComponent(sessionId)}/${encodeURIComponent(artifact.name)}`;
+}
+
+/** Inline-view URL (renders in the browser instead of downloading). */
+export function viewUrl(sessionId: string, artifact: Artifact): string {
+  return `${API_BASE_URL}/api/view/${encodeURIComponent(sessionId)}/${encodeURIComponent(artifact.name)}`;
 }
 
 /**

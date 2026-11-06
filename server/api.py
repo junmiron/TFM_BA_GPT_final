@@ -10,6 +10,7 @@ Run:
 
 import asyncio
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +29,7 @@ suppress_third_party_deprecations()
 
 from lib import agents_tools_helpers, continuation, experience_indexer, transcript_loader
 from lib.pipeline import PROJECT_ROOT, STAGES, create_workflow, run_workflow
+from src.model_loader import PROFILES, PROFILE_ALIASES
 
 CONV_ROOT = Path(PROJECT_ROOT) / "conversation"
 UI_DIST = Path(PROJECT_ROOT) / "ui" / "dist"
@@ -205,6 +207,128 @@ def health() -> dict:
         },
         "ui_build": UI_DIST.is_dir(),
     }
+
+# --------------------------------------------------------------------------
+# Configuration API (Feature 8): the settings page reads and writes the
+# whitelisted environment variables, persisted back to the project .env.
+# --------------------------------------------------------------------------
+
+CONFIG_BOOLS = {"SIMULATE_HUMAN", "UI_SHOW_ARTIFACTS", "UI_SHOW_INTERNAL_MESSAGES", "FEEDBACK_ENABLED"}
+CONFIG_INTS = {"MAX_MESSAGES": (1, 1000), "MAX_CHECKER_ROUNDS": (0, 20), "FEEDBACK_TIMEOUT_S": (30, 3600)}
+CONFIG_LANES = {"MODEL_CLIENT", "MODEL_CLIENT_TOOLS", "HUMAN_MODEL"}
+CONFIG_KEYS = sorted({key for _, key in PROFILES.values() if key})
+_PROFILE_RE = re.compile(r"^([A-Z0-9_]+)_(MODEL|BASE_URL|HOST)$")
+
+
+def _valid_profile(name: str) -> str | None:
+    normalized = PROFILE_ALIASES.get(name.strip().lower(), name.strip().lower())
+    return normalized if normalized in PROFILES else None
+
+
+def _env_value(name: str, value):
+    """Validate one whitelisted config value; return its string form or raise."""
+    if name in CONFIG_LANES:
+        profile = _valid_profile(str(value))
+        if profile is None:
+            raise HTTPException(status_code=400, detail=f"unknown model profile '{value}'")
+        return profile
+    if name in CONFIG_BOOLS:
+        if not isinstance(value, bool):
+            raise HTTPException(status_code=400, detail=f"{name} must be a boolean")
+        return "true" if value else "false"
+    if name in CONFIG_INTS:
+        lo, hi = CONFIG_INTS[name]
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail=f"{name} must be an integer")
+        if not lo <= number <= hi:
+            raise HTTPException(status_code=400, detail=f"{name} must be between {lo} and {hi}")
+        return str(number)
+    if name in CONFIG_KEYS:
+        text = str(value).strip()
+        if not text or "\n" in text:
+            raise HTTPException(status_code=400, detail=f"{name} must be a non-empty single-line value")
+        return text
+    match = _PROFILE_RE.match(name)
+    if match and match.group(1).lower() in PROFILES:
+        text = str(value).strip()
+        if "\n" in text:
+            raise HTTPException(status_code=400, detail=f"{name} must be a single-line value")
+        # An empty override deliberately restores the model declared in YAML.
+        return text
+    raise HTTPException(status_code=400, detail=f"'{name}' cannot be configured from the UI")
+
+
+def _write_env(updates: Dict[str, str]) -> None:
+    """Rewrite only the whitelisted lines of the project .env, keep the rest."""
+    path = Path(PROJECT_ROOT) / ".env"
+    crlf = False
+    if path.exists():
+        raw = path.read_text(encoding="utf-8")
+        crlf = "\r\n" in raw
+        lines = raw.splitlines()
+    else:
+        lines = []
+    remaining = dict(updates)
+    out = []
+    for line in lines:
+        name = line.split("=", 1)[0].strip()
+        if name in remaining:
+            out.append(f"{name}={remaining.pop(name)}")
+        else:
+            out.append(line)
+    for name, value in remaining.items():
+        out.append(f"{name}={value}")
+    path.write_text(("\r\n" if crlf else "\n").join(out) + "\n", encoding="utf-8")
+
+
+@app.get("/api/config")
+def get_config():
+    profiles = []
+    for name, (_yaml, key_env) in PROFILES.items():
+        upper = name.upper()
+        profiles.append({
+            "name": name,
+            "needs_key": bool(key_env),
+            "key_present": bool(os.getenv(key_env)) if key_env else None,
+            "model_override": os.getenv(f"{upper}_MODEL"),
+            "base_url_override": os.getenv(f"{upper}_BASE_URL") or os.getenv(f"{upper}_HOST"),
+        })
+    return {
+        "lanes": {
+            "model_client": os.getenv("MODEL_CLIENT", "openai"),
+            "model_client_tools": os.getenv("MODEL_CLIENT_TOOLS", os.getenv("MODEL_CLIENT", "openai")),
+            "human_model": os.getenv("HUMAN_MODEL", "openai"),
+        },
+        "simulate_human": _flag("SIMULATE_HUMAN", "true"),
+        "ui": {
+            "show_artifacts": _flag("UI_SHOW_ARTIFACTS", "true"),
+            "show_internal": _flag("UI_SHOW_INTERNAL_MESSAGES", "true"),
+        },
+        "limits": {
+            "max_messages": int(os.getenv("MAX_MESSAGES", "300")),
+            "max_checker_rounds": int(os.getenv("MAX_CHECKER_ROUNDS", "3")),
+            "feedback_enabled": _flag("FEEDBACK_ENABLED", "true"),
+            "feedback_timeout_s": int(os.getenv("FEEDBACK_TIMEOUT_S", "300")),
+        },
+        "keys": [{"env": env, "present": bool(os.getenv(env))} for env in CONFIG_KEYS],
+        "profiles": profiles,
+    }
+
+
+@app.put("/api/config")
+def put_config(payload: Dict[str, Any]):
+    if not isinstance(payload, dict) or not payload:
+        raise HTTPException(status_code=400, detail="empty configuration payload")
+    updates = {}
+    for name, value in payload.items():
+        updates[name.upper()] = _env_value(name.upper(), value)
+    for name, value in updates.items():
+        os.environ[name] = value
+    _write_env(updates)
+    return get_config()
+
 
 
 @app.get("/api/sessions")
@@ -495,16 +619,38 @@ async def session_feedback(session_id: str, payload: dict) -> dict:
     return {"session_id": safe_id, "result": result}
 
 
-@app.get("/api/files/{session_id}/{name}")
-def get_file(session_id: str, name: str):
-    # Session id and name come from the client: reject anything that could walk
-    # out of conversation/<SESSION_ID>/.
+def _safe_session_file(session_id: str, name: str) -> Path:
+    """Resolve a client-supplied session/file to a path inside conversation/.
+
+    Session id and name come from the client: reject anything that could walk
+    out of conversation/<SESSION_ID>/."""
     safe_id = "".join(c for c in session_id if c.isalnum() or c in "-_")
     safe_name = Path(name).name
-    path = CONV_ROOT / safe_id / safe_name
+    return CONV_ROOT / safe_id / safe_name
+
+
+@app.get("/api/files/{session_id}/{name}")
+def get_file(session_id: str, name: str):
+    path = _safe_session_file(session_id, name)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="file not found")
-    return FileResponse(path, filename=safe_name)
+    return FileResponse(path, filename=Path(path).name)
+
+
+INLINE_MEDIA = {".html": "text/html", ".md": "text/markdown", ".svg": "image/svg+xml", ".png": "image/png"}
+
+
+@app.get("/api/view/{session_id}/{name}")
+def view_file(session_id: str, name: str):
+    """Serve a deliverable inline (new-tab friendly) instead of as an attachment.
+    Only browser-renderable formats; the PDF keeps the download path."""
+    path = _safe_session_file(session_id, name)
+    media = INLINE_MEDIA.get(Path(name).suffix.lower())
+    if media is None:
+        raise HTTPException(status_code=400, detail="inline viewing is only supported for html, md, svg and png")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="file not found")
+    return FileResponse(path, media_type=media)
 
 
 @app.websocket("/ws/sessions/{session_id}")

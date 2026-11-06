@@ -63,6 +63,28 @@ export interface ServerErrorEvent {
   type: 'error';
   content: string;
 }
+export interface ConfigProfile {
+  name: string;
+  needs_key: boolean;
+  key_present: boolean | null;
+  model_override: string | null;
+  base_url_override: string | null;
+}
+
+export interface ConfigResponse {
+  lanes: { model_client: string; model_client_tools: string; human_model: string };
+  simulate_human: boolean;
+  ui: { show_artifacts: boolean; show_internal: boolean };
+  limits: {
+    max_messages: number;
+    max_checker_rounds: number;
+    feedback_enabled: boolean;
+    feedback_timeout_s: number;
+  };
+  keys: { env: string; present: boolean }[];
+  profiles: ConfigProfile[];
+}
+
 export interface ServerFeedbackRequestEvent {
   type: 'feedback_request';
   question: string;

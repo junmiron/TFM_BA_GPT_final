@@ -4,8 +4,23 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
-
 ### Added
+- Interview answer box is always visible: active when a question is pending,
+  greyed and disabled otherwise (Feature 5).
+- Header action row centered above the transcript: "Download Functional Spec
+  PDF" (targets the PDF, greyed out until it exists) and "View web version"
+  opening `functional_specification.html` inline in a new tab (Features 6-7).
+- New `/api/view/{session}/{name}` inline-serving endpoint (html/md/svg/png;
+  PDFs stay download-only).
+- Removed the dead `save_experience_chroma`/`recall_experience_chroma` MCP tools and
+  their `sentence_transformers` embedding code from the deliverable server; finalize
+  no longer indexes every session (only user-approved runs reach the RAG now,
+  via `lib/experience_indexer.py`).
+- Configuration page (gear icon): model lanes, model IDs/base-URL overrides,
+  API keys (masked, never echoed), AI-human simulation toggle, UI visibility
+  flags and run limits, saved through a whitelisted `/api/config` GET/PUT that
+  rewrites only whitelisted lines of `.env` (Feature 8).
+
 - **Reinforcement learning from approved sessions** (`lib/experience_indexer.py`):
   after a run completes the user is asked whether they are happy with the
   deliverables. "Yes" indexes them into a dedicated `approved_experiences`

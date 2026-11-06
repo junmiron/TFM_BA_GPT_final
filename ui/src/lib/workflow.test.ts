@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveStageStates, stageIndexForSource } from './workflow';
-import { findSpecArtifact, sortArtifacts } from './artifacts';
+import { findHtmlArtifact, findPdfArtifact, sortArtifacts } from './artifacts';
 
 describe('workflow stage derivation', () => {
   it('maps agent sources to stages', () => {
@@ -42,10 +42,11 @@ describe('artifact ordering', () => {
     ]);
   });
 
-  it('prefers the markdown spec for the header download', () => {
-    expect(findSpecArtifact([mk('functional_specification.html'), mk('functional_specification.pdf')])?.name)
+  it('the header download targets the PDF deliverable', () => {
+    expect(findPdfArtifact([mk('functional_specification.html'), mk('functional_specification.pdf')])?.name)
       .toBe('functional_specification.pdf');
-    expect(findSpecArtifact([mk('functional_specification.md')])?.name).toBe('functional_specification.md');
-    expect(findSpecArtifact([])).toBeUndefined();
+    expect(findPdfArtifact([mk('functional_specification.md')])).toBeUndefined();
+    expect(findPdfArtifact([])).toBeUndefined();
+    expect(findHtmlArtifact([mk('functional_specification.html')])?.name).toBe('functional_specification.html');
   });
 });

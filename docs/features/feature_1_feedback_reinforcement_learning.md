@@ -36,7 +36,7 @@ When a run completes, ask the user whether they are happy with the deliverables.
   (`memory=rag_memories` at lines 368, 391, 426, 452, 531, 586).
 - `save_experience_chroma` (`mcp_servers/Final_deliverable_MCP_server/PDF_format_mcp_server.py:1791`)
   is invoked by the terminate agent's step list and indexes the whole session into a
-  DIFFERENT collection, `tfm_ba_gpt_experiences`. Nothing queries that collection
+  DIFFERENT collection, `tfm_ba_gpt_experiences` - that legacy tool and its collection were removed (2026-11-06) because nothing queried it
   during a run, and it is the tool that timed out (180 s) in the parked issue.
 - `server/api.py:284-311` is the end-of-run hook: after `run_workflow` returns
   `stop_reason`, the session is marked `done` and an `artifacts` event is emitted.

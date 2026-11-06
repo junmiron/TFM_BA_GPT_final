@@ -210,4 +210,4 @@ def test_pdf_server_defers_the_ml_imports_until_a_tool_needs_them():
     assert not offenders, f"heavy imports still at module scope: {offenders}"
 
     module = _load_module(SERVERS["pdf"], "pdf_mcp_lazy")
-    assert callable(module._make_chroma_memory)
+    assert "def save_experience_chroma(" not in src, "dead experience tool still present"

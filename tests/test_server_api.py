@@ -220,6 +220,30 @@ def test_unknown_session_and_traversal_are_rejected(fake_run):
     assert c.get("/api/files/..%2F..%2Fetc/passwd").status_code == 404
     assert c.get("/api/files/sess-safe/..%2Fsecret.txt").status_code == 404
 
+def test_view_endpoint_serves_deliverables_inline(fake_run):
+    c = client()
+    sid = c.post("/api/sessions", json={"task": "test"}).json()["session_id"]
+    _await_finished(c, sid)
+    folder = fake_run / sid
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "functional_specification.html").write_text(
+        "<html><body>inline spec</body></html>", encoding="utf-8"
+    )
+    r = c.get(f"/api/view/{sid}/functional_specification.html")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    # Inline rendering is the whole point: no attachment disposition.
+    assert "attachment" not in r.headers.get("content-disposition", "")
+    assert b"inline spec" in r.content
+
+    missing = c.get(f"/api/view/{sid}/nope.html")
+    assert missing.status_code == 404
+
+    # PDFs stay download-only; traversal is neutralised (stripped name -> 404).
+    assert c.get(f"/api/view/{sid}/functional_specification.pdf").status_code == 400
+    assert c.get(f"/api/view/{sid}/..%2Fsecret.html").status_code == 404
+
+
 def test_session_titles_are_headings_not_raw_markdown():
     from server.api import _title_of
 

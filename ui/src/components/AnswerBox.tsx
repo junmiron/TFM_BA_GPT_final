@@ -3,26 +3,33 @@ import { Button } from './ui/Button';
 import { SendIcon } from './ui/icons';
 
 export interface AnswerBoxProps {
-  question: string;
+  /** The pending interviewer question, or null when nothing awaits an answer. */
+  question: string | null;
+  /** Shown instead of the question when there is none. */
+  caption: string;
   connected: boolean;
   onSend: (answer: string) => boolean;
 }
 
-/** Inline answer box shown when the interviewer has asked a QUESTION. */
-export function AnswerBox({ question, connected, onSend }: AnswerBoxProps) {
+/**
+ * Interview answer box. Always on screen (never appears/disappears):
+ * active when a question is pending, greyed out and disabled otherwise.
+ */
+export function AnswerBox({ question, caption, connected, onSend }: AnswerBoxProps) {
   const [answer, setAnswer] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const id = useId().replace(/:/g, '-');
-  const canSend = answer.trim().length > 0 && connected;
+  const canSend = Boolean(question) && answer.trim().length > 0 && connected;
 
   useEffect(() => {
-    ref.current?.focus({ preventScroll: false });
+    // Focus only when a real question arrives; the idle box must not steal focus.
+    if (question) ref.current?.focus({ preventScroll: false });
   }, [question]);
 
   const submit = () => {
     const text = answer.trim();
-    if (!text) return;
+    if (!text || !question) return;
     if (!connected) {
       setSendError('Not connected to the run. Your answer was not sent; it will be available once the connection returns.');
       return;
@@ -41,6 +48,21 @@ export function AnswerBox({ question, connected, onSend }: AnswerBoxProps) {
       submit();
     }
   };
+
+  if (!question) {
+    return (
+      <section aria-live="polite" className="rounded-lg border border-dashed border-border bg-card/60 p-4">
+        <p className="text-sm text-muted-foreground">{caption}</p>
+        <textarea
+          aria-disabled="true"
+          disabled
+          rows={3}
+          className="mt-2 w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground"
+          placeholder="No pending question"
+        />
+      </section>
+    );
+  }
 
   return (
     <section

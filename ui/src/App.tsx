@@ -5,12 +5,13 @@ import { AnswerBox } from './components/AnswerBox';
 import { RunPanel } from './components/RunPanel';
 import { ContinueBox } from './components/ContinueBox';
 import { Header } from './components/Header';
+import { SettingsPage } from './components/SettingsPage';
 import { useHealth } from './hooks/useHealth';
 import { useSessions } from './hooks/useSessions';
 import { useSessionSocket } from './hooks/useSessionSocket';
-import { api, downloadArtifact, postFeedback } from './lib/api';
+import { api, downloadArtifact, postFeedback, viewUrl } from './lib/api';
 import { errorMessage, formatLanes, sessionTitle } from './lib/format';
-import { findSpecArtifact } from './lib/artifacts';
+import { findHtmlArtifact, findPdfArtifact } from './lib/artifacts';
 import { shouldFollowLatest } from './lib/scroll';
 import { isActiveRun, reducer, initialState, EMPTY_THREAD, awaitingQuestion, stageStates, PENDING_PREFIX, isTerminalRun, type RunStatus, type Thread } from './state/runState';
 
@@ -103,18 +104,21 @@ export default function App() {
 
   const selectSession = useCallback((id: string) => dispatch({ type: 'session/select', id }), []);
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const runActive = isActiveRun(thread.run);
   const question = useMemo(() => awaitingQuestion(thread), [thread]);
   const stages = useMemo(() => stageStates(thread), [thread]);
-  const specArtifact = thread.artifacts ? findSpecArtifact(thread.artifacts) : undefined;
+  const pdfArtifact = thread.artifacts ? findPdfArtifact(thread.artifacts) : undefined;
+  const webArtifact = thread.artifacts ? findHtmlArtifact(thread.artifacts) : undefined;
   const connected = thread.conn === 'open';
 
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const downloadSpec = useCallback(() => {
-    if (!activeId || !specArtifact) return;
+    if (!activeId || !pdfArtifact) return;
     setDownloadError(null);
-    downloadArtifact(activeId, specArtifact).catch((error: unknown) => setDownloadError(errorMessage(error)));
-  }, [activeId, specArtifact]);
+    downloadArtifact(activeId, pdfArtifact).catch((error: unknown) => setDownloadError(errorMessage(error)));
+  }, [activeId, pdfArtifact]);
 
   // Copilot-style: the composer is pinned at the bottom of the chat column,
   // so the transcript scrolls up to keep the latest turn in view. We only
@@ -154,13 +158,29 @@ export default function App() {
         lanes={lanes}
         healthOk={healthOk}
         healthError={state.healthError}
-        specArtifact={specArtifact}
+        pdfArtifact={pdfArtifact}
+        webArtifact={webArtifact}
+        webSpecUrl={activeId && webArtifact ? viewUrl(activeId, webArtifact) : null}
         onDownloadSpec={downloadSpec}
         downloadError={downloadError}
         canStop={runActive}
         onStop={stop}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
+      {settingsOpen ? (
+        <SettingsPage
+          onClose={() => setSettingsOpen(false)}
+          onSaved={async () => {
+            try {
+              const health = await api.health();
+              dispatch({ type: 'health/loaded', health });
+            } catch {
+              /* health refresh is best-effort; useHealth retries on its own */
+            }
+          }}
+        />
+      ) : (
       <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-[18rem_minmax(0,1fr)_18rem] lg:gap-6">
         <SessionRail
           sessions={state.sessions}
@@ -202,11 +222,18 @@ export default function App() {
             </div>
           </section>
 
-          {question && (
-            <div className="sticky bottom-0 shrink-0">
-              <AnswerBox question={question} connected={connected} onSend={send} />
-            </div>
-          )}
+          <div className="sticky bottom-0 shrink-0">
+            <AnswerBox
+              question={question}
+              caption={runActive
+                ? 'No question right now - the interviewer is working. The box lights up when a question arrives.'
+                : activeId && !activeId.startsWith(PENDING_PREFIX)
+                  ? 'No pending question. Add information to continue this session, or start a new session.'
+                  : 'Start or select a session to begin the interview.'}
+              connected={connected}
+              onSend={send}
+            />
+          </div>
 
           {!runActive && activeId && !activeId.startsWith(PENDING_PREFIX) && thread.artifacts && thread.artifacts.length > 0 && (
             <div className="px-4 pb-4">
@@ -235,6 +262,7 @@ export default function App() {
           showArtifacts={state.health?.ui?.show_artifacts !== false}
         />
       </div>
+      )}
     </div>
   );
 }

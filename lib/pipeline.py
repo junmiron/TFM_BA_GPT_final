@@ -743,13 +743,7 @@ async def create_workflow(ask_user: Callable, notify: Callable, session_id: Opti
 
       5 Confirm <SESSION_DIR>/functional_specification.pdf and <SESSION_DIR>/functional_specification.html exist.
 
-      6 Save experience metadata:
-          save_experience_chroma(
-            session_dir="<SESSION_DIR>",
-            session_id="<SESSION_ID>"
-          )
-
-      7 Output exactly: **TERMINATE**
+      6 Output exactly: **TERMINATE**
 
     **RULES**
       Be explicit about each steps success or failure.
