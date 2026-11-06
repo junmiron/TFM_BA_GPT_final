@@ -154,7 +154,7 @@ rm -rf chromadb_storage index_state.json   # Windows: rmdir /s /q chromadb_stora
 chainlit run app2.py -w                    # re-indexes data/ and the configured URLs on start
 ```
 
-Since v1.0.1, `app.py`/`app2.py` also validate the store at startup (one warm-up
+Since v1.0.1, `app2.py` also validates the store at startup (one warm-up
 query) and continue without RAG memory instead of dying mid-conversation if it is
 unopenable — you will see a `⚠️  RAG vector memory unavailable ...` line in the console.
 

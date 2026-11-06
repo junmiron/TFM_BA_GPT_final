@@ -228,7 +228,7 @@ async def run_pipeline():
     client = ScriptedModelClient()
 
     canvas_memory = TextCanvasMemory()
-    # app.py exposes the canvas tool under the module name 'canvas'.
+    # Build a canvas shim compatible with the pipeline's tool wiring.
     canvas = types.SimpleNamespace(update_file_tool=canvas_memory.get_update_file_tool())
     sys.modules["canvas"] = canvas
 

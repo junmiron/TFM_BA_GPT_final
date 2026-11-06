@@ -140,8 +140,7 @@ stakeholder interview on the `HUMAN_MODEL` lane instead of typing answers.
   answer box, workflow progress, artifact downloads).
 
 Both call `lib/pipeline.py`, which builds the AutoGen team, wires MCP tools and
-runs the termination sequence. `app.py` is the older variant that loads the team
-from `lib/agents_config.yaml`.
+runs the termination sequence.
 
 ## Tests
 

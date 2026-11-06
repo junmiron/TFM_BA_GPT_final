@@ -39,7 +39,7 @@ planning_agent ─► interviewer_agent ─► summarizer_agent ─► functiona
 | `mermaid_code_reviewer_agent` | reviews Mermaid syntax and clarity | `canvas.update_file_tool`, `write_mermaid_to_file_tool` | canvas |
 | `terminate_agent` | runs the export pipeline and ends the run | `move_file_tool`, `ensure_dir_tool`, Mermaid MCP, PDF MCP | - |
 
-Definitions live in `lib/agents_config.yaml` (`app.py`) or inline in `app2.py`.
+Definitions live in `lib/agents_config.yaml` and `lib/pipeline.py`; `app2.py` wires them into the interview and termination sequence.
 
 ## Hand-off protocol
 
