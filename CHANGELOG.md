@@ -73,6 +73,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Header web link now reads "Open Functional Spec in browser".
+- SECURITY.md now documents the local API surface (localhost binding, CORS
+  allowlist, key-presence-only config endpoints, 10 MB upload cap) instead of
+  claiming there is no server.
+- `.gitignore` lost stale entries for the removed `frontend/` app and docs
+  archives.
 
 ## [1.2.0] - 2026-11-05
 

@@ -1,7 +1,20 @@
 # Security Policy
 
 BA-GPT runs locally and talks directly to your model provider. It has no
-server, no database of user data, and no telemetry.
+hosted service, no database of user data, and no telemetry. The only network
+surface is the local FastAPI server (`server/api.py`) and the Chainlit app.
+
+## The local API's boundaries
+
+- `uvicorn server.api:app` binds to `127.0.0.1` unless you pass `--host`
+  explicitly. Do not expose it to a network: the config endpoints have no
+  authentication.
+- CORS is restricted to the Vite dev origins (`localhost:5173`).
+- `/api/config` reports whether a key is set, never its value, and only
+  writes whitelisted variable names to `.env`.
+- Transcript uploads are capped at 10 MB; the inline artifact view serves
+  only html/md/svg/png from inside the session folder (path traversal
+  returns 404).
 
 ## What is never stored
 

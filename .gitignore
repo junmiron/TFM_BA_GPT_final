@@ -37,11 +37,8 @@ index_state.json
 *.log
 # pinned portable typst/pandoc binaries fetched by scripts/install_render_tools.py
 mcp_servers/Final_deliverable_MCP_server/vendor/
-docs/Screencasts
-docs/data.7z
 
 # large binaries / media kept locally but not in the repo
-docs/papers/
 *.sqlite3
 *.7z
 *.mp4
@@ -52,9 +49,6 @@ docs/papers/
 # web UI
 ui/node_modules
 ui/dist
-# frontend build artifacts
-frontend/talk-wiz-chat/node_modules
-frontend/talk-wiz-chat/dist
 *.lockb
 
 # editor / OS noise
