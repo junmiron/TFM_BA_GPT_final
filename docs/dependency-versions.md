@@ -107,9 +107,9 @@ instead if older browsers become a supported target. Sources:
 The upgrade is only "done" when all of these are green:
 
 1. `pytest tests` — full suite, zero warnings.
-2. `python test/e2e_real_pipeline.py` — real model lanes + MCP servers + PDF.
-3. `python test/test_terminate_pipeline.py` — terminate agent path.
-4. `python test/roleplay_e2e.py` — full interview-to-deliverable run.
+2. `python e2e/e2e_real_pipeline.py` — real model lanes + MCP servers + PDF.
+3. `python e2e/test_terminate_pipeline.py` — terminate agent path.
+4. `python e2e/roleplay_e2e.py` — full interview-to-deliverable run.
 5. `python scripts/smoke_check.py` — lane keys, mmdc, engines.
 6. Live lane probe: `strata`, `opencode`, `groq` each return a completion.
 7. RAG probe: persisted ChromaDB collection queries after the chromadb bump.

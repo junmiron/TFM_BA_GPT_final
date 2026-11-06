@@ -41,14 +41,14 @@ python -m pytest tests/test_server_api.py -q
 
 # 3. a full run through the same API the UI calls (needs SIMULATE_HUMAN=true)
 SIMULATE_HUMAN=true python -m uvicorn server.api:app --port 8000
-python test/ui_backend_e2e.py          # prints RESULT: PASS/FAIL
+python e2e/ui_backend_e2e.py          # prints RESULT: PASS/FAIL
 
 # 4. the rendered page in a real browser
 #    open http://127.0.0.1:8000 - start an interview, watch the stage rail,
 #    Stop mid-run, then check the download links under the transcript
 ```
 
-`test/ui_backend_e2e.py` mirrors the UI exactly (POST a task, follow the event
+`e2e/ui_backend_e2e.py` mirrors the UI exactly (POST a task, follow the event
 stream, verify the four deliverables exist and that the PDF has images,
 bookmarks and no raw Mermaid text). Point it at any port with `UI_E2E_BASE`.
 

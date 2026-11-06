@@ -13,9 +13,9 @@ CHECKED = [
     "lib/agents_tools_helpers.py",
     "scripts/smoke_check.py",
     "mcp_servers/Final_deliverable_MCP_server/PDF_format_mcp_server.py",
-    "test/e2e_real_pipeline.py",
-    "test/roleplay_e2e.py",
-    "test/test_terminate_pipeline.py",
+    "e2e/e2e_real_pipeline.py",
+    "e2e/roleplay_e2e.py",
+    "e2e/test_terminate_pipeline.py",
     "tests/test_pdf_export.py",
     "tests/test_finalize_deliverables.py",
 ]

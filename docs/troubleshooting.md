@@ -189,7 +189,7 @@ user proxy and nothing after it.
 Cause (fixed in v1.0.1): Chainlit's `AskUserMessage.send()` returns a StepDict
 whose text is under `"output"`, but `app2.py`'s user-proxy input loop only read
 `"content"` — a key that does not exist — so every valid answer looked empty and
-was re-asked. The fix reads `"content"`/`"output"`/`"text"` (same as `app.py`).
+was re-asked. The fix reads `"content"`/`"output"`/`"text"`.
 
 Note: while a run is in progress, answers must go into the question box shown
 in the chat; text typed into the main input bar at the bottom does not reach the
