@@ -854,8 +854,8 @@ def render(markdown_path: Path, pdf_path: Path, title: Optional[str] = None) -> 
         return {"status": "unavailable", "engine": "typst",
                 "message": "typst and/or pandoc not found; falling back to PyMuPDF"}
 
-    md_path = Path(markdown_path)
-    out_path = Path(pdf_path)
+    md_path = Path(markdown_path).resolve()
+    out_path = Path(pdf_path).resolve()
     session_dir = md_path.parent
     try:
         md_text = md_path.read_text(encoding="utf-8", errors="ignore")
