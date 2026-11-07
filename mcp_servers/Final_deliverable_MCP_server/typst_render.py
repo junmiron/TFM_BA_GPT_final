@@ -163,7 +163,8 @@ _TEMPLATE = r"""#set document(title: "__TITLE__")
   v(5cm)
   text("BUSINESS ANALYSIS", size: 12pt, weight: "semibold", fill: accent)
   v(0.7cm)
-  text(doc-title, size: 30pt, weight: "bold")
+  set text(hyphenate: false)
+  text(doc-title, size: 25pt, weight: "bold")
   v(0.4cm)
   text(doc-subtitle, size: 17pt, fill: sub)
   v(1cm)
@@ -324,7 +325,7 @@ def _style_table_block(block: List[str]) -> List[str]:
     word boundaries instead of splitting "Confirmed" into "Con-firmed"."""
     columns_index = None
     for index, line in enumerate(block):
-        match = re.match(r"\s*columns:\s*\((.*)\),?\s*$", line)
+        match = re.match(r"\s*columns:\s*(\((.*)\)|(\d+)),?\s*$", line)
         if match:
             columns_index = index
             break
@@ -332,8 +333,11 @@ def _style_table_block(block: List[str]) -> List[str]:
     if columns_index is None or header_index is None:
         return block
 
-    columns = [c.strip() for c in re.split(r",", block[columns_index].split(":", 1)[1]) if c.strip()]
-    ncols = len(columns)
+    cols_part = block[columns_index].split(":", 1)[1].strip().rstrip(",")
+    if cols_part.startswith("("):
+        ncols = len([c for c in re.split(r",", cols_part[1:-1]) if c.strip()])
+    else:
+        ncols = int(cols_part)
     if ncols < 2:
         return block
 
@@ -342,11 +346,19 @@ def _style_table_block(block: List[str]) -> List[str]:
         return block
     widths = _column_widths(rows)
 
+    hline_index = next((i for i, line in enumerate(block) if "table.hline(" in line), None)
+    header_end = hline_index - 1 if hline_index is not None and hline_index > header_index else header_index
+    # pandoc wraps long header cells over several lines; join the whole header
+    # span so every [cell] gets wrapped in white text, not just the first line.
+    header_text = " ".join(block[header_index:header_end + 1]).strip()
+    header_text = re.sub(r"\[([^\[\]]*)\]", r"text([\1], fill: white)", header_text)
+
     styled = ["#{", "  set text(hyphenate: false)", "  table(", "  " + _TABLE_FILL]
     for index, line in enumerate(block[1:]):
         if index + 1 == header_index:
-            wrapped = re.sub(r"\[([^\[\]]*)\]", r"text([\1], fill: white)", line)
-            styled.append(wrapped)
+            styled.append("  " + header_text)
+        elif header_index < index + 1 <= header_end:
+            continue  # header continuation lines were merged above
         elif index + 1 == columns_index:
             styled.append("  columns: (" + ", ".join(f"{w}%" for w in widths) + "),")
         else:

@@ -17,6 +17,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Table header rows are now always dark-on-white: pandoc tables emitted with
+  an integer column count (`columns: 5,`) or with header cells wrapped over
+  several lines skipped the styling pass, leaving black header text on the
+  dark header fill (solid blocks instead of white text). Both shapes are now
+  normalized, with proportional widths computed from content.
+- Cover title renders at 25pt with hyphenation off, so "Functional
+  Specification Document" fits the page width on one line instead of being
+  hyphen-split across two rows.
 - PDF deliverable regression: pandoc's parser swallowed everything between two
   standalone `---` rules into one headerless single-column table (mangled
   tables, 114-page renders), and YAML-metadata parsing failures made the Typst

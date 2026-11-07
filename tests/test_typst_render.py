@@ -287,6 +287,31 @@ def test_table_figures_are_unwrapped_and_styled():
     assert "[FR-02.30]" in fixed
 
 
+def test_wrapped_and_integer_columns_tables_get_white_headers():
+    """pandoc emits `columns: 5,` (integer) and wraps long header cells over
+    lines; both used to leave header text black on the dark header fill
+    (solid blocks instead of white text)."""
+    mod = _load("typst_render_headers", TYPST_RENDER)
+    integer_cols = (
+        "#table(\n"
+        "    columns: 5,\n"
+        "    align: (auto,auto,auto,auto,auto,),\n"
+        "    table.header([Role], [Name], [Approver / Reviewer], [Date], [Version\n"
+        "      Approved],),\n"
+        "    table.hline(),\n"
+        "    [Head of UAT], [QA Lead], [Approver], [TBD], [1.0],\n"
+        ")\n"
+    )
+    fixed = mod.fix_table_columns(integer_cols)
+    widths = [int(w) for w in re.findall(r"(\d+)%", fixed)]
+    assert len(widths) == 5 and sum(widths) == 100
+    collapsed = re.sub(r"\s+", " ", fixed)
+    assert "text([Version Approved], fill: white)" in collapsed
+    assert "table.header([Role]" not in fixed  # every header cell wrapped
+    for cell in ("[Role]", "[Name]", "[Approver / Reviewer]", "[Date]"):
+        assert "text(%s, fill: white)" % cell in collapsed
+
+
 @pytest.mark.skipif(not _load("typst_render", TYPST_RENDER).engines_available(),
                     reason="typst/pandoc not installed (run scripts/install_render_tools.py)")
 def test_typst_render_produces_cover_toc_and_linked_body(tmp_path):
