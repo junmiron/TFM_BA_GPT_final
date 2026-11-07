@@ -1533,7 +1533,7 @@ def export_to_pdf(session_dir: Path, md_file: str, pdf_out: str, engine: str = "
 
     cmd = [
         "pandoc", str(prepped_path), "-o", str(pdf_path),
-        "--from", "markdown+link_attributes+bracketed_spans+implicit_figures+raw_tex",
+        "--from", "markdown+link_attributes+bracketed_spans+implicit_figures+raw_tex-yaml_metadata_block",
         "--pdf-engine", engine,
         "--resource-path", str(session_dir),
         "-V", f"geometry:margin={margin}",

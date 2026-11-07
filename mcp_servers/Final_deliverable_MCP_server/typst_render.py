@@ -77,6 +77,13 @@ _META_PATTERNS = (
 
 _MERMAID_FENCE_RE = re.compile(r"```mermaid.*?```", re.S)
 
+# Pandoc reads a standalone `---` line as the separator of a headerless simple
+# table: everything up to the next `---` gets swallowed into one narrow column,
+# shredding headings, quotes and real tables into plain cells. `***` is an
+# unambiguous horizontal rule for pandoc and renders as the same Typst
+# #divider(), so section separators are rewritten before conversion.
+_HR_RE = re.compile(r"^\s*-{3,}\s*$")
+
 # A4 page minus the template margins: content box is 469 x 706 pt.
 _CONTENT_WIDTH_PT = 469.0
 _CONTENT_HEIGHT_PT = 706.0
@@ -282,6 +289,24 @@ def extract_metadata(md_text: str, fallback_title: str = "") -> Dict[str, str]:
         heading = re.search(r"^#\s+(.*)$", md_text, re.M)
         meta["title"] = heading.group(1).strip() if heading else "Functional Specification"
     return meta
+
+
+def normalize_horizontal_rules(md_text: str) -> str:
+    """Rewrite standalone `---` section separators as `***` before pandoc sees
+    them, so pandoc's table parser cannot mistake them for table separators.
+
+    A `---` line only becomes an HR when it stands alone; a setext heading
+    underline sits directly under heading text, and `|---|` table separators
+    contain pipes. Only the standalone case is rewritten.
+    """
+    lines = md_text.split("\n")
+    out: List[str] = []
+    for index, line in enumerate(lines):
+        if _HR_RE.match(line) and (index == 0 or not lines[index - 1].strip()):
+            out.append("***")
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def strip_mermaid_fences(md_text: str) -> str:
@@ -551,8 +576,8 @@ def _markdown_to_typst(md_text: str, session_dir: Path, pandoc_bin: str) -> str:
     body_md = session_dir / "__tfm_body.md"
     body_md.write_text(md_text, encoding="utf-8")
     proc = subprocess.run(
-        [pandoc_bin, str(body_md), "-f", "markdown+link_attributes", "-t", "typst",
-         "-o", "__tfm_body.typ"],
+        [pandoc_bin, str(body_md), "-f", "markdown+link_attributes-yaml_metadata_block",
+         "-t", "typst", "-o", "__tfm_body.typ"],
         capture_output=True, text=True, cwd=str(session_dir),
         stdin=subprocess.DEVNULL, timeout=120,
     )
@@ -616,7 +641,10 @@ def render(markdown_path: Path, pdf_path: Path, title: Optional[str] = None) -> 
         return {"status": "error", "engine": "typst", "message": f"Markdown read failed: {exc}"}
 
     meta = extract_metadata(md_text, title or "")
-    body_md = _fit_diagram_images(_split_markdown_tables(strip_mermaid_fences(md_text)), session_dir)
+    body_md = _fit_diagram_images(
+        _split_markdown_tables(normalize_horizontal_rules(strip_mermaid_fences(md_text))),
+        session_dir,
+    )
 
     fonts_ready = any(FONT_DIR.glob("*.ttf")) or any(FONT_DIR.glob("*.otf"))
     font = "Inter" if fonts_ready else "Libertinus Serif"

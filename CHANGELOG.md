@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+### Fixed
+
+- PDF deliverable regression: pandoc's parser swallowed everything between two
+  standalone `---` rules into one headerless single-column table (mangled
+  tables, 114-page renders), and YAML-metadata parsing failures made the Typst
+  engine fall back to the plain PyMuPDF renderer (unlinked bullet Contents).
+  Standalone section rules are now rewritten as `***` before conversion, the
+  YAML-metadata extension is disabled for the spec Markdown, and the Typst
+  output is QA'd for linked Contents entries and intact tables.
+
 ## [1.3.0] - 2026-11-06
 ### Removed
 

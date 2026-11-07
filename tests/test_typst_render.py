@@ -133,6 +133,77 @@ def test_markdown_tables_are_chunked_to_page_size():
             assert line.count("|") == 6
 
 
+def test_standalone_hr_lines_are_normalized_for_pandoc():
+    """pandoc reads a standalone `---` following a pipe table as the separator
+    of a headerless simple table and swallows everything up to the next `---`
+    into a single column - headings, quotes and real tables alike. Standalone
+    rules must become `***`; table separators and setext underlines stay
+    untouched."""
+    mod = _load("typst_render_hr", TYPST_RENDER)
+    md = (
+        "| System | Type |\n|---|---|\n| iOS | Native |\n\n\n---\n"
+        "# 3. Functional Requirements\n\nHeading text\n---\n"
+    )
+    fixed = mod.normalize_horizontal_rules(md)
+    assert fixed.count("***") == 1          # the lone section rule only
+    assert "|---|---|" in fixed            # pipe-table separator untouched
+    assert "Heading text\n---" in fixed    # setext underline untouched
+
+
+HR_SPEC = """# WashLoop — Functional Requirements Specification
+
+**Project Name:** WashLoop
+**Version:** 1.0
+
+## 2.3 Systems & Platforms
+
+| System | Type | Notes |
+|---|---|---|
+| iOS app | Native | App Store distribution |
+| Existing POS | External system | Pricing sync |
+
+---
+# 3. Functional Requirements
+
+> **Priority scheme:** MoSCoW.
+
+## 3.1 Ordering
+
+| ID | Requirement | Priority |
+|---|---|---|
+| FR-01 | The system shall accept orders. | Must |
+| FR-02 | The system shall confirm pickup windows. | Should |
+
+---
+# 4. Non-Functional Requirements
+
+| ID | Requirement |
+|---|---|
+| NFR-01 | Response time under 2 s |
+"""
+
+
+@pytest.mark.skipif(not _load("typst_render_hr2", TYPST_RENDER).engines_available(),
+                    reason="typst/pandoc not installed (run scripts/install_render_tools.py)")
+def test_hr_separated_sections_stay_headings_not_table_cells(tmp_path):
+    """Regression: pandoc folded everything between two `---` rules into one
+    headerless 1-column table, shredding the sections and ballooning the page
+    count. Headings must stay headings and the rules must stay dividers."""
+    mod = _load("typst_render_hr3", TYPST_RENDER)
+    session = tmp_path / "sess-hr"
+    session.mkdir()
+    (session / "spec.md").write_text(HR_SPEC, encoding="utf-8")
+    result = mod.render(session / "spec.md", session / "spec.pdf")
+    assert result["status"] == "ok", result.get("message")
+    assert result["pages"] <= 8
+    body = mod._markdown_to_typst(
+        mod.normalize_horizontal_rules(HR_SPEC), session, mod.find_binary("pandoc")
+    )
+    assert "\\# 3. Functional" not in body
+    assert re.search(r"(?m)^= 3\. Functional Requirements", body)
+    assert "#divider()" in body
+
+
 def test_priority_is_not_wider_than_status_and_source():
     """The FR tables' Priority column only ever holds Must/Should. Content
     max-lengths once made it wider than Status/Source, leaving big whitespace
