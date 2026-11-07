@@ -99,10 +99,11 @@ _ROW_PAD_PT = 12.0
 
 # Diagram images are atomic figures too: a tall Mermaid PNG is clipped at the
 # page bottom. Bands keep each figure under the content box minus room for its
-# caption; consecutive bands overlap slightly so a node label never sits
-# exactly on the cut line.
+# caption. A fixed-height cut slices node boxes in half, so every internal
+# cut is snapped to the quietest row (blank, or only connector-line pixels)
+# inside a search window above it; bands then tile the image with no overlap.
 _DIAGRAM_CAP_ALLOW_PT = 40.0
-_DIAGRAM_OVERLAP_PT = 30.0
+_DIAGRAM_GAP_SEARCH_PT = 100.0
 
 # Typst styling injected into every table pandoc emits: dark header row with
 # white text plus light zebra stripes. Verified against typst 0.15 (the fill
@@ -471,13 +472,35 @@ def _split_markdown_tables(md_text: str) -> str:
     return "\n".join(out)
 
 
+def _row_ink_profile(path: Path) -> List[int]:
+    """Dark-pixel count per image row. Band cuts snap to the quietest row so
+    they land on whitespace or a thin connector line instead of slicing a
+    node box in half."""
+    try:
+        from PIL import Image
+        with Image.open(path) as img:
+            gray = img.convert("L")
+            try:
+                import numpy as np
+                return list((np.asarray(gray) < 200).sum(axis=1))
+            except ImportError:
+                width = gray.size[0]
+                return [sum(1 for px in gray.crop((0, r, width, r + 1)).getdata()
+                            if isinstance(px, (int, float)) and px < 200)
+                        for r in range(gray.size[1])]
+    except Exception:
+        return []
+
+
 def _fit_diagram_images(md_text: str, session_dir: Path) -> str:
     """Split diagram PNGs taller than one page into page-sized bands.
 
     Typst never splits a #figure across pages, so a tall process diagram is
-    clipped. Each band is cropped at full width with a small vertical overlap
-    and emitted as its own captioned figure, "(part k of N)". Images that
-    already fit a page are left untouched.
+    clipped. Each band is cropped at full width, with every internal cut
+    snapped to the quietest row in a search window (whitespace or a lone
+    connector line) so node boxes are never sliced in half, and emitted as
+    its own captioned figure, "(part k of N)". Images that already fit a
+    page are left untouched.
     """
     image_re = re.compile(r"!\[([^\]]*)\]\(([^)\s]+\.png)\)(?:\{\s*width=(\d+)%\s*\})?")
 
@@ -508,18 +531,25 @@ def _fit_diagram_images(md_text: str, session_dir: Path) -> str:
 
         px_per_pt = width / rendered_width_pt
         band_px = int(max_band_pt * px_per_pt)
-        overlap_px = int(_DIAGRAM_OVERLAP_PT * px_per_pt)
+        ink_rows = _row_ink_profile(path)
         bands = []
         y = 0
         while y < height:
             end = min(height, y + band_px)
+            if end < height and ink_rows:
+                # Snap the cut up to _DIAGRAM_GAP_SEARCH_PT higher, to the
+                # row with the fewest dark pixels (tie: keep it as low as
+                # possible so bands stay near full height).
+                window = int(_DIAGRAM_GAP_SEARCH_PT * px_per_pt)
+                lo = max(y + 1, end - window)
+                end = min(range(lo, end + 1), key=lambda r: (ink_rows[r], -r))
             band_path = session_dir / f"{path.stem}_band{len(bands) + 1}{path.suffix}"
             with Image.open(path) as img:
                 img.crop((0, y, width, end)).save(band_path)
             bands.append(band_path.name)
             if end == height:
                 break
-            y = end - overlap_px
+            y = end
 
         total = len(bands)
         return "\n\n".join(
@@ -576,7 +606,7 @@ def _markdown_to_typst(md_text: str, session_dir: Path, pandoc_bin: str) -> str:
     body_md = session_dir / "__tfm_body.md"
     body_md.write_text(md_text, encoding="utf-8")
     proc = subprocess.run(
-        [pandoc_bin, str(body_md), "-f", "markdown+link_attributes-yaml_metadata_block",
+        [pandoc_bin, str(body_md.resolve()), "-f", "markdown+link_attributes-yaml_metadata_block",
          "-t", "typst", "-o", "__tfm_body.typ"],
         capture_output=True, text=True, cwd=str(session_dir),
         stdin=subprocess.DEVNULL, timeout=120,

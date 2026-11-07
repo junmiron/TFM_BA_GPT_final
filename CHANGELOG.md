@@ -13,6 +13,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Standalone section rules are now rewritten as `***` before conversion, the
   YAML-metadata extension is disabled for the spec Markdown, and the Typst
   output is QA'd for linked Contents entries and intact tables.
+- Diagram banding now snaps every band cut to the quietest row (whitespace or
+  a lone connector line) near the page limit instead of cutting at a fixed
+  height through node boxes; bands tile the diagram exactly with no overlap.
+  `_markdown_to_typst` resolves the body path to an absolute path so pandoc
+  finds it even when the caller passes a relative session path.
 
 ## [1.3.0] - 2026-11-06
 ### Removed

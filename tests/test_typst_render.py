@@ -385,6 +385,45 @@ def test_tall_diagram_is_split_into_page_sized_bands(tmp_path):
     assert sum(heights) >= 2096
 
 
+def test_band_cuts_snap_to_blank_rows(tmp_path):
+    """A fixed-height band cut landing mid-node slices the box in half and
+    the diagram reads as broken. Cuts must snap to the quietest row within
+    the search window (a blank row or a lone connector line) so node boxes
+    stay intact and the bands tile the image exactly."""
+    mod = _load("typst_render_snap", TYPST_RENDER)
+    session = tmp_path / "sess-snap"
+    session.mkdir()
+    from PIL import Image, ImageDraw
+    width, height = 500, 2000
+    img = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(img)
+    # boxes at k*700..k*700+499 (filled), gaps of 200 with a 1px connector
+    for k in range(3):
+        draw.rectangle((0, k * 700, width - 1, k * 700 + 499), fill="black")
+        draw.line((250, k * 700 + 499, 250, (k + 1) * 700), fill="black")
+    png = session / "process_diagram.png"
+    img.save(png)
+
+    md = "![Diagram](process_diagram.png){ width=95% }"
+    fixed = mod._fit_diagram_images(md, session)
+    band_names = re.findall(r"\((process_diagram_band\d+\.png)\)", fixed)
+    assert len(band_names) >= 3, "diagram should split into several bands"
+
+    profile = mod._row_ink_profile(png)
+    boundary = 0
+    for name in band_names[:-1]:
+        with Image.open(session / name) as band:
+            boundary += band.size[1]
+        assert profile[boundary] <= 1, (
+            f"band cut at row {boundary} slices a node "
+            f"({profile[boundary]} dark pixels on the cut row)")
+    total = 0
+    for name in band_names:
+        with Image.open(session / name) as band:
+            total += band.size[1]
+    assert total == height, "bands must tile the image with no lost rows"
+
+
 def test_diagram_that_fits_one_page_is_left_alone(tmp_path):
     mod = _load("typst_render_unit2", TYPST_RENDER)
     session = tmp_path / "sess-fit"
