@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+
+- Graph-aware splitting of tall Mermaid process diagrams (`diagram_split.py`):
+  each stage subgraph becomes a numbered figure ("Process flow — Stage 3 (part
+  4 of 12)"), tall stages are re-cut on topological rank bands, and edges that
+  cross parts become paired `Ref X` out/in flag nodes with a connector index
+  table. Fragments render as SVG with native (`htmlLabels: false`) labels, so
+  Typst keeps every node label as selectable PDF text; fragment renders are
+  cached per session via a digest manifest. Diagrams that cannot be split
+  (no stage subgraphs) still fall back to quiet-row banding.
+
 ### Fixed
 
 - PDF deliverable regression: pandoc's parser swallowed everything between two

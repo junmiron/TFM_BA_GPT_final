@@ -22,6 +22,8 @@ bundled so the PDF looks identical on Windows and Linux CI.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import os
 import re
@@ -492,6 +494,189 @@ def _row_ink_profile(path: Path) -> List[int]:
         return []
 
 
+_DIAGRAM_SPLIT_MIN_SCALE = 0.50
+_DIAGRAM_MAX_PARTS = 24
+_VECTOR_MERMAID_CONFIG = {"htmlLabels": False,
+                         "flowchart": {"rankSpacing": 20, "nodeSpacing": 12}}
+
+
+def _mmdc_ci_flags() -> List[str]:
+    """mmdc needs --no-sandbox puppeteer config on GitHub runners."""
+    if os.environ.get("CI"):
+        cfg = Path(__file__).resolve().parent.parent / "Mermaid-MCP" / "puppeteer-ci.json"
+        if cfg.exists():
+            return ["-p", str(cfg)]
+    return []
+
+
+def _svg_native_size(svg_text: str) -> Optional[tuple]:
+    """Native (width, height) of an mmdc SVG from its outer viewBox."""
+    match = re.search(r'<svg[^>]*viewBox="([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+)"', svg_text)
+    if not match:
+        return None
+    width, height = float(match.group(3)), float(match.group(4))
+    return (width, height) if width > 0 and height > 0 else None
+
+
+def _render_fragment_svg(mmd_text: str, out_path: Path) -> Optional[tuple]:
+    """Render one Mermaid fragment to SVG with native text labels.
+
+    htmlLabels:false makes mmdc emit <text> elements instead of
+    foreignObject HTML, which Typst keeps as real selectable PDF text.
+    Returns the native (width, height), or None when mmdc is unavailable
+    or the fragment fails to parse.
+    """
+    exe = shutil.which("mmdc") or shutil.which("mmdc.cmd")
+    if not exe:
+        return None
+    with tempfile.NamedTemporaryFile("w", suffix=".mmd", delete=False,
+                                     encoding="utf-8") as handle:
+        handle.write(mmd_text)
+        source = Path(handle.name)
+    config = Path(str(source) + ".cfg.json")
+    config.write_text(json.dumps(_VECTOR_MERMAID_CONFIG), encoding="utf-8")
+    try:
+        subprocess.run([exe, "-i", str(source), "-o", str(out_path),
+                        "-c", str(config)] + _mmdc_ci_flags(),
+                       check=True, timeout=120, capture_output=True,
+                       stdin=subprocess.DEVNULL)
+    except Exception:
+        return None
+    finally:
+        try:
+            source.unlink()
+            config.unlink()
+        except OSError:
+            pass
+    try:
+        size = _svg_native_size(out_path.read_text(encoding="utf-8", errors="replace"))
+    except OSError:
+        size = None
+    return size if size and "<svg" in out_path.read_text(encoding="utf-8", errors="replace") else None
+
+
+def _graph_split_diagram(png_path: Path, session_dir: Path, caption: str) -> Optional[str]:
+    """Replace one too-tall diagram with graph-split fragments, one figure per page.
+
+    The fragment sources come from the `{stem}.clean.mmd` written by the
+    Mermaid render step. Every fragment is measured with mmdc; if any piece
+    cannot be shrunk to a page without making labels unreadable, this returns
+    None and the caller falls back to quiet-row banding.
+    """
+    source_path = session_dir / f"{png_path.stem}.clean.mmd"
+    if not source_path.is_file():
+        return None
+    try:
+        from diagram_split import split_for_render
+    except ImportError:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            from diagram_split import split_for_render
+        except ImportError:
+            return None
+
+    max_band_pt = _CONTENT_HEIGHT_PT - _DIAGRAM_CAP_ALLOW_PT
+
+    # Reuse the previous render's fragment SVGs when the fragment sources are
+    # unchanged, so re-exporting a spec does not re-run mmdc 20+ times.
+    source_text = source_path.read_text(encoding="utf-8")
+    source_hash = hashlib.sha1(source_text.encode("utf-8")).hexdigest()
+    manifest_path = session_dir / f"{png_path.stem}_parts.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        manifest = {}
+    cache_on = manifest.get("source") == source_hash
+
+    def _rendered_height(width: float, height: float) -> float:
+        # A fragment is emitted at scale s = min(1, content_w/w, max_band/h);
+        # it is acceptable when s >= min_scale, i.e. when both
+        # height <= max_band/min_scale and width <= content_w/min_scale.
+        # Expressed as one "height" number the splitter compares against
+        # max_height_pt (= max_band/min_scale):
+        return max(height, width * max_band_pt / _CONTENT_WIDTH_PT)
+
+    def fragment_svg(mmd_text: str) -> Optional[tuple]:
+        """Render (or reuse) one fragment SVG, keyed by its source digest."""
+        digest = hashlib.sha1(mmd_text.encode("utf-8")).hexdigest()[:16]
+        svg_path = session_dir / f"{png_path.stem}_part_{digest}.svg"
+        entry = manifest.get("parts", {}).get(digest) if cache_on else None
+        if entry and svg_path.is_file():
+            return (entry[0], entry[1])
+        return _render_fragment_svg(mmd_text, svg_path)
+
+    def measure(mmd_text: str) -> float:
+        size = fragment_svg(mmd_text)
+        return _rendered_height(*size) if size else 1e9
+
+    try:
+        result = split_for_render(source_text, measure, max_band_pt,
+                                  min_scale=_DIAGRAM_SPLIT_MIN_SCALE,
+                                  max_parts=_DIAGRAM_MAX_PARTS)
+    except Exception:
+        return None
+    if not result or len(result) < 2 or len(result) > _DIAGRAM_MAX_PARTS:
+        return None
+
+    # Drop fragment SVGs from earlier, different splits.
+    keep = {f"{png_path.stem}_part_{hashlib.sha1(f.encode('utf-8')).hexdigest()[:16]}.svg"
+            for f in result.fragments}
+    for stale in session_dir.glob(f"{png_path.stem}_part_*.svg"):
+        if stale.name not in keep:
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+    for stale in session_dir.glob(f"{png_path.stem}_split_probe*"):
+        try:
+            stale.unlink()
+        except OSError:
+            pass
+    for stale in session_dir.glob(f"{png_path.stem}_band*{png_path.suffix}"):
+        try:
+            stale.unlink()
+        except OSError:
+            pass
+
+    total = len(result)
+    figures = []
+    new_parts: Dict[str, list] = {}
+    for index, fragment in enumerate(result.fragments, 1):
+        size = fragment_svg(fragment)
+        if size is None:
+            return None  # a fragment failed to render: keep the banded PNG
+        digest = hashlib.sha1(fragment.encode("utf-8")).hexdigest()[:16]
+        new_parts[digest] = list(size)
+        width, height = size
+        scale = min(1.0, _CONTENT_WIDTH_PT / width, max_band_pt / height)
+        if scale < _DIAGRAM_SPLIT_MIN_SCALE:
+            return None  # would need an unreadably small scale
+        width_pct = max(1, int(width * scale / _CONTENT_WIDTH_PT * 100))
+        title = result.titles[index - 1] if index - 1 < len(result.titles) else ""
+        label = f"{caption} — {title} (part {index} of {total})" if title \
+            else f"{caption} (part {index} of {total})"
+        svg_name = f"{png_path.stem}_part_{digest}.svg"
+        figures.append(f"![{label}]({svg_name}){{ width={width_pct}% }}")
+
+    try:
+        manifest_path.write_text(json.dumps({"source": source_hash, "parts": new_parts}),
+                                 encoding="utf-8")
+    except OSError:
+        pass
+
+    refs = result.refs or []
+    lines = figures
+    if refs:
+        lines.append("**Cross-part connectors** — each flagged node continues the flow "
+                     "on the part listed:")
+        rows = ["| Ref | Continues | Appears as |", "|---|---|---|"]
+        for letter, from_part, to_part in refs:
+            rows.append(f"| {letter} | part {from_part} | part {to_part} |")
+        lines.append("\n".join(rows))
+    return "\n\n".join(lines)
+
+
 def _fit_diagram_images(md_text: str, session_dir: Path) -> str:
     """Split diagram PNGs taller than one page into page-sized bands.
 
@@ -520,6 +705,13 @@ def _fit_diagram_images(md_text: str, session_dir: Path) -> str:
         max_band_pt = _CONTENT_HEIGHT_PT - _DIAGRAM_CAP_ALLOW_PT
         if height * rendered_width_pt / width <= max_band_pt:
             return match.group(0)
+
+        # Prefer a graph-aware split: stage subgraphs become numbered parts with
+        # off-page connector flags, so no node box is ever sliced. Banding stays
+        # as the fallback for sequence/state diagrams and unparseable sources.
+        split = _graph_split_diagram(path, session_dir, caption)
+        if split:
+            return split
 
         # stale bands from a previous render would otherwise linger in the
         # session folder and show up in the artifacts list
