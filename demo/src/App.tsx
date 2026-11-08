@@ -9,6 +9,7 @@ import { DemoHeader } from './components/DemoHeader';
 import { StartHero } from './components/StartHero';
 import { PlaybackBar } from './components/PlaybackBar';
 import { ArtifactViewer } from './components/ArtifactViewer';
+import { DialogBox } from './components/DialogBox';
 import { clampSpeed, firstNotDue, loadReplay, totalSpan, type ReplayData } from './replay';
 
 /**
@@ -120,6 +121,8 @@ export default function App() {
                 <Transcript turns={thread.turns} hasSession busy={busy} historical={false} showInternal={showInternal} />
               </div>
             </section>
+
+            <DialogBox turns={thread.turns} />
 
             {finished && thread.artifacts && thread.artifacts.length > 0 && <ArtifactViewer artifacts={thread.artifacts} />}
 

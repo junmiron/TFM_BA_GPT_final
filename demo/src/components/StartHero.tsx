@@ -23,6 +23,11 @@ export function StartHero({ meta, onStart, loading, error }: StartHeroProps) {
             Everything is the real UI - you can pause, change the speed and switch the internal
             agent messages on and off while it runs.
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Deliverables: <strong>HTML</strong> is the recommended way to read the spec &middot;
+            <strong>PDF</strong> is for signed or printed copies &middot;
+            <strong>Markdown</strong> is the best base for AI coding agents.
+          </p>
 
           <div className="mt-4 rounded-md border border-border bg-secondary/60 p-4">
             <p className="text-xs font-semibold text-muted-foreground">Fixed goal of this session</p>
