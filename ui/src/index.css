@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Explicitly scan this directory so builds that import this CSS from another
+ * project (e.g. demo/) pick up classes used by the shared components. */
+@source "../src";
 
 @theme inline {
   --color-background: hsl(var(--background));
