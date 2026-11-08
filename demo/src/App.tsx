@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState, useReducer } from 'react';
 import { Transcript } from '../../ui/src/components/Transcript';
 import { RunPanel } from '../../ui/src/components/RunPanel';
 import { EMPTY_THREAD, initialState, isTerminalRun, reducer, stageStates } from '../../ui/src/state/runState';
-import { shouldFollowLatest } from '../../ui/src/lib/scroll';
 import { formatLanes } from '../../ui/src/lib/format';
 import type { ServerEvent } from '../../ui/src/lib/types';
 import { DemoHeader } from './components/DemoHeader';
@@ -38,6 +37,11 @@ export default function App() {
   const lastWallRef = useRef(0);
   const [clockDisplay, setClockDisplay] = useState(0);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  // Follow-the-latest flag for the replay. The product's 160px proximity rule
+  // works in realtime, but at 16x a whole batch of turns lands in one tick and
+  // the gap from the bottom blows past the threshold instantly - so the demo
+  // remembers whether the reader was at the bottom BEFORE the batch arrived.
+  const followRef = useRef(true);
 
   useEffect(() => {
     loadReplay()
@@ -98,12 +102,23 @@ export default function App() {
   const totalMs = data ? totalSpan(data.offsets) : 0;
   const lanes = data?.meta.lanes ? formatLanes(data.meta.lanes) : [];
 
-  // Same auto-scroll rule as the product: follow the latest turn unless the
-  // reader has scrolled up to read history.
+  // Same intent as the product's rule, tuned for the replay: any manual scroll
+  // away from the bottom disarms following; returning near the bottom re-arms it.
+  useEffect(() => {
+    if (!started) return undefined;
+    const el = transcriptRef.current;
+    if (!el) return undefined;
+    const onScroll = () => {
+      followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+    };
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [started]);
+
   useEffect(() => {
     const el = transcriptRef.current;
     if (!el) return;
-    if (shouldFollowLatest(el.scrollHeight, el.scrollTop, el.clientHeight, false)) {
+    if (followRef.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, [thread.turns]);
