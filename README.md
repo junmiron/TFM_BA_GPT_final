@@ -268,7 +268,7 @@ After one session, `conversation/<SESSION_ID>/` contains:
 |---|---|
 | `interview.jsonl` | every Q&A turn, timestamped |
 | `source_transcript.txt` | the uploaded meeting transcript, if any |
-| `functional_specification.md` | 9-section FSD: scope, FRs, NFRs, roles, assumptions, use cases, glossary. Carries the rendered diagram and its Mermaid source |
+| `functional_specification.md` | 9-section FSD: Title Page, Introduction, Scope, Functional Requirements, Non-Functional Requirements, User Roles & Personas, Assumptions & Constraints, Use Cases, Glossary. Carries the rendered diagram and its Mermaid source |
 | `functional_specification.formatted.md` | FSD with requirements tables and page breaks |
 | `functional_specification.pdf` | Typst-typeset PDF: cover page, linked Contents with leaders, running header/footer, repeating table headers, bundled Inter fonts, tall diagrams split into page-sized bands |
 | `functional_specification.html` | Self-contained HTML with the diagram inlined as vector SVG (PNG data-URI fallback) |
