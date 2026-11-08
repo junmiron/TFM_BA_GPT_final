@@ -1,0 +1,257 @@
+%% Functional Specification Diagram - WashLoop v1 (reviewed & corrected by mermaid_code_reviewer_agent)
+%% Sources: Section 16.2 canonical 12-status model, Section 16.1 pickup collection model, Section 16.3 payment rule,
+%% Section 16.5 capacity rules, Section 17 RBAC matrix, Section 18 revised process flow, Sections 11 & 21 integrations and KPIs.
+%% Review fixes applied: (1) Collected status only after confirmed pickup, (2) stale-price branch no longer claims "live" pricing,
+%% (3) Estimate Confirmed status added, (4) legend status numbering corrected, (5) rework/delay escalation routed to manager review,
+%% (6) notification-failure branch added, (7) collection precedes payment capture.
+
+---
+
+## 1. End-to-End WashLoop v1 Process Flow (flowchart TD)
+
+Canonical status path, the revised-total approval hold branch, POS stale-price flagging, the ready notification with
+shop collection hours, notification-failure handling, payment capture, and the KPI reporting tail.
+
+```mermaid
+flowchart TD
+    A["Customer books order - status: Booked"] --> B["POS API syncs pricing and availability - target every 15 minutes"]
+    B --> C{"Is POS pricing current?"}
+    C -- "Yes" --> D["Live estimate shown in app - no charge at booking"]
+    C -- "No" --> E["Stale Pricing Used flag - visible warning plus last-synced timestamp - manager approval required"]
+    E --> D
+    D --> F["Front desk confirms or adjusts pickup window - status: Collection Confirmed"]
+    F --> G{"Capacity and same-day cut-off met - 10 pickups per hour, 2 p.m. cut-off?"}
+    G -- "No" --> H["Offer next available window or next day"]
+    H --> F
+    G -- "Yes" --> I["Twilio sends booking and window confirmation - within 5 minutes"]
+    I --> J["Shop staff attempt pickup at customer address"]
+    J --> K{"Pickup completed inside confirmed window?"}
+    K -- "No" --> L["Late Collection flag / no-show exception - reschedule offered"]
+    L --> F
+    L --> M["Cancelled - closure reason logged"]
+    K -- "Yes" --> N1["Status: Collected"]
+    N1 --> N2["Staff record items, weights, services, exceptions - status: Checked In"]
+    N2 --> O["Staff calculate final total from POS pricing"]
+    O --> P{"Does the revised total differ from the estimate?"}
+    P -- "No" --> Q["Estimate Confirmed - no revision required"]
+    Q --> RA["Price Approved - processing authorised"]
+    P -- "Yes" --> R["Revised total sent in app with reason - status: Revised Total Awaiting Approval - On Hold flag"]
+    R --> S{"Customer approves revised total in the app?"}
+    S -- "Yes" --> RA
+    S -- "No or no response" --> T["Order ON HOLD - customer contacts shop - manager may rescope, adjust or cancel - Approval Pending audit entry"]
+    T --> R
+    T --> M
+    RA --> U["Technician processes wash, fold, dry clean, iron - status: Processing"]
+    U --> V{"Rework required?"}
+    V -- "Yes" --> U
+    V -- "No" --> W["Staff mark order Ready"]
+    W --> X["Twilio ready notification - collect at shop Mon-Sat, 8 a.m. to 6 p.m."]
+    X --> NF{"Twilio delivery failed?"}
+    NF -- "Yes" --> G2["Email fallback - delivery failure logged - staff follow-up"]
+    G2 --> Y
+    NF -- "No" --> Y{"Collected within ready-but-uncollected threshold of 48 hours?"}
+    Y -- "No" --> Z["Uncollected report - reminder notification and staff follow-up"]
+    Z --> Y
+    Y -- "Yes" --> AD["Customer collects at shop - staff mark Collected by Customer - receipt issued"]
+    AD --> AA["Payment captured - Stripe card, Apple Pay or Google Pay"]
+    AA --> AB{"Payment successful?"}
+    AB -- "No" --> AC["Payment Failed flag - retry or alternate method - manager exception required to close unpaid"]
+    AC --> AA
+    AB -- "Yes" --> AE["Manager closes order - status: Closed - audit trail recorded"]
+    AE --> AF["Reporting - completed orders, on-time readiness at least 90 percent, rework under 3 percent, payment and notification failures"]
+    M --> AF
+```
+
+---
+
+## 2. Swimlane View - Who Does What (RBAC-aligned lanes)
+
+```mermaid
+flowchart TD
+    subgraph CUST["Customer - shared iOS/Android app"]
+        C1["Book pickup - service mix and same-day or next-day window"]
+        C2["View estimate - live or stale-flagged"]
+        C3["Approve or reject revised total in app"]
+        C4["Collect finished laundry at shop - Mon-Sat 8 a.m. to 6 p.m."]
+    end
+
+    subgraph FD["Front desk - web admin portal"]
+        F1["Confirm or adjust collection window"]
+        F2["Pick up laundry and record check-in, weights, exceptions"]
+        F3["Calculate and submit revised total"]
+        F5["Log no-show or reschedule missed pickup"]
+        F4["Mark Ready and mark Collected by Customer"]
+    end
+
+    subgraph TECH["Processing technician"]
+        T1["Process approved order - wash, fold, dry clean, iron"]
+        T2["Flag rework or delay"]
+    end
+
+    subgraph MGR["Manager / admin"]
+        M1["Edit or override price - approve corrections and stale-price use"]
+        M2["Configure hours, capacity, cut-off, sync and notification rules"]
+        M3["Review rework, delays and uncollected orders - close orders - audit trail and KPI dashboards"]
+    end
+
+    subgraph EXT["External integrations"]
+        P1["POS API - source of truth for pricing and availability"]
+        N1["Twilio - SMS and email, failure logging and fallback"]
+        S1["Stripe - card, Apple Pay, Google Pay, PCI compliant"]
+    end
+
+    C1 --> F1
+    P1 --> C2
+    F1 --> F2
+    F2 --> F5
+    F5 --> F1
+    F2 --> F3
+    P1 --> F3
+    F3 -. "POS stale - manager approval before pricing" .-> M1
+    F3 -- "total unchanged" --> T1
+    F3 -- "total changed" --> C3
+    N1 --> C3
+    C3 -- "approved" --> T1
+    C3 -- "not approved - order on hold" --> M1
+    T1 --> F4
+    T2 --> M3
+    F4 --> C4
+    N1 --> C4
+    C4 --> S1
+    S1 --> M3
+    M2 --> F1
+    M2 --> N1
+```
+
+---
+
+## 3. Canonical Order Status Lifecycle (stateDiagram-v2)
+
+Twelve canonical statuses. "Delayed", "No-show", "Paid" and "Awaiting Approval" are flags, not statuses.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Booked
+    Booked --> CollectionConfirmed: front desk or manager confirms pickup window
+    Booked --> Cancelled: customer or staff cancels
+
+    CollectionConfirmed --> Collected: shop staff pick up laundry
+    CollectionConfirmed --> Cancelled: no-show closed with reason and Late Collection flag
+
+    Collected --> CheckedIn: items, weights, services, exceptions recorded
+    CheckedIn --> EstimateConfirmed: total unchanged - no approval step required
+    CheckedIn --> RevisedTotalAwaitingApproval: total changed - On Hold flag
+
+    EstimateConfirmed --> PriceApproved: processing authorised
+    RevisedTotalAwaitingApproval --> PriceApproved: customer approves in app
+    RevisedTotalAwaitingApproval --> Cancelled: not approved - manager cancels with audit trail
+
+    PriceApproved --> Processing: technician authorised to start
+    Processing --> Ready: staff mark ready - ready notification sent Mon-Sat 8 a.m. to 6 p.m.
+    Ready --> Ready: not collected within 48 hours - Late Collection flag and reminder
+    Ready --> CollectedByCustomer: customer collects at shop
+    Ready --> Closed: manager exception closure - Payment Failed flag
+    CollectedByCustomer --> Closed: payment captured - order archived
+
+    Closed --> [*]
+    Cancelled --> [*]
+
+    note right of RevisedTotalAwaitingApproval: Processing blocked until explicit in-app approval
+    note right of CheckedIn: Stale Pricing Used flag when POS sync fails or data exceeds the staleness threshold
+    note right of Processing: Rework Required flag feeds the under-3 percent error/rework KPI
+```
+
+---
+
+## 4. Notification, Pricing and Payment Timing (sequenceDiagram)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Cust as Customer app
+    participant App as WashLoop app and API
+    participant POS as POS API
+    participant Twi as Twilio SMS and email
+    participant Str as Stripe
+    participant FD as Front desk
+    participant Tech as Processing technician
+
+    Cust->>App: Register and book pickup with service mix
+    App->>POS: Sync prices and availability - target every 15 minutes
+    POS-->>App: Catalog plus last-synced timestamp
+    App-->>Cust: Estimate shown - no charge taken
+    App->>Twi: Booking confirmation - delivered within 5 minutes
+    FD->>App: Confirm or adjust pickup window
+    App->>Twi: Window confirmation to customer
+
+    FD->>App: Attempt pickup at customer address
+    FD->>App: Record pickup inside window - status Collected
+    FD->>App: Check in items, weights and exceptions
+    App->>POS: Fetch pricing for final total
+    alt POS unreachable or data older than staleness threshold
+        App-->>FD: Stale price warning - manager approval required before use
+        App->>POS: Retry sync
+    end
+
+    alt Revised total differs from estimate
+        App->>Twi: Revised total approval request
+        App-->>Cust: Approve revised total in app
+        Cust->>App: Approve
+        App-->>Tech: Processing unlocked - Price Approved
+    else Total unchanged
+        App-->>Tech: Processing allowed - Estimate Confirmed then Price Approved
+    end
+
+    Tech->>App: Update processing status, flag rework or delay
+    Tech->>App: Mark Ready
+    App->>Twi: Ready notification with collection hours Mon-Sat, 8 a.m. to 6 p.m.
+    alt Primary channel fails
+        App->>Twi: Email fallback
+        App-->>FD: Delivery failure logged - manual follow-up required
+    end
+
+    Cust->>FD: Collect laundry at shop
+    FD->>App: Mark Collected by Customer
+    FD->>Str: Capture payment for the approved total
+    Str-->>App: Paid or failed state recorded
+    alt Payment failed
+        App-->>Cust: Retry or choose Apple Pay or Google Pay
+        App-->>FD: Payment Failed flag surfaced for reconciliation
+    end
+    FD->>App: Manager closes order
+    App->>App: Audit trail and KPI counters updated
+```
+
+---
+
+## 5. Legend - Canonical Statuses, Flags and Targets
+
+| Canonical status (1-12) | Meaning in the diagram |
+|---|---|
+| 1. Booked | Order created, estimate shown, no charge taken |
+| 2. Collection Confirmed | Pickup window confirmed or adjusted by front desk/manager |
+| 3. Collected | Shop staff physically picked up the laundry |
+| 4. Checked In | Items, weights, services and exceptions recorded |
+| 5. Estimate Confirmed | Total unchanged after check-in - no approval step needed |
+| 6. Revised Total Awaiting Approval | Total changed - order On Hold, processing blocked |
+| 7. Price Approved | Customer approval recorded (or unchanged estimate) |
+| 8. Processing | Wash, fold, dry clean, iron in progress |
+| 9. Ready | Completed and awaiting customer collection |
+| 10. Collected by Customer | Customer picked up the order at the shop |
+| 11. Closed | Order archived after payment or manager exception |
+| 12. Cancelled | Cancelled by customer, no-show closure, or unapproved revision |
+
+| Flag (never a status) | Trigger |
+|---|---|
+| Stale Pricing Used | POS sync failure or data beyond the staleness threshold - manager approval required |
+| On Hold / Approval Pending | Revised total awaiting explicit customer approval |
+| Rework Required | Technician rework - feeds the under-3% error/rework KPI |
+| Late Collection | Pickup outside confirmed window, or ready order past the 48-hour threshold |
+| Payment Failed | Stripe decline or abandoned payment - manager exception to close unpaid |
+
+| Integration rule | Value |
+|---|---|
+| POS sync cadence | Every 15 minutes (near real-time) |
+| Notification delivery | Within 5 minutes of a status change, with failure logging and email fallback |
+| Capacity | 10 pickups per hour, 2 p.m. same-day cut-off (configurable) |
+| KPI targets | On-time readiness >= 90%, error/rework < 3% |

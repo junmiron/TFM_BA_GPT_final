@@ -87,7 +87,7 @@ def main() -> int:
         else:
             missing.append(src_name)
 
-    sizes = sum((out / c).stat().size for c in copied)
+    sizes = sum((out / c).stat().st_size for c in copied)
     readme = f"""# Sample session: WashLoop laundry service shop app
 
 A real end-to-end BA-GPT run, committed so you can see the output without

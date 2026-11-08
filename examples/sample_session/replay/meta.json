@@ -1,0 +1,293 @@
+{
+  "session_id": "sess-demo-washloop",
+  "task": "I want to launch \"WashLoop\", a laundry service shop app. The shop collects laundry from customers (same-day or next-day pickup), washes, folds, dry-cleans and irons it, and customers collect at the shop - home return delivery is out of scope for v1. We need a full functional specification: the end-to-end process flow, use cases, functional and non-functional requirements, roles, glossary, integrations (Stripe, Apple/Google Pay, Twilio SMS/email, our POS API for inventory and pricing), KPIs and a process diagram. Native iOS and Android apps plus a lightweight web admin portal. Budget is $15k-$18k over 12 weeks, around 200 active customers per week.",
+  "lanes": {
+    "model_client": "strata",
+    "model_client_tools": "strata",
+    "human_model": "opencode"
+  },
+  "started_at": "2026-11-08T00:41:55.781902+00:00",
+  "ended_at": "2026-11-08T01:26:51.744126+00:00",
+  "wall_duration_s": 2696,
+  "event_count": 115,
+  "event_counts": {
+    "info": 2,
+    "message": 93,
+    "answer": 18,
+    "complete": 1,
+    "artifacts": 1
+  },
+  "sources": [
+    "diagram_creator_agent",
+    "functional_spec_checker_agent",
+    "functional_spec_writer_agent",
+    "glossary_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "interviewer_agent",
+    "mermaid_code_reviewer_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "planning_agent",
+    "summarizer_agent",
+    "summarizer_agent",
+    "summarizer_agent",
+    "summarizer_agent",
+    "terminate_agent",
+    "use_case_agent",
+    "use_case_agent",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user",
+    "user"
+  ],
+  "stop_reason": "Text 'TERMINATE' mentioned",
+  "error": null,
+  "artifacts": [
+    {
+      "name": "canvas_diagram.md",
+      "kind": "file",
+      "size": 11924,
+      "url": "/api/files/sess-demo-washloop/canvas_diagram.md"
+    },
+    {
+      "name": "functional_specification.formatted.md",
+      "kind": "markdown",
+      "size": 110796,
+      "url": "/api/files/sess-demo-washloop/functional_specification.formatted.md"
+    },
+    {
+      "name": "functional_specification.html",
+      "kind": "html",
+      "size": 1125563,
+      "url": "/api/files/sess-demo-washloop/functional_specification.html"
+    },
+    {
+      "name": "functional_specification.md",
+      "kind": "markdown",
+      "size": 101689,
+      "url": "/api/files/sess-demo-washloop/functional_specification.md"
+    },
+    {
+      "name": "functional_specification.pdf",
+      "kind": "pdf",
+      "size": 1349766,
+      "url": "/api/files/sess-demo-washloop/functional_specification.pdf"
+    },
+    {
+      "name": "interview.jsonl",
+      "kind": "jsonl",
+      "size": 12105,
+      "url": "/api/files/sess-demo-washloop/interview.jsonl"
+    },
+    {
+      "name": "process_diagram.clean.mmd",
+      "kind": "file",
+      "size": 2961,
+      "url": "/api/files/sess-demo-washloop/process_diagram.clean.mmd"
+    },
+    {
+      "name": "process_diagram.mmd",
+      "kind": "mermaid",
+      "size": 11922,
+      "url": "/api/files/sess-demo-washloop/process_diagram.mmd"
+    },
+    {
+      "name": "process_diagram.png",
+      "kind": "png",
+      "size": 299252,
+      "url": "/api/files/sess-demo-washloop/process_diagram.png"
+    },
+    {
+      "name": "process_diagram.svg",
+      "kind": "file",
+      "size": 260408,
+      "url": "/api/files/sess-demo-washloop/process_diagram.svg"
+    },
+    {
+      "name": "process_diagram_2.clean.mmd",
+      "kind": "file",
+      "size": 1867,
+      "url": "/api/files/sess-demo-washloop/process_diagram_2.clean.mmd"
+    },
+    {
+      "name": "process_diagram_2.png",
+      "kind": "png",
+      "size": 80620,
+      "url": "/api/files/sess-demo-washloop/process_diagram_2.png"
+    },
+    {
+      "name": "process_diagram_2.svg",
+      "kind": "file",
+      "size": 235007,
+      "url": "/api/files/sess-demo-washloop/process_diagram_2.svg"
+    },
+    {
+      "name": "process_diagram_2_band1.png",
+      "kind": "png",
+      "size": 69397,
+      "url": "/api/files/sess-demo-washloop/process_diagram_2_band1.png"
+    },
+    {
+      "name": "process_diagram_2_band2.png",
+      "kind": "png",
+      "size": 13168,
+      "url": "/api/files/sess-demo-washloop/process_diagram_2_band2.png"
+    },
+    {
+      "name": "process_diagram_3.clean.mmd",
+      "kind": "file",
+      "size": 1622,
+      "url": "/api/files/sess-demo-washloop/process_diagram_3.clean.mmd"
+    },
+    {
+      "name": "process_diagram_3.png",
+      "kind": "png",
+      "size": 54537,
+      "url": "/api/files/sess-demo-washloop/process_diagram_3.png"
+    },
+    {
+      "name": "process_diagram_3.svg",
+      "kind": "file",
+      "size": 236657,
+      "url": "/api/files/sess-demo-washloop/process_diagram_3.svg"
+    },
+    {
+      "name": "process_diagram_4.clean.mmd",
+      "kind": "file",
+      "size": 2213,
+      "url": "/api/files/sess-demo-washloop/process_diagram_4.clean.mmd"
+    },
+    {
+      "name": "process_diagram_4.png",
+      "kind": "png",
+      "size": 95067,
+      "url": "/api/files/sess-demo-washloop/process_diagram_4.png"
+    },
+    {
+      "name": "process_diagram_4.svg",
+      "kind": "file",
+      "size": 218680,
+      "url": "/api/files/sess-demo-washloop/process_diagram_4.svg"
+    },
+    {
+      "name": "process_diagram_band1.png",
+      "kind": "png",
+      "size": 41902,
+      "url": "/api/files/sess-demo-washloop/process_diagram_band1.png"
+    },
+    {
+      "name": "process_diagram_band2.png",
+      "kind": "png",
+      "size": 50948,
+      "url": "/api/files/sess-demo-washloop/process_diagram_band2.png"
+    },
+    {
+      "name": "process_diagram_band3.png",
+      "kind": "png",
+      "size": 39341,
+      "url": "/api/files/sess-demo-washloop/process_diagram_band3.png"
+    },
+    {
+      "name": "process_diagram_band4.png",
+      "kind": "png",
+      "size": 60289,
+      "url": "/api/files/sess-demo-washloop/process_diagram_band4.png"
+    },
+    {
+      "name": "process_diagram_band5.png",
+      "kind": "png",
+      "size": 33744,
+      "url": "/api/files/sess-demo-washloop/process_diagram_band5.png"
+    },
+    {
+      "name": "process_diagram_band6.png",
+      "kind": "png",
+      "size": 44837,
+      "url": "/api/files/sess-demo-washloop/process_diagram_band6.png"
+    },
+    {
+      "name": "process_diagram_band7.png",
+      "kind": "png",
+      "size": 33449,
+      "url": "/api/files/sess-demo-washloop/process_diagram_band7.png"
+    },
+    {
+      "name": "replay_events.jsonl",
+      "kind": "file",
+      "size": 205037,
+      "url": "/api/files/sess-demo-washloop/replay_events.jsonl"
+    }
+  ]
+}
