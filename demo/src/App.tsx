@@ -42,6 +42,7 @@ export default function App() {
   // the gap from the bottom blows past the threshold instantly - so the demo
   // remembers whether the reader was at the bottom BEFORE the batch arrived.
   const followRef = useRef(true);
+  const lastJumpRef = useRef(-1);
 
   useEffect(() => {
     loadReplay()
@@ -102,24 +103,23 @@ export default function App() {
   const totalMs = data ? totalSpan(data.offsets) : 0;
   const lanes = data?.meta.lanes ? formatLanes(data.meta.lanes) : [];
 
-  // Same intent as the product's rule, tuned for the replay: any manual scroll
-  // away from the bottom disarms following; returning near the bottom re-arms it.
-  useEffect(() => {
-    if (!started) return undefined;
-    const el = transcriptRef.current;
-    if (!el) return undefined;
-    const onScroll = () => {
-      followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
-    };
-    el.addEventListener('scroll', onScroll);
-    return () => el.removeEventListener('scroll', onScroll);
-  }, [started]);
-
+  // Same intent as the product's rule, tuned for the replay: after every jump we
+  // remember the bottom position; if the reader's scrollTop drops below it, they
+  // scrolled up and following stops until they return near the bottom. This is
+  // deterministic even when a whole batch of turns lands in one 100ms tick.
   useEffect(() => {
     const el = transcriptRef.current;
     if (!el) return;
+    if (lastJumpRef.current >= 0 && el.scrollTop < lastJumpRef.current - 32) {
+      followRef.current = false;
+    }
     if (followRef.current) {
       el.scrollTop = el.scrollHeight;
+      lastJumpRef.current = el.scrollTop;
+    } else if (el.scrollHeight - el.scrollTop - el.clientHeight < 160) {
+      followRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      lastJumpRef.current = el.scrollTop;
     }
   }, [thread.turns]);
 
