@@ -40,33 +40,36 @@ export function PlaybackBar({
           {finished ? 'Finished' : paused ? 'Resume' : 'Pause'}
         </Button>
 
-        <div role="group" aria-label="Playback speed" className="flex gap-1">
+        <div role="group" aria-label="Playback speed" className="flex gap-1 rounded-md border border-border bg-secondary p-1">
           {SPEEDS.map((s) => (
             <Button
               key={s}
               size="sm"
-              variant={speed === s ? 'primary' : 'ghost'}
+              variant={speed === s ? 'primary' : 'secondary'}
+              className="shadow-sm"
               onClick={() => onSpeed(s)}
+              aria-pressed={speed === s}
               aria-label={`Play at ${s} times speed`}
+              title={`Replay the session at ${s}× speed`}
             >
               {s}&times;
             </Button>
           ))}
         </div>
 
-        <div role="group" aria-label="Transcript version" className="flex gap-1">
-          <Button size="sm" variant={!showInternal ? 'primary' : 'ghost'} onClick={() => onShowInternal(false)}>
+        <div role="group" aria-label="Transcript version" className="flex gap-1 rounded-md border border-border bg-secondary p-1">
+          <Button size="sm" variant={!showInternal ? 'primary' : 'secondary'} className="shadow-sm" onClick={() => onShowInternal(false)} aria-pressed={!showInternal} title="Show only the interviewer questions and stakeholder answers">
             Interview only
           </Button>
-          <Button size="sm" variant={showInternal ? 'primary' : 'ghost'} onClick={() => onShowInternal(true)}>
+          <Button size="sm" variant={showInternal ? 'primary' : 'secondary'} className="shadow-sm" onClick={() => onShowInternal(true)} aria-pressed={showInternal} title="Show every internal agent message, tool call and status update">
             Full agent team
           </Button>
         </div>
 
-        <Button size="sm" variant="ghost" onClick={onJumpToEnd} disabled={finished} aria-label="Skip straight to the deliverables">
+        <Button size="sm" variant="secondary" className="shadow-sm" onClick={onJumpToEnd} disabled={finished} aria-label="Skip straight to the deliverables" title="Jump straight to the end and the finished deliverables">
           Skip to deliverables
         </Button>
-        <Button size="sm" variant="ghost" onClick={onRestart} aria-label="Restart the demo from the beginning">
+        <Button size="sm" variant="secondary" className="shadow-sm" onClick={onRestart} aria-label="Restart the demo from the beginning" title="Restart the replay from the first message">
           Restart
         </Button>
 

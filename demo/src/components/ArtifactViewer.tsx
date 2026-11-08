@@ -23,16 +23,21 @@ export function ArtifactViewer({ artifacts }: ArtifactViewerProps) {
       <div className="p-4">
         <div className="flex flex-wrap gap-2">
           {html && (
-            <Button variant="primary" onClick={() => setPreview(html.url)}>
+            <Button variant="primary" onClick={() => setPreview(html.url)} title="The read-friendly, self-contained web version of the spec">
               View the interactive spec
             </Button>
           )}
           {pdf && (
-            <Button variant="secondary" onClick={() => setPreview(pdf.url)}>
+            <Button variant="secondary" onClick={() => setPreview(pdf.url)} title="Print- and signature-ready typeset PDF">
               Preview the PDF
             </Button>
           )}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          <strong>HTML</strong> is the recommended way to read the spec &middot;
+          <strong>PDF</strong> is for signed or printed copies &middot;
+          <strong>Markdown</strong> is the best base for AI coding agents.
+        </p>
         <ul className="mt-3 divide-y divide-border">
           {sorted.map((artifact) => (
             <li key={artifact.name} className="flex items-center justify-between gap-3 py-2">
