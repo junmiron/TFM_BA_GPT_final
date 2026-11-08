@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 ### Added
 
+- Interactive Vercel demo (`demo/`): a static SPA that replays a real recorded
+  run through the product's own React components and reducer - fixed goal,
+  one-button start, pause/resume, 2x/4x/8x/16x speed, interview-only vs full
+  agent-team transcript, artifact viewer with the committed sample deliverables.
+  `scripts/record_demo_replay.py` records the replay log from a headless
+  simulated run; `scripts/export_sample_session.py` exports clean deliverables
+  to `examples/sample_session/`.
+
 - Graph-aware splitting of tall Mermaid process diagrams (`diagram_split.py`):
   each stage subgraph becomes a numbered figure ("Process flow — Stage 3 (part
   4 of 12)"), tall stages are re-cut on topological rank bands, and edges that
