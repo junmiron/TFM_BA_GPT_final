@@ -4,6 +4,9 @@ A local-first AI business analyst that runs a budgeted, deterministic requiremen
 interview with you and produces a traceable **Functional Specification Document
 (FSD)** — PDF, HTML and Markdown — plus Mermaid process diagrams.
 
+**HTML** is the recommended way to read the spec · **PDF** is for signed or printed
+copies · **Markdown** is the best base for AI coding agents.
+
 *Part of a Master's thesis (TFM) in Artificial Intelligence on multi-agent
 requirements elicitation. Designed and built by
 [Juan Manuel Mirón](https://www.linkedin.com/in/juanmanuelmiron/).*
