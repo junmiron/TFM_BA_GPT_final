@@ -115,16 +115,20 @@ export default function App() {
         <StartHero meta={data?.meta ?? { task: '' }} onStart={start} loading={!data && !loadError} error={loadError} />
       ) : (
         <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-6">
-          <main id="main" aria-label="Interview transcript" className="flex min-h-[60vh] min-w-0 flex-col gap-4">
+          <main id="main" aria-label="Interview transcript" className="flex min-h-[60vh] min-w-0 flex-col gap-4 max-h-[calc(100vh-5rem)] lg:max-h-[calc(100vh-7rem)]">
             <section aria-label="Live transcript" className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card shadow-lg">
               <div ref={transcriptRef} className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
                 <Transcript turns={thread.turns} hasSession busy={busy} historical={false} showInternal={showInternal} />
               </div>
             </section>
 
-            {finished && thread.artifacts && thread.artifacts.length > 0 && <ArtifactViewer artifacts={thread.artifacts} />}
+            {finished && thread.artifacts && thread.artifacts.length > 0 && (
+              <div className="min-h-0 max-h-[45vh] overflow-y-auto">
+                <ArtifactViewer artifacts={thread.artifacts} />
+              </div>
+            )}
 
-            <div className="sticky bottom-0 flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
               <DialogBox turns={thread.turns} />
               <PlaybackBar
                 paused={paused}
@@ -142,17 +146,19 @@ export default function App() {
             </div>
           </main>
 
-          <RunPanel
-            sessionId={SESSION_ID}
-            stages={stageStates(thread)}
-            runActive={busy}
-            artifacts={thread.artifacts}
-            artifactsError={thread.artifactsError}
-            onRetryArtifacts={() => undefined}
-            turns={thread.turns.length}
-            turnBudget={null}
-            showArtifacts
-          />
+          <div className="min-h-0 max-h-[calc(100vh-5rem)] overflow-y-auto lg:max-h-[calc(100vh-7rem)]">
+            <RunPanel
+              sessionId={SESSION_ID}
+              stages={stageStates(thread)}
+              runActive={busy}
+              artifacts={thread.artifacts}
+              artifactsError={thread.artifactsError}
+              onRetryArtifacts={() => undefined}
+              turns={thread.turns.length}
+              turnBudget={null}
+              showArtifacts
+            />
+          </div>
         </div>
       )}
     </div>
