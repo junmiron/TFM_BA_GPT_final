@@ -58,6 +58,21 @@ def test_decision_table_and_owner_paragraphs_are_sources(tmp_path):
     assert any("Shift scheduling window" in q for q in questions)
 
 
+def test_open_questions_plain_bullets_are_extracted(tmp_path):
+    """Specs can use "Open Questions" headings with plain (non-bold) bullets."""
+    spec = tmp_path / "functional_specification.md"
+    spec.write_text(
+        "## 11. Open Questions / Future Considerations (v1 Deferrals)\n"
+        "- Whether the mobile app should support limited offline queuing in later versions.\n"
+        "- Whether automatic scheduled backups are needed.\n",
+        encoding="utf-8",
+    )
+    questions = spec_questions.pending_questions(tmp_path)
+    assert len(questions) == 2
+    assert any("offline queuing" in q for q in questions)
+    assert any("scheduled backups" in q for q in questions)
+
+
 def test_no_spec_returns_no_questions(tmp_path):
     assert spec_questions.pending_questions(tmp_path) == []
 

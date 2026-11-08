@@ -19,13 +19,14 @@ import re
 from pathlib import Path
 from typing import List, Tuple
 
-# Heading of any level whose text mentions "open items", body until the next heading.
+# Heading of any level whose text mentions open items/questions, body until the next heading.
 _OPEN_SECTION_RE = re.compile(
-    r"^#{1,4}\s*[^\n]*[Oo]pen [Ii]tems[^\n]*\n(.*?)(?=^#{1,4}\s|^-{3,}$|\Z)",
+    r"^#{1,4}\s*[^\n]*(?:[Oo]pen [Ii]tems|[Oo]pen [Qq]uestions)[^\n]*\n(.*?)(?=^#{1,4}\s|^-{3,}$|\Z)",
     re.M | re.S,
 )
-# List items: "1. **Title.** detail" or "- **Title**: detail".
-_LIST_ITEM_RE = re.compile(r"^(?:\d+\.|[-*])\s+(?:\*\*(.+?)\*\*[:.]?\s*(.*))$", re.M)
+# Any bullet line in an open-items section: numbered or dash, bold-titled or plain.
+_BULLET_RE = re.compile(r"^\s*(?:\d+\.|[-*])\s+(.+)$", re.M)
+_BOLD_RE = re.compile(r"^\*\*(.+?)\*\*[:.]?\s*(.*)$")
 # Table row with at least three cells: | id | item | detail... |
 _ROW_RE = re.compile(r"^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.+?)\s*\|", re.M)
 # "| 3 | Payment timing | Default adopted | Decision needed |"
@@ -58,8 +59,14 @@ def extract_open_questions(md_text: str) -> List[Tuple[str, str]]:
 
     for section in _OPEN_SECTION_RE.finditer(md_text):
         body = section.group(1)
-        for title, detail in _LIST_ITEM_RE.findall(body):
-            question = f"{title.rstrip('.')}. {detail}".strip() if detail else f"{title.rstrip('.')}?"
+        for bullet in _BULLET_RE.findall(body):
+            bold = _BOLD_RE.match(bullet)
+            if bold:
+                title, detail = bold.group(1), bold.group(2)
+                question = f"{title.rstrip('.')}. {detail}".strip() if detail else f"{title.rstrip('.')}?"
+            else:
+                title = bullet
+                question = bullet if bullet.endswith(("?", ".")) else f"{bullet}?"
             add(title, question)
         for first, second, rest in _ROW_RE.findall(body):
             # Skip header rows ("| # | Open Item | ... |") and separator rows.
