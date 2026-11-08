@@ -257,6 +257,9 @@ Session outcomes also feed back: approved runs land in `experiences/` (plus
 fine-tune JSONL in `experiences/fine_tune/`, gitignored); critiques land in
 `feedback/` (gitignored).
 
+Which deliverable to use: **HTML** for reading, **PDF** for signed or printed
+copies, **Markdown** as the spec base to hand to an AI coding agent.
+
 ## Tests
 
 ```bash

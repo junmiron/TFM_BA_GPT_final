@@ -43,6 +43,21 @@ def _load_pdf_module():
     return module
 
 
+def test_extract_title_uses_project_not_title_page(tmp_path):
+    """The browser tab and PDF metadata must never read "Title Page"."""
+    pdf = _load_pdf_module()
+    md = tmp_path / "functional_specification.md"
+    md.write_text(
+        "# Title Page\n\n**Project:** WashLoop v1  \n**Document:** Functional Specification Document  \n\n## 1. Scope\n",
+        encoding="utf-8",
+    )
+    assert pdf._extract_title(md) == "WashLoop v1 - Functional Specification Document"
+
+    # No Project metadata: fall through to the first real heading.
+    md.write_text("# Title Page\n\n**Version:** 1.0\n\n## 2. Functional Requirements\n", encoding="utf-8")
+    assert pdf._extract_title(md) == "2. Functional Requirements"
+
+
 def _make_session(tmp_path: Path) -> Path:
     session = tmp_path / "sess-test"
     session.mkdir(parents=True, exist_ok=True)

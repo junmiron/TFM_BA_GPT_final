@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 ### Added
 
+- Deliverable guidance: HTML is presented as the read-friendly spec, PDF as the
+  signed/printed copy, Markdown as the base for AI coding agents (README,
+  sample-session README, demo artifact viewer).
 - Interactive Vercel demo (`demo/`): a static SPA that replays a real recorded
   run through the product's own React components and reducer - fixed goal,
   one-button start, pause/resume, 2x/4x/8x/16x speed, interview-only vs full
@@ -25,6 +28,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The HTML deliverable's document title is now the project name from the
+  Title Page metadata (`WashLoop v1 - Functional Specification Document`)
+  instead of the literal heading "Title Page", which appeared in the browser
+  tab and PDF metadata. `_extract_title` falls back to the first non-Title-Page
+  heading when no Project field exists.
 - Table header rows are now always dark-on-white: pandoc tables emitted with
   an integer column count (`columns: 5,`) or with header cells wrapped over
   several lines skipped the styling pass, leaving black header text on the

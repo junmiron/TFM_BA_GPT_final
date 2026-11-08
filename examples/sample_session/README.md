@@ -27,3 +27,11 @@ running anything. Generated on 2026-11-08 from session
 
 Reproduce this run yourself: `python scripts/record_demo_replay.py`, then
 `python scripts/export_sample_session.py conversation/<session-id>`.
+
+## Which deliverable to use
+
+- **HTML** - the recommended way to read the spec: self-contained, navigable,
+  printable, diagram inline.
+- **PDF** - the typeset copy for signatures, printing and formal review.
+- **Markdown** - the best base to hand to an AI coding agent as a spec to
+  implement from.

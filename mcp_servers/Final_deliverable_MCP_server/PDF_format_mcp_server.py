@@ -510,14 +510,28 @@ def have_pandoc() -> bool:
 
 
 def _extract_title(md_path: Path) -> str:
-    """Return the first Markdown heading (or the filename stem) as a PDF title."""
+    """Return the document title for HTML/PDF metadata.
+
+    Prefers "Project - Document" from the Title Page section; the literal
+    "Title Page" heading must never become the document title (the browser
+    tab and the cover would both read "Title Page").
+    """
     try:
-        for line in md_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            line = line.strip()
-            if line.startswith("#"):
-                return line.lstrip("#").strip()
+        text = md_path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
-        pass
+        return md_path.stem
+    project = re.search(r"\*\*Project:\*\*\s*(.+)", text)
+    if project:
+        doc = re.search(r"\*\*Document:\*\*\s*(.+)", text)
+        if doc:
+            return f"{project.group(1).strip().rstrip()} - {doc.group(1).strip().rstrip()}"
+        return f"{project.group(1).strip().rstrip()} - Functional Specification"
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("#"):
+            heading = line.lstrip("#").strip()
+            if heading.lower() != "title page":
+                return heading
     return md_path.stem
 
 
