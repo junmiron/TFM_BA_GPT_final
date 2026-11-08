@@ -122,11 +122,10 @@ export default function App() {
               </div>
             </section>
 
-            <DialogBox turns={thread.turns} />
-
             {finished && thread.artifacts && thread.artifacts.length > 0 && <ArtifactViewer artifacts={thread.artifacts} />}
 
-            <div className="sticky bottom-0">
+            <div className="sticky bottom-0 flex flex-col gap-3">
+              <DialogBox turns={thread.turns} />
               <PlaybackBar
                 paused={paused}
                 speed={speed}

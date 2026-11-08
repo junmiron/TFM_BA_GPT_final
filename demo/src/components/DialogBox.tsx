@@ -34,8 +34,8 @@ export function DialogBox({ turns }: { turns: Turn[] }) {
   }
 
   return (
-    <section aria-label="Interview dialog" className="rounded-lg border-2 border-primary bg-accent p-4 shadow-glow">
-      <div className="mb-2 flex items-center gap-2">
+    <section aria-label="Interview dialog" className="rounded-lg border-2 border-primary bg-accent p-3 shadow-glow">
+      <div className="mb-1 flex items-center gap-2">
         <span
           aria-hidden="true"
           className={`h-2.5 w-2.5 rounded-full ${dialog.answer ? 'bg-emerald-600' : 'animate-pulse-dot bg-primary'}`}
@@ -44,14 +44,14 @@ export function DialogBox({ turns }: { turns: Turn[] }) {
           {dialog.answer ? 'Simulated stakeholder answered' : 'Awaiting stakeholder answer'}
         </h3>
       </div>
-      <p className="whitespace-pre-wrap text-sm text-foreground">{dialog.question}</p>
+      <p className="line-clamp-2 text-sm text-foreground" title={dialog.question}>{dialog.question}</p>
       {dialog.answer ? (
-        <div className="mt-3 rounded-md border border-border bg-card p-3">
+        <div className="mt-2 rounded-md border border-border bg-card p-2">
           <p className="text-xs font-semibold text-muted-foreground">Answer (opencode stakeholder lane)</p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{dialog.answer}</p>
+          <p className="mt-1 line-clamp-3 text-sm text-foreground" title={dialog.answer}>{dialog.answer}</p>
         </div>
       ) : (
-        <p className="mt-2 text-xs text-muted-foreground">The stakeholder lane is composing the reply&hellip;</p>
+        <p className="mt-1 text-xs text-muted-foreground">The stakeholder lane is composing the reply&hellip;</p>
       )}
     </section>
   );
