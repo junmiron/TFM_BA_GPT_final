@@ -195,6 +195,25 @@ three demo components, artifact URL remapping.
 | **P4 — Demo chrome** | StartHero, PlaybackBar (pause/speed/restart/agents toggle/progress), ArtifactViewer (PDF/HTML preview), deep links, artifact URL remap | full replay at 16× (~4–5 min) watched end-to-end: stages light up, typing visible, pause/resume holds, toggle flips internal messages, downloads work |
 | **P5 — Ship** | Vercel deploy (or GitHub import), README + LinkedIn copy, optional screen-capture GIF at 16× | production URL loads, replay runs, artifacts open |
 
+### Running record (2026-11-08)
+
+- P1/P2: `sess-demo-washloop` recorded (115 replay events, opencode stakeholder lane);
+  `scripts/export_sample_session.py` copied the clean deliverables plus the replay log to
+  `examples/sample_session/`.
+- P3/P4: demo replay engine + tests; controls verified against the deployed page: pause,
+  2×/4×/8×/16×, Interview only / Full agent team, Skip to deliverables, Restart, pinned Q&A
+  dialog box (mirrors the real UI AnswerBox), deliverable guidance in the hero, Run complete
+  badge, Deliverables panel with inline HTML preview and PDF/MD/CSV download.
+- P5 Vercel deploy: done - static dist lives in the portfolio repo (`static/ba-gpt-demo/`,
+  copied by `scripts/build.py`); live at
+  `https://portfolio-jun-9193.vercel.app/ba-gpt/demo/`. 13 replay/dialog tests green.
+
+## Follow-ups
+
+- Re-record with a stronger stakeholder simulator: some simulated answers drift from the
+  question they follow (visible in the pinned dialog). The replay is faithful; the recorded
+  human-lane quality is what needs work.
+
 Estimated effort: P1 ~0.5 d (mostly waiting on the run), P2 ~0.25 d,
 P3 ~0.5–1 d, P4 ~0.5–1 d, P5 ~0.25 d.
 

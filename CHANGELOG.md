@@ -8,7 +8,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Deliverable guidance: HTML is presented as the read-friendly spec, PDF as the
   signed/printed copy, Markdown as the base for AI coding agents (README,
-  sample-session README, demo artifact viewer).
+  sample-session README, demo artifact viewer, demo hero).
+- Demo dialog box (`demo/src/components/DialogBox.tsx`): a pinned panel styled like the
+  real UI's answer composer that shows the current interviewer question and the simulated
+  stakeholder's answer as the replay pairs them, so viewers can follow the dialogue without
+  scrolling the transcript.
 - Interactive Vercel demo (`demo/`): a static SPA that replays a real recorded
   run through the product's own React components and reducer - fixed goal,
   one-button start, pause/resume, 2x/4x/8x/16x speed, interview-only vs full
