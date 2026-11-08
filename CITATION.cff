@@ -1,0 +1,10 @@
+data-citation:
+  - id: citation-key-1
+    title: "BA-GPT: Multi-Agent Business Analyst"
+    authors:
+      - name: "Mirón, Juan Manuel"
+    date-released: 2026-11-08
+    version: "1.3.0"
+    license: "MIT"
+    repository-code: "https://github.com/junmiron/ba-gpt"
+    type: software

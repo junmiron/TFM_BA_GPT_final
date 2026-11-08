@@ -4,6 +4,12 @@ A local-first AI business analyst that runs a budgeted, deterministic requiremen
 interview with you and produces a traceable **Functional Specification Document
 (FSD)** — PDF, HTML and Markdown — plus Mermaid process diagrams.
 
+"Local-first" means the app, your files, the indexes and the rendering all run on
+your machine. If you pick a remote model profile (OpenAI, Azure, Groq, Hugging
+Face, GitHub Copilot) the interview content is sent to that provider — the
+`ollama`, `lmstudio`, `strata` and `onnx` lanes keep everything on your machine.
+Web RAG only fetches the URLs you list in `SITES` (`lib/rag_config.yaml`).
+
 **HTML** is the recommended way to read the spec · **PDF** is for signed or printed
 copies · **Markdown** is the best base for AI coding agents.
 
@@ -47,19 +53,19 @@ Each feature has a design doc under `docs/features/`.
    `QUESTION:` per turn and every Q&A pair is saved to `interview.jsonl`.
    Runs are capped by `MAX_MESSAGES` (default 300) and can only be ended by
    `terminate_agent`.
-- **Meeting transcript to spec (Feature 4)** — attach a `.txt`, `.md`,
+- **Meeting transcript to spec** — attach a `.txt`, `.md`,
    `.docx`, `.pdf`, `.vtt` or `.srt` transcript when creating a session; it is
    saved as `source_transcript.txt` and seeds the run so the interview only
    fills gaps.
-- **Session continuation (Feature 3)** — select an existing session and add
+- **Session continuation** — select an existing session and add
    information; the supplement is merged into the spec (heading-preserving
-   guard with a deterministic Addendum fallback, Feature 9), the version is
+   guard with a deterministic Addendum fallback), the version is
    bumped, and the PDF/HTML/MD are re-rendered in place. Supplements are
    audited in `supplements.jsonl`.
-- **Fixed interview composer (Feature 5)** — the answer box is always
+- **Fixed interview composer** — the answer box is always
    visible; it activates when a question is pending and stays greyed out
    otherwise, so the transcript never shifts under it.
-- **Feedback capture and visibility (Feature 12)** — after a run completes the
+- **Feedback capture and visibility** — after a run completes the
    satisfaction request appears in the pinned composer and forces the
    transcript to scroll to it, so it cannot be missed. Silence means no
    feedback is stored.
@@ -72,12 +78,12 @@ Each feature has a design doc under `docs/features/`.
 - **Typst-typeset PDF** — cover page, linked Contents with leaders, running
    header/footer, repeating table headers, bundled Inter fonts; falls back to
    PyMuPDF Story when `typst`/`pandoc` are absent.
-- **No clipped diagrams (Feature 10)** — process diagrams taller than one
+- **No clipped diagrams** — process diagrams taller than one
    page are split in the PDF into full-width, page-sized bands captioned
    "part k of N".
 - **Self-contained HTML spec** — the Mermaid diagram is inlined as vector SVG
    (PNG data-URI fallback), so the single file opens and prints anywhere.
-- **Centered spec actions (Features 6, 7, 11)** — a header row above the
+- **Centered spec actions** — a header row above the
     transcript offers "Download Functional Spec PDF" (greyed out until the
     artifact exists) and "Open Functional Spec in browser", which serves the
     HTML inline via `/api/view/{session}/{name}` in a new tab.
@@ -89,19 +95,20 @@ Each feature has a design doc under `docs/features/`.
 
 ### Learning and configuration
 
-- **Reinforcement learning from approved sessions (Feature 1)** — when you
+- **Feedback-driven experience indexing** — when you
     say the deliverables are good, the session is indexed into an
     `approved_experiences` ChromaDB collection (queried by the interview and
     writer agents alongside the web RAG), appended to
-    `experiences/reinforcement_learning.md`, and written as a task→spec JSONL
+    a learning ledger under `experiences/`, and written as a task→spec JSONL
     example under `experiences/fine_tune/`. A "not quite" answer stores the
-    critique in `feedback/<session_id>.md`; silence indexes nothing.
-- **In-app configuration page (Feature 8)** — the gear icon opens a settings
+    critique in `feedback/<session_id>.md`; silence indexes nothing. This is
+    retrieval-based feedback, not RL in the policy-gradient sense.
+- **In-app configuration page** — the gear icon opens a settings
     view: model lanes and IDs, API-key entry (presence is shown, values are
     never echoed), AI-human simulation toggle, UI visibility switches and run
     limits, saved through a whitelisted `/api/config` GET/PUT that rewrites
     only whitelisted lines of `.env`.
-- **UI visibility switches (Feature 2)** — `UI_SHOW_ARTIFACTS` hides the
+- **UI visibility switches** — `UI_SHOW_ARTIFACTS` hides the
     Artifacts panel; `UI_SHOW_INTERNAL_MESSAGES=false` shows only the
     interviewer/user conversation (the full event log stays in the backend
     for audit).
@@ -111,8 +118,8 @@ Each feature has a design doc under `docs/features/`.
 ```bash
 # 1. Install
 python -m venv .venv
-.venv\Scripts\activate              # Windows
-# source .venv/bin/activate         # Linux / macOS
+source .venv/bin/activate           # Linux / macOS
+# Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 npm i -g @mermaid-js/mermaid-cli    # required for diagram rendering
@@ -126,7 +133,7 @@ python scripts/smoke_check.py
 # 4. Run - pick a front-end
 # React web UI (recommended)
 cd ui && npm ci && npm run build && cd ..
-python -m uvicorn server.api:app --port 8000
+python -m uvicorn server.api:app --host 127.0.0.1 --port 8000
 
 # or the Chainlit operator view
 chainlit run app2.py -w
@@ -137,9 +144,22 @@ and answer the interviewer. The run ends when `terminate_agent` exports the
 deliverables. Both front-ends drive the same `lib/pipeline.py`, so behaviour and
 artifacts are identical. Web UI details: [docs/web-ui.md](docs/web-ui.md).
 
-Detailed setup: [docs/configuration.md](docs/configuration.md)
-Design and agent flow: [docs/architecture.md](docs/architecture.md)
-Common failures: [docs/troubleshooting.md](docs/troubleshooting.md)
+- Detailed setup: [docs/configuration.md](docs/configuration.md)
+- Design and agent flow: [docs/architecture.md](docs/architecture.md)
+- Common failures: [docs/troubleshooting.md](docs/troubleshooting.md)
+
+## Results: what a real session produced
+
+Measured from the committed sample session (`examples/sample_session/`, a
+laundry-shop pickup-and-delivery spec):
+
+- **33 interview Q&A pairs** logged in `interview.jsonl`
+- **66 functional requirements, 59 non-functional requirements, 26 use cases**
+- **55-page typeset PDF** with linked contents and page-sized diagram bands
+- **~30 minutes wall time** end to end (lane-dependent; the run budget is 300
+  chat messages across the 11-agent team)
+
+Judge the output directly: [interactive demo replay](https://portfolio-jun-9193.vercel.app/ba-gpt/demo/) · [sample deliverables](examples/sample_session/).
 
 ## Architecture
 
@@ -270,6 +290,9 @@ python -m pytest -q tests
 cd ui && npm test
 ```
 
+CI installs `mermaid-cli` (12.2.0), so the diagram-rendering tests run in the
+badge; locally they are skipped when `mmdc` is absent.
+
 | Test | Covers | Needs |
 |---|---|---|
 | `tests/test_pipeline.py` | file/JSONL tools, selector routing, termination guard, config hygiene | nothing |
@@ -340,4 +363,16 @@ MIT — see [LICENSE](LICENSE).
 ## Citation
 
 This project is part of a Master's thesis (TFM) on multi-agent requirements
-elicitation. The design rationale is in [IDEA.md](IDEA.md).
+elicitation. The design rationale is in [IDEA.md](IDEA.md). See
+[CITATION.cff](CITATION.cff) (GitHub shows a "Cite this repository" button),
+or:
+
+```bibtex
+@software{miron2026_bagpt,
+  author  = {Mirón, Juan Manuel},
+  title   = {BA-GPT: Multi-Agent Business Analyst},
+  year    = {2026},
+  version = {1.3.0},
+  url     = {https://github.com/junmiron/ba-gpt}
+}
+```

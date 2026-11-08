@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+
+- README accuracy pass (external review): "Reinforcement learning" renamed to
+  "feedback-driven experience indexing" (the mechanism is retrieval-based
+  indexing + fine-tune example export, not RL); explicit privacy caveat for
+  the "local-first" claim (remote model lanes send interview content to the
+  provider); copy-paste-safe quick start (Windows activate line commented);
+  uvicorn bound to `--host 127.0.0.1`; doc links made a list; internal
+  "(Feature N)" numbering dropped from the README.
+
 ### Added
 
 - Pending-question dialog for existing sessions: `GET /api/sessions/{id}/pending-questions`
