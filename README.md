@@ -1,31 +1,35 @@
 # BA-GPT — Multi-Agent Business Analyst
 
 A local-first AI business analyst that runs a budgeted, deterministic requirements
-interview with a human and produces a traceable **Functional Specification
-Document (FSD)**, Mermaid process diagrams, and PDF, HTML and Markdown deliverables.
+interview with you and produces a traceable **Functional Specification Document
+(FSD)** — PDF, HTML and Markdown — plus Mermaid process diagrams.
+
+*Part of a Master's thesis (TFM) in Artificial Intelligence on multi-agent
+requirements elicitation. Designed and built by
+[Juan Manuel Mirón](https://www.linkedin.com/in/juanmanuelmiron/).*
+
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue)
+![AutoGen](https://img.shields.io/badge/autogen--agentchat-0.7.5-red)
+![License](https://img.shields.io/badge/license-MIT-green)
+![CI](https://github.com/junmiron/ba-gpt/actions/workflows/ci.yml/badge.svg)
+
+![BA-GPT web UI with an interview in progress](docs/images/ba-gpt-ui.png)
+
+**See it without installing anything:**
+[interactive demo replay](https://portfolio-jun-9193.vercel.app/ba-gpt/demo/)
+(a recorded session you can pause, speed up, and read with or without the
+internal agent messages) · [sample output](examples/sample_session/)
 
 Built on **AutoGen 0.7.5** (selector group chat), a React/Vite web UI over a
 FastAPI adapter (Chainlit remains the operator/debug view), and two stdio **MCP
 servers** for diagram rendering and document export.
 
-> ## ⚠️ Technical preview
->
-> This is a **technical preview** release (v1.3.0). The agent team, pipeline
-> and deliverable formats are stable enough for evaluation, but the project
-> is still under active development and details may change.
->
-> In particular, the **Chainlit view is a debug/operator surface, not a
-> finished end-user product**: it exposes internal pipeline state —
-> per-category interview progress (`asked=N, status=done`), live agent
-> statuses (`done` / `pending` / `not started`), raw `[ASSIGNMENT]` task
-> dispatches and tool-call traces. That is exactly what you want while
-> developing or auditing the multi-agent workflow, and more noise than a
-> final product would show. The React UI is the operator-friendly front-end.
-
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue)
-![AutoGen](https://img.shields.io/badge/autogen--agentchat-0.7.5-red)
-![License](https://img.shields.io/badge/license-MIT-green)
-![CI](https://github.com/junmiron/TFM_BA_GPT_final/actions/workflows/ci.yml/badge.svg)
+> **Technical preview (v1.3.0).** The agent team, pipeline and deliverable
+> formats are stable enough for evaluation; details may still change. The
+> Chainlit view exposes internal pipeline state (agent statuses, raw
+> `[ASSIGNMENT]` dispatches, tool traces) — great for auditing the workflow,
+> noisy for everyday use; the React UI is the operator-facing front-end.
+> Changelog: [releases](https://github.com/junmiron/ba-gpt/releases).
 
 ---
 
@@ -35,46 +39,46 @@ Each feature has a design doc under `docs/features/`.
 
 ### Interview and workflow
 
-1. **Budgeted, deterministic interview** — the planning agent decomposes the
+- **Budgeted, deterministic interview** — the planning agent decomposes the
    task and hands off with `[ASSIGNMENT]` markers; the interviewer asks one
    `QUESTION:` per turn and every Q&A pair is saved to `interview.jsonl`.
    Runs are capped by `MAX_MESSAGES` (default 300) and can only be ended by
    `terminate_agent`.
-2. **Meeting transcript to spec (Feature 4)** — attach a `.txt`, `.md`,
+- **Meeting transcript to spec (Feature 4)** — attach a `.txt`, `.md`,
    `.docx`, `.pdf`, `.vtt` or `.srt` transcript when creating a session; it is
    saved as `source_transcript.txt` and seeds the run so the interview only
    fills gaps.
-3. **Session continuation (Feature 3)** — select an existing session and add
+- **Session continuation (Feature 3)** — select an existing session and add
    information; the supplement is merged into the spec (heading-preserving
    guard with a deterministic Addendum fallback, Feature 9), the version is
    bumped, and the PDF/HTML/MD are re-rendered in place. Supplements are
    audited in `supplements.jsonl`.
-4. **Fixed interview composer (Feature 5)** — the answer box is always
+- **Fixed interview composer (Feature 5)** — the answer box is always
    visible; it activates when a question is pending and stays greyed out
    otherwise, so the transcript never shifts under it.
-5. **Feedback capture and visibility (Feature 12)** — after a run completes the
+- **Feedback capture and visibility (Feature 12)** — after a run completes the
    satisfaction request appears in the pinned composer and forces the
    transcript to scroll to it, so it cannot be missed. Silence means no
    feedback is stored.
-6. **Human simulation** — set `SIMULATE_HUMAN=true` to answer the interview
+- **Human simulation** — set `SIMULATE_HUMAN=true` to answer the interview
    from a stakeholder persona on a separate model lane (`HUMAN_MODEL`) instead
    of typing answers yourself.
 
 ### Deliverables
 
-7. **Typst-typeset PDF** — cover page, linked Contents with leaders, running
+- **Typst-typeset PDF** — cover page, linked Contents with leaders, running
    header/footer, repeating table headers, bundled Inter fonts; falls back to
    PyMuPDF Story when `typst`/`pandoc` are absent.
-8. **No clipped diagrams (Feature 10)** — process diagrams taller than one
+- **No clipped diagrams (Feature 10)** — process diagrams taller than one
    page are split in the PDF into full-width, page-sized bands captioned
    "part k of N".
-9. **Self-contained HTML spec** — the Mermaid diagram is inlined as vector SVG
+- **Self-contained HTML spec** — the Mermaid diagram is inlined as vector SVG
    (PNG data-URI fallback), so the single file opens and prints anywhere.
-10. **Centered spec actions (Features 6, 7, 11)** — a header row above the
+- **Centered spec actions (Features 6, 7, 11)** — a header row above the
     transcript offers "Download Functional Spec PDF" (greyed out until the
     artifact exists) and "Open Functional Spec in browser", which serves the
     HTML inline via `/api/view/{session}/{name}` in a new tab.
-11. **Nine-section guaranteed spec** — the checker can bounce missing template
+- **Nine-section guaranteed spec** — the checker can bounce missing template
     sections back to the writer `MAX_CHECKER_ROUNDS` times (default 3); past
     that, `finalize_deliverables` assembles any missing section from existing
     material or an explicit fill-in marker, so every export contains all nine
@@ -82,19 +86,19 @@ Each feature has a design doc under `docs/features/`.
 
 ### Learning and configuration
 
-12. **Reinforcement learning from approved sessions (Feature 1)** — when you
+- **Reinforcement learning from approved sessions (Feature 1)** — when you
     say the deliverables are good, the session is indexed into an
     `approved_experiences` ChromaDB collection (queried by the interview and
     writer agents alongside the web RAG), appended to
     `experiences/reinforcement_learning.md`, and written as a task→spec JSONL
     example under `experiences/fine_tune/`. A "not quite" answer stores the
     critique in `feedback/<session_id>.md`; silence indexes nothing.
-13. **In-app configuration page (Feature 8)** — the gear icon opens a settings
+- **In-app configuration page (Feature 8)** — the gear icon opens a settings
     view: model lanes and IDs, API-key entry (presence is shown, values are
     never echoed), AI-human simulation toggle, UI visibility switches and run
     limits, saved through a whitelisted `/api/config` GET/PUT that rewrites
     only whitelisted lines of `.env`.
-14. **UI visibility switches (Feature 2)** — `UI_SHOW_ARTIFACTS` hides the
+- **UI visibility switches (Feature 2)** — `UI_SHOW_ARTIFACTS` hides the
     Artifacts panel; `UI_SHOW_INTERNAL_MESSAGES=false` shows only the
     interviewer/user conversation (the full event log stays in the backend
     for audit).
@@ -315,6 +319,13 @@ docs/                   architecture, configuration, troubleshooting, feature do
   embedder when sentence-transformers is unavailable.
 - The `/api/config` endpoint is intended for local single-user use; it is
   unauthenticated and should not be exposed publicly without adding auth.
+
+## Roadmap
+
+- **Docker / Compose packaging** - the current setup needs Python, Node +
+  mermaid-cli and (optionally) vendored Typst/pandoc; containerised one-command
+  setup is planned so casual visitors can try it without installing anything.
+- **`/api/config` authentication** before any non-local deployment.
 
 ## License
 
