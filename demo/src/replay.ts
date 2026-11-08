@@ -132,6 +132,17 @@ export function remapArtifacts(events: ReplayEvent[], baseUrl: string): ReplayEv
   });
 }
 
+/** The pipeline echoes stakeholder answers as "🧣 Stakeholder: ..." - the UI
+ * already labels the turn as "You", so the prefix is redundant in the demo. */
+export function normalizeAnswers(events: ReplayEvent[]): ReplayEvent[] {
+  const prefix = "🧣 Stakeholder: ";
+  return events.map((event) =>
+    event.type === "answer" && event.content && event.content.startsWith(prefix)
+      ? { ...event, content: event.content.slice(prefix.length) }
+      : event
+  );
+}
+
 export async function loadReplay(): Promise<ReplayData> {
   const base = import.meta.env.BASE_URL || '/';
   const metaResponse = await fetch(`${base}meta.json`);
@@ -139,7 +150,7 @@ export async function loadReplay(): Promise<ReplayData> {
   const meta = (await metaResponse.json()) as ReplayMeta;
   const eventsResponse = await fetch(`${base}events.jsonl`);
   if (!eventsResponse.ok) throw new Error(`Could not load events.jsonl (HTTP ${eventsResponse.status}).`);
-  const events = remapArtifacts(parseEvents(await eventsResponse.text()), base);
+  const events = remapArtifacts(normalizeAnswers(parseEvents(await eventsResponse.text())), base);
   if (events.length === 0) throw new Error('The replay log is empty.');
   return { events, offsets: computeOffsets(events), meta };
 }

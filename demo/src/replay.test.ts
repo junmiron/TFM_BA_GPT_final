@@ -3,6 +3,7 @@ import {
   clampSpeed,
   computeOffsets,
   firstNotDue,
+  normalizeAnswers,
   parseEvents,
   remapArtifacts,
   totalSpan,
@@ -72,6 +73,18 @@ describe('remapArtifacts', () => {
     expect(artifacts.length).toBe(1);
     expect(artifacts[0].url).toBe('/ba-gpt/demo/api/files/demo/functional_specification.pdf');
     expect(remapped[1].type).toBe('info');
+  });
+});
+
+describe('normalizeAnswers', () => {
+  it('strips the stakeholder echo prefix from answers only', () => {
+    const events = parseEvents(
+      JSON.stringify({ type: 'answer', ts: '2026-11-08T00:00:00Z', content: '🧣 Stakeholder: We wash and fold.' }) + '\n' +
+      JSON.stringify({ type: 'message', ts: '2026-11-08T00:00:01Z', source: 'interviewer_agent', content: '🧣 Stakeholder: not an answer' })
+    );
+    const normalized = normalizeAnswers(events);
+    expect(normalized[0].content).toBe('We wash and fold.');
+    expect(normalized[1].content).toBe('🧣 Stakeholder: not an answer');
   });
 });
 
