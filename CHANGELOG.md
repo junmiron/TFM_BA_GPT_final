@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 ### Added
 
+- Pending-question dialog for existing sessions: `GET /api/sessions/{id}/pending-questions`
+  extracts open items from the finished spec (numbered/bulleted "Open Items" lists,
+  `| O1 | ... |` open-item tables, decision rows in the assumptions table, and
+  "Confirmation required from <owner>:" paragraphs), filters items already settled via
+  supplements, and renders them in the answer box with a one-shot confirm flow that
+  merges the answers through the continuation mechanism and re-renders deliverables
+  (`lib/spec_questions.py`, `ui/src/components/AnswerBox.tsx`).
+
 - Deliverable guidance: HTML is presented as the read-friendly spec, PDF as the
   signed/printed copy, Markdown as the base for AI coding agents (README,
   sample-session README, demo artifact viewer, demo hero).

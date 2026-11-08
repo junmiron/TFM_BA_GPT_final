@@ -12,18 +12,23 @@ export interface AnswerBoxProps {
   /** Satisfaction request awaiting an answer (Feature 12); null when none. */
   feedback: string | null;
   onFeedback: (satisfied: boolean, comment: string) => void;
+  /** Open items in the finished spec awaiting confirmation (persisted sessions). */
+  specQuestions: string[];
+  /** Route a confirmation answer into the spec via the continuation mechanism. */
+  onConfirm: (answer: string) => Promise<boolean>;
 }
 
 /**
  * Interview answer box. Always on screen (never appears/disappears):
  * active when a question is pending, greyed out and disabled otherwise.
  */
-export function AnswerBox({ question, caption, connected, onSend, feedback, onFeedback }: AnswerBoxProps) {
+export function AnswerBox({ question, caption, connected, onSend, feedback, onFeedback, specQuestions, onConfirm }: AnswerBoxProps) {
   const [answer, setAnswer] = useState('');
   const [commentOpen, setCommentOpen] = useState(false);
   const [comment, setComment] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const id = useId().replace(/:/g, '-');
   const canSend = Boolean(question) && answer.trim().length > 0 && connected;
@@ -105,6 +110,66 @@ export function AnswerBox({ question, caption, connected, onSend, feedback, onFe
             </div>
           </div>
         )}
+        {sendError && (
+          <p role="alert" className="mt-2 text-sm text-rose-800">{sendError}</p>
+        )}
+      </section>
+    );
+  }
+
+  if (!question && specQuestions.length > 0) {
+    const submitConfirm = async () => {
+      const text = answer.trim();
+      if (!text || confirmBusy) return;
+      setConfirmBusy(true);
+      setSendError(null);
+      const ok = await onConfirm(text);
+      setConfirmBusy(false);
+      if (ok) setAnswer('');
+      else setSendError('The confirmation could not be saved. Please try again.');
+    };
+
+    return (
+      <section aria-labelledby={`${id}-confirm-title`} className="rounded-lg border-2 border-primary bg-accent p-4 shadow-glow">
+        <div className="mb-2 flex items-center gap-2">
+          <span aria-hidden="true" className="h-2.5 w-2.5 animate-pulse-dot rounded-full bg-primary" />
+          <h3 id={`${id}-confirm-title`} className="text-sm font-semibold text-accent-foreground">
+            Open items in the spec awaiting your confirmation ({specQuestions.length})
+          </h3>
+        </div>
+        <ol className="mb-3 list-inside space-y-1 text-sm text-foreground">
+          {specQuestions.slice(0, 5).map((q) => (
+            <li key={q} className="whitespace-pre-wrap">{q}</li>
+          ))}
+          {specQuestions.length > 5 && (
+            <li className="text-muted-foreground">+{specQuestions.length - 5} more open items</li>
+          )}
+        </ol>
+        <label htmlFor={`${id}-confirm-input`} className="mb-1 block text-xs font-medium text-foreground">
+          Your confirmations
+        </label>
+        <textarea
+          id={`${id}-confirm-input`}
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+              event.preventDefault();
+              void submitConfirm();
+            }
+          }}
+          rows={3}
+          maxLength={4000}
+          className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="Confirm or amend these open items (you can answer several at once)…"
+        />
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="text-xs text-foreground/80">Answers are merged into the spec and the PDF/HTML/MD are regenerated.</span>
+          <Button variant="primary" size="sm" onClick={() => void submitConfirm()} disabled={!answer.trim() || confirmBusy}>
+            <SendIcon />
+            <span>{confirmBusy ? 'Updating…' : 'Send confirmation'}</span>
+          </Button>
+        </div>
         {sendError && (
           <p role="alert" className="mt-2 text-sm text-rose-800">{sendError}</p>
         )}

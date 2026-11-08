@@ -27,7 +27,7 @@ from lib.quiet_deprecations import suppress_third_party_deprecations
 
 suppress_third_party_deprecations()
 
-from lib import agents_tools_helpers, continuation, experience_indexer, transcript_loader
+from lib import agents_tools_helpers, continuation, experience_indexer, spec_questions, transcript_loader
 from lib.pipeline import PROJECT_ROOT, STAGES, create_workflow, run_workflow
 from src.model_loader import PROFILES, PROFILE_ALIASES
 
@@ -577,6 +577,22 @@ def session_artifacts(session_id: str) -> dict:
                   "url": f"/api/files/{session_id}/{f.name}"}
                  for f in sorted(d.iterdir()) if f.is_file()] if d.is_dir() else []
     return {"artifacts": files}
+
+
+@app.get("/api/sessions/{session_id}/pending-questions")
+def session_pending_questions(session_id: str) -> dict:
+    """Open items in the specification that still need stakeholder confirmation.
+
+    Works for live and persisted sessions alike: questions come from the spec's
+    "Open Items Requiring Confirmation" structures, minus items the user already
+    settled through supplements.
+    """
+    session = SESSIONS.get(session_id)
+    if session is not None:
+        d = session.session_dir()
+    else:
+        d = CONV_ROOT / "".join(c for c in session_id if c.isalnum() or c in "-_")
+    return {"session_id": session_id, "questions": spec_questions.pending_questions(d)}
 
 
 @app.post("/api/sessions/{session_id}/continue")

@@ -31,6 +31,54 @@ export default function App() {
 
   const { send, stop } = useSessionSocket(activeId, dispatch, getRun);
 
+  // Existing sessions: the spec's "Open Items Requiring Confirmation" section
+  // drives the dialog. Fetched once per session, once the interview is no longer
+  // active (live questions already occupy the answer box).
+  const [specQuestions, setSpecQuestions] = useState<string[]>([]);
+  const specQuestionsFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeId || activeId.startsWith(PENDING_PREFIX)) {
+      setSpecQuestions([]);
+      specQuestionsFor.current = null;
+      return;
+    }
+    if (isActiveRun(thread.run)) return;
+    if (specQuestionsFor.current === activeId) return;
+    specQuestionsFor.current = activeId;
+    api
+      .pendingQuestions(activeId)
+      .then((questions) => setSpecQuestions(questions))
+      .catch(() => setSpecQuestions([]));
+  }, [activeId, thread.run]);
+
+  /** Confirm open items: merge into the spec via the continuation mechanism and re-render. */
+  const confirmSpecItems = useCallback(
+    async (answer: string) => {
+      if (!activeId || activeId.startsWith(PENDING_PREFIX)) return false;
+      try {
+        const result = await api.continueSession(activeId, answer);
+        dispatch({
+          type: 'socket/event',
+          id: activeId,
+          event: {
+            type: 'info',
+            content: `Confirmation recorded - spec updated to ${result.version} (${result.merged} merged); deliverables regenerated.`,
+          },
+        });
+        api
+          .listArtifacts(activeId)
+          .then((artifacts) => dispatch({ type: 'artifacts/loaded', id: activeId, artifacts }))
+          .catch(() => undefined);
+        specQuestionsFor.current = null;
+        api.pendingQuestions(activeId).then(setSpecQuestions).catch(() => undefined);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [activeId, dispatch],
+  );
+
   /** Feature 1: satisfaction gate. REST works for live and persisted sessions alike. */
   const sendFeedback = useCallback(
     (satisfied: boolean, comment: string) => {
@@ -234,6 +282,8 @@ export default function App() {
               onSend={send}
             feedback={feedback}
             onFeedback={sendFeedback}
+            specQuestions={specQuestions}
+            onConfirm={confirmSpecItems}
             />
           </div>
 

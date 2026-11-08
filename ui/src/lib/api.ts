@@ -81,6 +81,14 @@ export const api = {
     );
     return body.artifacts;
   },
+
+  /** Open items in the finished spec that still await stakeholder confirmation. */
+  async pendingQuestions(sessionId: string): Promise<string[]> {
+    const body = await request<{ session_id: string; questions: string[] }>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/pending-questions`,
+    );
+    return body.questions;
+  },
 };
 
 /** Download URL for an artifact (contract path /api/files/SESSION_ID/NAME). */
