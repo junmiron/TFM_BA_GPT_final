@@ -80,6 +80,17 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [started, paused, speed, data, dispatch]);
 
+  const jumpToEnd = () => {
+    if (!data) return;
+    const next = data.offsets.length;
+    for (let i = cursorRef.current; i < next; i += 1) {
+      dispatch({ type: 'socket/event', id: SESSION_ID, event: data.events[i] as unknown as ServerEvent });
+    }
+    cursorRef.current = next;
+    clockRef.current = totalSpan(data.offsets);
+    setClockDisplay(clockRef.current);
+  };
+
   const thread = state.threads[SESSION_ID] ?? EMPTY_THREAD;
   const finished = isTerminalRun(thread.run);
   const busy = started && !finished;
@@ -124,6 +135,7 @@ export default function App() {
                 onSpeed={setSpeed}
                 onShowInternal={setShowInternal}
                 onRestart={start}
+                onJumpToEnd={jumpToEnd}
               />
             </div>
           </main>

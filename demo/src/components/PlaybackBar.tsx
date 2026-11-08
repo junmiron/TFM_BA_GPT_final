@@ -13,6 +13,7 @@ interface PlaybackBarProps {
   onSpeed: (speed: number) => void;
   onShowInternal: (value: boolean) => void;
   onRestart: () => void;
+  onJumpToEnd: () => void;
 }
 
 /** Pinned control bar replacing the human answer box: pause, speed, version, restart. */
@@ -27,6 +28,7 @@ export function PlaybackBar({
   onSpeed,
   onShowInternal,
   onRestart,
+  onJumpToEnd,
 }: PlaybackBarProps) {
   const remainingMs = Math.max(0, totalMs - elapsedMs);
   const remainingReal = remainingMs / speed;
@@ -61,6 +63,9 @@ export function PlaybackBar({
           </Button>
         </div>
 
+        <Button size="sm" variant="ghost" onClick={onJumpToEnd} disabled={finished} aria-label="Skip straight to the deliverables">
+          Skip to deliverables
+        </Button>
         <Button size="sm" variant="ghost" onClick={onRestart} aria-label="Restart the demo from the beginning">
           Restart
         </Button>
