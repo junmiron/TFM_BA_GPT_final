@@ -157,7 +157,7 @@ laundry-shop pickup-and-delivery spec):
 - **66 functional requirements, 59 non-functional requirements, 26 use cases**
 - **55-page typeset PDF** with linked contents and page-sized diagram bands
 - **~30 minutes wall time** end to end (lane-dependent; the run budget is 300
-  chat messages across the 11-agent team)
+  chat messages across the 10-agent team)
 
 Judge the output directly: [interactive demo replay](https://portfolio-jun-9193.vercel.app/ba-gpt/demo/) · [sample deliverables](examples/sample_session/).
 
