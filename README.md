@@ -348,9 +348,23 @@ docs/                   architecture, configuration, troubleshooting, feature do
   embedder when sentence-transformers is unavailable.
 - The `/api/config` endpoint is intended for local single-user use; it is
   unauthenticated and should not be exposed publicly without adding auth.
+- The interviewer records answers and flags unconfirmed values as open items,
+  but it does not yet challenge a requested feature or contradictions between
+  answers (see Roadmap: post-spec review steps).
 
 ## Roadmap
 
+- **Post-spec review steps** - optional steps that run after the specification
+  is generated, so the system can question the requirements instead of only
+  recording them. Planned, not implemented:
+  - **Process review and improvement** - map the current process described in
+    the interview and ask which decision or outcome the app is meant to improve.
+  - **Research and recommendations** - propose improvements and flag
+    requirements with no clear outcome or success measure.
+  - **Benchmark** - compare the specification with similar products. It
+    suggests questions and candidate targets; the owner confirms them. This
+    needs web access, so it would be opt-in and off by default to keep the
+    local-first behaviour.
 - **Docker / Compose packaging** - the current setup needs Python, Node +
   mermaid-cli and (optionally) vendored Typst/pandoc; containerised one-command
   setup is planned so casual visitors can try it without installing anything.
