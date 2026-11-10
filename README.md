@@ -365,6 +365,9 @@ docs/                   architecture, configuration, troubleshooting, feature do
     suggests questions and candidate targets; the owner confirms them. This
     needs web access, so it would be opt-in and off by default to keep the
     local-first behaviour.
+  - **Consistency review after new information** - re-check the whole spec for
+    conflicts, list changed sections, and require the owner to confirm before
+    accepting the update. Planned, not implemented.
 - **Docker / Compose packaging** - the current setup needs Python, Node +
   mermaid-cli and (optionally) vendored Typst/pandoc; containerised one-command
   setup is planned so casual visitors can try it without installing anything.
